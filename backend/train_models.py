@@ -1,23 +1,88 @@
+from __future__ import annotations
+
+from collections import Counter
 from pathlib import Path
 import json
+import math
 import re
 
 import joblib
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import accuracy_score, f1_score
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+
+from utils.xlsx_loader import read_excel_flexible
 
 
 ROOT = Path(__file__).resolve().parent
 DATASETS_DIR = ROOT / 'datasets'
 MODELS_DIR = ROOT / 'models'
 MODELS_DIR.mkdir(exist_ok=True)
+
+STOPWORDS = {
+    'and', 'or', 'with', 'for', 'the', 'a', 'an', 'to', 'of', 'in', 'on', 'using',
+    'skills', 'skill', 'experience', 'knowledge', 'work', 'working', 'ability',
+    'development', 'developer', 'engineer', 'software', 'data', 'science', 'role',
+    'roles', 'job', 'jobs', 'good', 'strong', 'basic', 'advanced',
+}
+
+SKILL_PATTERNS = {
+    'python': ['python'],
+    'sql': ['sql', 'mysql', 'postgres', 'postgresql'],
+    'statistics': ['statistics', 'statistical', 'probability'],
+    'machine learning': ['machine learning', 'ml'],
+    'deep learning': ['deep learning', 'neural network'],
+    'pandas': ['pandas'],
+    'numpy': ['numpy'],
+    'power bi': ['power bi'],
+    'tableau': ['tableau'],
+    'excel': ['excel'],
+    'spark': ['spark', 'pyspark'],
+    'java': ['java'],
+    'javascript': ['javascript', 'js'],
+    'react': ['react'],
+    'node': ['node', 'nodejs', 'node.js'],
+    'backend': ['backend', 'api', 'microservice', 'server'],
+    'frontend': ['frontend', 'ui', 'css', 'html'],
+    'dsa': ['dsa', 'data structures', 'algorithms'],
+    'system design': ['system design'],
+    'git': ['git', 'github'],
+    'testing': ['testing', 'unit test', 'pytest', 'qa'],
+    'cloud': ['cloud', 'aws', 'azure', 'gcp'],
+    'devops': ['devops', 'docker', 'kubernetes', 'ci/cd', 'jenkins'],
+    'cybersecurity': ['cybersecurity', 'security', 'soc', 'penetration testing'],
+    'product': ['product', 'roadmap', 'stakeholder', 'market research'],
+}
+
+CAREER_PATHS = {
+    'data_science': [
+        'data scientist', 'data science', 'machine learning', 'ml engineer', 'ai engineer',
+        'data analyst', 'business intelligence', 'analytics', 'bi analyst',
+    ],
+    'software_development': [
+        'software engineer', 'software developer', 'full stack', 'frontend', 'backend',
+        'web developer', 'application developer', 'sde', 'programmer',
+    ],
+    'cloud_devops': ['devops', 'site reliability', 'sre', 'cloud engineer', 'platform engineer'],
+    'cybersecurity': ['security analyst', 'cybersecurity', 'soc analyst', 'security engineer'],
+    'product_management': ['product manager', 'product owner', 'program manager', 'business analyst'],
+}
+
+PATH_DISPLAY_NAMES = {
+    'data_science': 'Data Science',
+    'software_development': 'Software Development',
+    'cloud_devops': 'Cloud / DevOps',
+    'cybersecurity': 'Cybersecurity',
+    'product_management': 'Product Management',
+}
 
 
 def safe_float(value, default=0.0):
@@ -34,32 +99,50 @@ def safe_float(value, default=0.0):
         return default
 
 
+def normalize_text(value) -> str:
+    return re.sub(r'\s+', ' ', str(value or '').lower()).strip()
+
+
 def split_items(text):
     if pd.isna(text):
         return []
-    parts = re.split(r'[;,/]| and ', str(text))
-    return [part.strip() for part in parts if part and part.strip()]
+    parts = re.split(r'[;,/|]|\band\b', str(text), flags=re.IGNORECASE)
+    return [part.strip().lower() for part in parts if part and part.strip()]
+
+
+def tokenize(value: str) -> list[str]:
+    tokens = re.findall(r'[a-z][a-z0-9+#.-]{1,}', normalize_text(value))
+    return [token for token in tokens if token not in STOPWORDS]
+
+
+def extract_skill_hits(text: str) -> list[str]:
+    lowered = normalize_text(text)
+    hits = []
+    for skill, patterns in SKILL_PATTERNS.items():
+        if any(pattern in lowered for pattern in patterns):
+            hits.append(skill)
+    return hits
 
 
 def map_interest(text):
-    value = str(text).lower()
+    value = normalize_text(text)
     if any(word in value for word in ['data', 'analytic', 'analysis', 'ai', 'cloud']):
         return 'data'
-    if any(word in value for word in ['manage', 'business', 'leader', 'finance', 'sales', 'market']):
+    if any(word in value for word in ['manage', 'business', 'leader', 'finance', 'sales', 'market', 'product']):
         return 'management'
     return 'technical'
 
 
 def map_market(text):
-    value = str(text).lower()
+    value = normalize_text(text)
     if any(word in value for word in ['enterprise', 'saas', 'b2b', 'fintech', 'hrtech', 'deeptech']):
         return 'enterprise'
     return 'consumer'
 
 
 def map_sector(text):
-    value = str(text).lower()
-    if any(word in value for word in ['health', 'medical', 'hospital', 'fisher', 'nutrition', 'jsy', 'mmr', 'imr']):
+    value = normalize_text(text)
+    if any(word in value for word in ['health', 'medical', 'hospital', 'nutrition', 'jsy', 'mmr', 'imr']):
         return 'healthcare'
     if any(word in value for word in ['education', 'school', 'student', 'teacher', 'learning', 'aicte']):
         return 'education'
@@ -78,10 +161,175 @@ def parse_money_to_usd(value):
 
 def parse_rupee_amount(text):
     value = str(text)
-    match = re.search(r'₹\s*([0-9,]+(?:\.[0-9]+)?)', value)
+    match = re.search(r'([0-9,]+(?:\.[0-9]+)?)', value)
     if not match:
         return np.nan
     return safe_float(match.group(1).replace(',', ''), np.nan)
+
+
+def parse_experience_range(text):
+    numbers = [safe_float(num, np.nan) for num in re.findall(r'[0-9]+(?:\.[0-9]+)?', str(text))]
+    numbers = [num for num in numbers if not math.isnan(num)]
+    if not numbers:
+        return np.nan
+    return float(sum(numbers) / len(numbers))
+
+
+def normalize_course(text):
+    value = normalize_text(text)
+    if any(word in value for word in ['b.tech', 'b.e', 'computer', 'information', 'it', 'software']):
+        return 'engineering'
+    if any(word in value for word in ['b.sc', 'science', 'mathematics', 'physics']):
+        return 'science'
+    if any(word in value for word in ['bca', 'mca']):
+        return 'computer_applications'
+    if any(word in value for word in ['business', 'commerce', 'management', 'mba']):
+        return 'business'
+    return 'general'
+
+
+def classify_career_path(text):
+    lowered = normalize_text(text)
+    for path_name, patterns in CAREER_PATHS.items():
+        if any(pattern in lowered for pattern in patterns):
+            return path_name
+    return None
+
+
+def build_profile_metadata(dataset, y, numeric_features, categorical_features):
+    metadata = {
+        'numeric': {},
+        'categorical': {},
+    }
+    positive = dataset.loc[y == 1].copy()
+    negative = dataset.loc[y == 0].copy()
+
+    for feature in numeric_features:
+        series = dataset[feature].astype(float)
+        pos_series = positive[feature].astype(float) if feature in positive else pd.Series(dtype=float)
+        neg_series = negative[feature].astype(float) if feature in negative else pd.Series(dtype=float)
+        metadata['numeric'][feature] = {
+            'overall_median': round(float(series.median()), 4),
+            'positive_median': round(float(pos_series.median()), 4) if not pos_series.empty else None,
+            'negative_median': round(float(neg_series.median()), 4) if not neg_series.empty else None,
+            'p75': round(float(series.quantile(0.75)), 4),
+            'p25': round(float(series.quantile(0.25)), 4),
+            'positive_p25': round(float(pos_series.quantile(0.25)), 4) if not pos_series.empty else None,
+            'positive_p75': round(float(pos_series.quantile(0.75)), 4) if not pos_series.empty else None,
+        }
+
+    for feature in categorical_features:
+        rates = (
+            dataset.assign(_target=y.astype(int))
+            .groupby(feature, dropna=False)['_target']
+            .agg(['mean', 'count'])
+            .reset_index()
+            .sort_values(['mean', 'count'], ascending=[False, False])
+        )
+        metadata['categorical'][feature] = [
+            {
+                'value': '' if pd.isna(row[feature]) else str(row[feature]),
+                'success_rate': round(float(row['mean']), 4),
+                'count': int(row['count']),
+            }
+            for _, row in rates.head(10).iterrows()
+        ]
+
+    return metadata
+
+
+def build_tree_pipeline(numeric_features, categorical_features, estimator):
+    transformers = [
+        ('num', Pipeline([('imputer', SimpleImputer(strategy='median'))]), numeric_features),
+    ]
+    if categorical_features:
+        transformers.append((
+            'cat',
+            Pipeline([
+                ('imputer', SimpleImputer(strategy='most_frequent')),
+                ('onehot', OneHotEncoder(handle_unknown='ignore')),
+            ]),
+            categorical_features,
+        ))
+
+    return Pipeline([
+        ('preprocessor', ColumnTransformer(transformers=transformers)),
+        ('model', estimator),
+    ])
+
+
+def train_tree_bundle(domain, dataset, numeric_features, categorical_features, feature_labels):
+    X = dataset[numeric_features + categorical_features].copy()
+    y = dataset['target'].astype(int)
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        random_state=42,
+        stratify=y if y.nunique() > 1 else None,
+    )
+
+    candidates = {
+        'random_forest': RandomForestClassifier(
+            n_estimators=400,
+            max_depth=14,
+            min_samples_leaf=2,
+            random_state=42,
+            class_weight='balanced_subsample',
+            n_jobs=1,
+        ),
+        'extra_trees': ExtraTreesClassifier(
+            n_estimators=500,
+            max_depth=None,
+            min_samples_leaf=2,
+            random_state=42,
+            class_weight='balanced',
+            n_jobs=1,
+        ),
+    }
+
+    best = None
+    best_metrics = None
+    best_score = -1.0
+
+    for model_name, estimator in candidates.items():
+        pipeline = build_tree_pipeline(numeric_features, categorical_features, estimator)
+        pipeline.fit(X_train, y_train)
+        predictions = pipeline.predict(X_test)
+        probabilities = pipeline.predict_proba(X_test)[:, 1]
+        metrics = {
+            'model': model_name,
+            'accuracy': round(float(accuracy_score(y_test, predictions)), 4),
+            'f1': round(float(f1_score(y_test, predictions, zero_division=0)), 4),
+            'roc_auc': round(float(roc_auc_score(y_test, probabilities)), 4),
+        }
+        score = metrics['f1'] * 0.55 + metrics['roc_auc'] * 0.35 + metrics['accuracy'] * 0.10
+        if score > best_score:
+            best = model_name
+            best_metrics = metrics
+            best_score = score
+
+    final_pipeline = build_tree_pipeline(
+        numeric_features,
+        categorical_features,
+        candidates[best],
+    )
+    final_pipeline.fit(X, y)
+
+    return {
+        'domain': domain,
+        'pipeline': final_pipeline,
+        'positive_class': 1,
+        'metrics': best_metrics,
+        'samples': int(len(dataset)),
+        'features': {
+            'numeric': numeric_features,
+            'categorical': categorical_features,
+        },
+        'profiles': build_profile_metadata(dataset, y, numeric_features, categorical_features),
+        'feature_labels': feature_labels,
+    }
 
 
 def build_career_dataset():
@@ -93,16 +341,23 @@ def build_career_dataset():
     job_col = 'If yes, then what is/was your first Job title in your current field of work? If not applicable, write NA.               '
     masters_col = 'Have you done masters after undergraduation? If yes, mention your field of masters.(Eg; Masters in Mathematics)'
     cert_col = 'If yes, please specify your certificate course title.'
+    course_col = 'What was your course in UG?'
+    spec_col = 'What is your UG specialization? Major Subject (Eg; Mathematics)'
 
     out = pd.DataFrame()
-    out['cgpa'] = df[cgpa_col].apply(lambda x: safe_float(x) / 10 if safe_float(x) > 10 else safe_float(x, 7.0)).clip(0, 10)
+    cgpa_raw = df[cgpa_col].apply(lambda x: safe_float(x, 7.0))
+    out['cgpa'] = np.where(cgpa_raw > 10, cgpa_raw / 10.0, cgpa_raw).clip(0, 10)
     out['skills_count'] = df[skills_col].apply(lambda x: len(split_items(x)))
     out['projects_count'] = (
         df[cert_col].apply(lambda x: len(split_items(x)))
         + df[working_col].fillna('').astype(str).str.lower().eq('yes').astype(int)
         + df[masters_col].notna().astype(int)
     )
+    out['certifications_count'] = df[cert_col].apply(lambda x: len(split_items(x)))
+    out['masters_flag'] = df[masters_col].notna().astype(int)
     out['interest'] = df[interest_col].apply(map_interest)
+    out['course_group'] = df[course_col].apply(normalize_course)
+    out['specialization_group'] = df[spec_col].apply(normalize_course)
 
     job_series = df[job_col].fillna('').astype(str).str.strip().str.lower()
     good_job = ~job_series.isin({'', 'na', 'nan', 'student (unemployed)', 'student'})
@@ -124,12 +379,14 @@ def build_finance_dataset():
         + credit_df['cb_person_cred_hist_length'].fillna(5) * 3
         - credit_df['loan_int_rate'].fillna(10) * 2
     ).clip(300, 850)
+    credit_part['loan_to_income'] = (credit_part['loan'] / credit_part['income']).clip(0, 5)
     credit_part['target'] = (credit_df['loan_status'] == 0).astype(int)
 
     personal_part = pd.DataFrame()
     personal_part['income'] = personal_df['monthly_income_usd'].clip(lower=1) * 12
     personal_part['loan'] = personal_df['loan_amount_usd'].fillna(0).clip(lower=0)
     personal_part['credit_score'] = personal_df['credit_score'].clip(300, 850)
+    personal_part['loan_to_income'] = (personal_part['loan'] / personal_part['income']).clip(0, 5)
     personal_part['target'] = (
         (personal_df['debt_to_income_ratio'].fillna(0) < 0.45)
         & (personal_df['credit_score'].fillna(0) >= 640)
@@ -148,6 +405,7 @@ def build_startup_dataset():
     success_part['team_size'] = success_df['team_size'].fillna(success_df['team_size'].median()).clip(lower=1)
     success_part['market'] = success_df['sector'].apply(map_market)
     success_part['experience'] = success_df['founder_experience_years'].fillna(0).clip(lower=0)
+    success_part['funding_per_team'] = (success_part['funding'] / success_part['team_size']).clip(0, 100_000_000)
     success_part['target'] = success_df['outcome'].isin(['IPO', 'Acquisition']).astype(int)
 
     funding_part = pd.DataFrame()
@@ -155,6 +413,7 @@ def build_startup_dataset():
     funding_part['team_size'] = 8
     funding_part['market'] = funding_df['Industry Vertical'].apply(map_market)
     funding_part['experience'] = 5.0
+    funding_part['funding_per_team'] = (funding_part['funding'] / 8.0).clip(0, 100_000_000)
     investment_type = funding_df['InvestmentnType'].fillna('').astype(str).str.lower()
     funding_part['target'] = (
         funding_part['funding'].fillna(0) >= funding_part['funding'].median(skipna=True)
@@ -163,6 +422,7 @@ def build_startup_dataset():
 
     combined = pd.concat([success_part, funding_part], ignore_index=True)
     combined['funding'] = combined['funding'].fillna(combined['funding'].median())
+    combined['funding_per_team'] = combined['funding_per_team'].fillna(combined['funding_per_team'].median())
     return combined.dropna()
 
 
@@ -178,12 +438,11 @@ def build_policy_dataset():
         + schemes_df['details'].fillna('')
     )
     scheme_part['sector'] = sector_source.apply(map_sector)
-    scheme_part['budget'] = (
-        schemes_df['benefits'].apply(parse_rupee_amount).fillna(250000)
-    ).clip(lower=10000)
+    scheme_part['budget'] = schemes_df['benefits'].apply(parse_rupee_amount).fillna(250000).clip(lower=10000)
     level = schemes_df['level'].fillna('State').astype(str).str.lower()
     population_map = {'central': 50000000, 'state': 7000000, 'union territory': 1000000}
     scheme_part['population'] = level.map(population_map).fillna(3000000)
+    scheme_part['per_capita_budget'] = (scheme_part['budget'] / scheme_part['population']).clip(lower=0)
     text_score = (
         schemes_df['eligibility'].fillna('').str.len()
         + schemes_df['application'].fillna('').str.len()
@@ -192,117 +451,257 @@ def build_policy_dataset():
     )
     scheme_part['target'] = ((text_score >= text_score.median()) & (scheme_part['budget'] > 0)).astype(int)
 
+    historical_df = read_excel_flexible(DATASETS_DIR / 'policy' / 'India 20 year dataset.xlsx')
     historical_rows = []
-    xlsx_path = DATASETS_DIR / 'policy' / 'India 20 year dataset.xlsx'
-    if xlsx_path.exists():
-        try:
-            historical_df = pd.read_excel(xlsx_path, engine=None)
-            historical_df = historical_df.sort_values('Year')
-            estimated_population = np.linspace(1080000000, 1400000000, len(historical_df))
-            infra_index = historical_df['Roads'] + historical_df['Houses'] * 1000 + historical_df['Water supply']
-            health_index = historical_df['JSY'] * 1000 - historical_df['IMR'] * 10000 - historical_df['MMR'] * 2000
-            for idx, (_, row) in enumerate(historical_df.iterrows()):
-                pop_value = float(estimated_population[idx])
-                historical_rows.append({
-                    'sector': 'healthcare',
-                    'budget': safe_float(row['JSY'], 0) * 1_000_000,
-                    'population': pop_value,
-                    'target': int(health_index.iloc[idx] >= health_index.median()),
-                })
-                historical_rows.append({
-                    'sector': 'infrastructure',
-                    'budget': max(10000.0, safe_float(row['Roads'], 0) * 1000 + safe_float(row['Water supply'], 0) * 100),
-                    'population': pop_value,
-                    'target': int(infra_index.iloc[idx] >= infra_index.median()),
-                })
-        except Exception:
-            historical_rows = []
+    if not historical_df.empty and 'Year' in historical_df.columns:
+        for column in historical_df.columns:
+            historical_df[column] = pd.to_numeric(historical_df[column], errors='coerce')
+        historical_df = historical_df.dropna(subset=['Year']).sort_values('Year')
+        estimated_population = np.linspace(1080000000, 1400000000, len(historical_df))
+        infra_index = pd.to_numeric(historical_df['Roads'], errors='coerce') + pd.to_numeric(historical_df['Houses'], errors='coerce') * 1000 + pd.to_numeric(historical_df['Water supply'], errors='coerce')
+        health_index = pd.to_numeric(historical_df['JSY'], errors='coerce') * 1000 - pd.to_numeric(historical_df['IMR'], errors='coerce') * 10000 - pd.to_numeric(historical_df['MMR'], errors='coerce') * 2000
+        for idx, (_, row) in enumerate(historical_df.iterrows()):
+            pop_value = float(estimated_population[idx])
+            jsy = safe_float(row.get('JSY'), 0)
+            roads = safe_float(row.get('Roads'), 0)
+            water = safe_float(row.get('Water supply'), 0)
+            historical_rows.append({
+                'sector': 'healthcare',
+                'budget': max(10000.0, jsy * 1_000_000),
+                'population': pop_value,
+                'per_capita_budget': max(10000.0, jsy * 1_000_000) / pop_value,
+                'target': int(health_index.iloc[idx] >= health_index.median()),
+            })
+            infra_budget = max(10000.0, roads * 1000 + water * 100)
+            historical_rows.append({
+                'sector': 'infrastructure',
+                'budget': infra_budget,
+                'population': pop_value,
+                'per_capita_budget': infra_budget / pop_value,
+                'target': int(infra_index.iloc[idx] >= infra_index.median()),
+            })
 
     history_part = pd.DataFrame(historical_rows)
     combined = pd.concat([scheme_part, history_part], ignore_index=True)
     combined['budget'] = combined['budget'].fillna(combined['budget'].median()).clip(lower=10000)
     combined['population'] = combined['population'].fillna(combined['population'].median()).clip(lower=1000)
+    combined['per_capita_budget'] = combined['per_capita_budget'].fillna(combined['per_capita_budget'].median()).clip(lower=0)
     return combined.dropna()
 
 
-def train_and_save(domain, dataset, numeric_features, categorical_features):
-    X = dataset[numeric_features + categorical_features].copy()
-    y = dataset['target'].astype(int)
+def build_career_path_bundle():
+    postings_df = read_excel_flexible(DATASETS_DIR / 'career' / 'indian-job-market-dataset-2025.xlsx')
+    salary_df = pd.read_csv(DATASETS_DIR / 'career' / 'job_salary_prediction_dataset.csv')
+
+    posting_part = pd.DataFrame()
+    posting_part['title'] = postings_df.get('title', '').fillna('')
+    posting_part['skills_text'] = postings_df.get('tagsAndSkills', '').fillna('')
+    posting_part['description'] = postings_df.get('jobDescription', '').fillna('')
+    posting_part['experience_years'] = (
+        pd.to_numeric(postings_df.get('minimumExperience'), errors='coerce').fillna(np.nan)
+        + pd.to_numeric(postings_df.get('maximumExperience'), errors='coerce').fillna(np.nan)
+    ) / 2
+    posting_part['experience_years'] = posting_part['experience_years'].fillna(postings_df.get('experience', '').apply(parse_experience_range) if 'experience' in postings_df else np.nan).fillna(2)
+    posting_part['salary'] = (
+        pd.to_numeric(postings_df.get('minimumSalary'), errors='coerce').fillna(np.nan)
+        + pd.to_numeric(postings_df.get('maximumSalary'), errors='coerce').fillna(np.nan)
+    ) / 2
+    posting_part['salary'] = posting_part['salary'].fillna(0)
+    posting_part['skills_count'] = posting_part['skills_text'].apply(lambda value: len(split_items(value)))
+    posting_part['certifications'] = 0
+    posting_part['text'] = (
+        posting_part['title'].astype(str)
+        + ' '
+        + posting_part['skills_text'].astype(str)
+        + ' '
+        + posting_part['description'].astype(str)
+    )
+    posting_part['path'] = (posting_part['title'].astype(str) + ' ' + posting_part['skills_text'].astype(str)).apply(classify_career_path)
+
+    salary_part = pd.DataFrame()
+    salary_part['title'] = salary_df['job_title'].fillna('')
+    salary_part['skills_text'] = salary_part['title'].astype(str)
+    salary_part['description'] = salary_df['industry'].fillna('') + ' ' + salary_df['location'].fillna('') + ' ' + salary_df['remote_work'].fillna('')
+    salary_part['experience_years'] = pd.to_numeric(salary_df['experience_years'], errors='coerce').fillna(0)
+    salary_part['salary'] = pd.to_numeric(salary_df['salary'], errors='coerce').fillna(0)
+    salary_part['skills_count'] = pd.to_numeric(salary_df['skills_count'], errors='coerce').fillna(0)
+    salary_part['certifications'] = pd.to_numeric(salary_df['certifications'], errors='coerce').fillna(0)
+    salary_part['text'] = (
+        salary_part['title'].astype(str)
+        + ' '
+        + salary_df['industry'].fillna('').astype(str)
+        + ' '
+        + salary_df['education_level'].fillna('').astype(str)
+        + ' '
+        + salary_df['remote_work'].fillna('').astype(str)
+    )
+    salary_part['path'] = salary_part['title'].apply(classify_career_path)
+
+    combined = pd.concat([posting_part, salary_part], ignore_index=True)
+    combined = combined[combined['path'].notna()].copy()
+    combined['text'] = combined['text'].astype(str)
+    combined['experience_years'] = combined['experience_years'].fillna(combined['experience_years'].median()).clip(lower=0)
+    combined['salary'] = combined['salary'].fillna(combined['salary'].median()).clip(lower=0)
+    combined['skills_count'] = combined['skills_count'].fillna(combined['skills_count'].median()).clip(lower=0)
+    combined['certifications'] = combined['certifications'].fillna(0).clip(lower=0)
+
+    X = combined[['text', 'experience_years', 'skills_count', 'certifications', 'salary']]
+    y = combined['path']
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,
         y,
         test_size=0.2,
         random_state=42,
-        stratify=y if y.nunique() > 1 else None,
+        stratify=y,
     )
 
-    transformers = [
-        ('num', Pipeline([('imputer', SimpleImputer(strategy='median'))]), numeric_features),
-    ]
-    if categorical_features:
-        transformers.append((
-            'cat',
-            Pipeline([
-                ('imputer', SimpleImputer(strategy='most_frequent')),
-                ('onehot', OneHotEncoder(handle_unknown='ignore')),
-            ]),
-            categorical_features,
-        ))
-
-    preprocessor = ColumnTransformer(transformers=transformers)
-
     pipeline = Pipeline([
-        ('preprocessor', preprocessor),
-        ('model', RandomForestClassifier(
-            n_estimators=200,
-            max_depth=10,
-            min_samples_leaf=2,
-            random_state=42,
-            class_weight='balanced',
-        )),
+        ('preprocessor', ColumnTransformer([
+            ('text', TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=3000), 'text'),
+            ('num', Pipeline([
+                ('imputer', SimpleImputer(strategy='median')),
+                ('scaler', StandardScaler()),
+            ]), ['experience_years', 'skills_count', 'certifications', 'salary']),
+        ])),
+        ('model', LogisticRegression(max_iter=2000, class_weight='balanced')),
     ])
 
     pipeline.fit(X_train, y_train)
     predictions = pipeline.predict(X_test)
+    probabilities = pipeline.predict_proba(X_test)
     metrics = {
         'accuracy': round(float(accuracy_score(y_test, predictions)), 4),
-        'f1': round(float(f1_score(y_test, predictions, zero_division=0)), 4),
+        'f1_macro': round(float(f1_score(y_test, predictions, average='macro', zero_division=0)), 4),
     }
 
-    bundle = {
-        'domain': domain,
+    pipeline.fit(X, y)
+    class_order = pipeline.named_steps['model'].classes_.tolist()
+    text_vectorizer = pipeline.named_steps['preprocessor'].named_transformers_['text']
+    vocabulary = np.asarray(text_vectorizer.get_feature_names_out())
+
+    path_profiles = {}
+    global_skill_counter = Counter()
+    for text in combined['text'].astype(str).tolist():
+        global_skill_counter.update(extract_skill_hits(text))
+
+    for class_index, path_name in enumerate(class_order):
+        subset = combined[combined['path'] == path_name]
+        coefficient_vector = pipeline.named_steps['model'].coef_[class_index][:len(vocabulary)]
+        top_indices = np.argsort(coefficient_vector)[-12:][::-1]
+        top_terms = [term.replace('_', ' ') for term in vocabulary[top_indices] if term not in STOPWORDS][:8]
+
+        skill_counter = Counter()
+        for text in subset['text'].astype(str).tolist():
+            skill_counter.update(extract_skill_hits(text))
+        lifted_skills = []
+        subset_size = max(len(subset), 1)
+        total_size = max(len(combined), 1)
+        for skill, count in skill_counter.items():
+            path_rate = count / subset_size
+            global_rate = global_skill_counter.get(skill, 1) / total_size
+            lift = path_rate / max(global_rate, 1e-6)
+            lifted_skills.append((skill, lift, count))
+        lifted_skills.sort(key=lambda item: (item[1], item[2]), reverse=True)
+        top_skills = [skill for skill, _, _ in lifted_skills[:8]]
+
+        path_profiles[path_name] = {
+            'display_name': PATH_DISPLAY_NAMES.get(path_name, path_name.replace('_', ' ').title()),
+            'demand_count': int(len(subset)),
+            'salary_median': round(float(subset['salary'].median()), 2),
+            'experience_median': round(float(subset['experience_years'].median()), 2),
+            'top_terms': top_terms,
+            'top_skills': top_skills,
+            'market_score': round(float(len(subset) / max(len(combined), 1)), 4),
+        }
+
+    return {
         'pipeline': pipeline,
-        'positive_class': 1,
         'metrics': metrics,
-        'samples': int(len(dataset)),
-        'features': {
-            'numeric': numeric_features,
-            'categorical': categorical_features,
-        },
+        'class_order': class_order,
+        'path_profiles': path_profiles,
     }
+
+
+def save_bundle(domain, bundle):
     joblib.dump(bundle, MODELS_DIR / f'{domain}_model.joblib')
-    return metrics
 
 
 def main():
     summaries = {}
 
     career_df = build_career_dataset()
-    summaries['career'] = train_and_save('career', career_df, ['cgpa', 'skills_count', 'projects_count'], ['interest'])
+    career_bundle = train_tree_bundle(
+        'career',
+        career_df,
+        ['cgpa', 'skills_count', 'projects_count', 'certifications_count'],
+        ['interest', 'course_group', 'specialization_group'],
+        {
+            'cgpa': 'CGPA',
+            'skills_count': 'Skill count',
+            'projects_count': 'Project count',
+            'certifications_count': 'Certification count',
+            'interest': 'Interest area',
+            'course_group': 'Degree group',
+            'specialization_group': 'Specialization group',
+        },
+    )
+    career_bundle['comparison'] = build_career_path_bundle()
+    save_bundle('career', career_bundle)
+    summaries['career'] = career_bundle['metrics']
+    summaries['career_path'] = career_bundle['comparison']['metrics']
 
     finance_df = build_finance_dataset()
-    summaries['finance'] = train_and_save('finance', finance_df, ['income', 'loan', 'credit_score'], [])
+    finance_bundle = train_tree_bundle(
+        'finance',
+        finance_df,
+        ['income', 'loan', 'credit_score', 'loan_to_income'],
+        [],
+        {
+            'income': 'Income',
+            'loan': 'Loan amount',
+            'credit_score': 'Credit score',
+            'loan_to_income': 'Loan-to-income ratio',
+        },
+    )
+    save_bundle('finance', finance_bundle)
+    summaries['finance'] = finance_bundle['metrics']
 
     startup_df = build_startup_dataset()
-    summaries['startup'] = train_and_save('startup', startup_df, ['funding', 'team_size', 'experience'], ['market'])
+    startup_bundle = train_tree_bundle(
+        'startup',
+        startup_df,
+        ['funding', 'team_size', 'experience', 'funding_per_team'],
+        ['market'],
+        {
+            'funding': 'Funding',
+            'team_size': 'Team size',
+            'experience': 'Founder experience',
+            'funding_per_team': 'Funding per team member',
+            'market': 'Market type',
+        },
+    )
+    save_bundle('startup', startup_bundle)
+    summaries['startup'] = startup_bundle['metrics']
 
     policy_df = build_policy_dataset()
-    summaries['policy'] = train_and_save('policy', policy_df, ['budget', 'population'], ['sector'])
+    policy_bundle = train_tree_bundle(
+        'policy',
+        policy_df,
+        ['budget', 'population', 'per_capita_budget'],
+        ['sector'],
+        {
+            'budget': 'Budget',
+            'population': 'Population',
+            'per_capita_budget': 'Per-capita budget',
+            'sector': 'Sector',
+        },
+    )
+    save_bundle('policy', policy_bundle)
+    summaries['policy'] = policy_bundle['metrics']
 
     summary_path = MODELS_DIR / 'training_summary.json'
     summary_path.write_text(json.dumps(summaries, indent=2), encoding='utf-8')
-
     print(json.dumps(summaries, indent=2))
 
 

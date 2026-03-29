@@ -9,6 +9,91 @@ const domainLabels = {
   policy: 'Policy',
 }
 
+function ComparisonPanel({ payload }) {
+  const details = payload.details || {}
+  const probabilities = Array.isArray(details.probabilities) ? details.probabilities : []
+  const explanations = Array.isArray(details.explanations) ? details.explanations : []
+  const risks = Array.isArray(details.risks) ? details.risks : []
+  const suggestions = details.actionable_suggestions || {}
+
+  return (
+    <div className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-3xl bg-[linear-gradient(135deg,_rgba(15,23,42,1),_rgba(14,165,233,0.82))] p-5 text-white">
+        <div className="text-xs uppercase tracking-[0.24em] text-slate-200">Career comparison</div>
+        <div className="mt-2 text-2xl font-semibold">{payload.decision}</div>
+        <p className="mt-3 text-sm leading-6 text-slate-100">{payload.summary}</p>
+      </div>
+
+      <div className="rounded-3xl bg-slate-50 p-4">
+        <div className="text-sm font-semibold text-slate-900">Success probability</div>
+        <div className="mt-4 space-y-3">
+          {probabilities.map((item) => {
+            const percent = Math.round((item.probability || 0) * 100)
+            return (
+              <div key={item.label}>
+                <div className="flex items-center justify-between text-sm font-medium text-slate-700">
+                  <span>{item.label}</span>
+                  <span>{percent}%</span>
+                </div>
+                <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-200">
+                  <div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500" style={{ width: `${percent}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-3xl bg-slate-50 p-4">
+          <div className="text-sm font-semibold text-slate-900">Explanation</div>
+          <div className="mt-3 space-y-3">
+            {explanations.map((item, index) => (
+              <div key={`${item}-${index}`} className="rounded-2xl bg-white p-3 text-sm leading-6 text-slate-700">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-3xl bg-slate-50 p-4">
+          <div className="text-sm font-semibold text-slate-900">Risk analysis</div>
+          <div className="mt-3 space-y-3">
+            {risks.map((item) => (
+              <div key={item.path} className="rounded-2xl bg-white p-3 text-sm leading-6 text-slate-700">
+                <div className="font-semibold text-slate-900">{item.path}</div>
+                <div>{item.risk}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {details.what_if && (
+        <div className="rounded-3xl border border-sky-200 bg-sky-50 p-4">
+          <div className="text-sm font-semibold text-sky-900">Alternative scenario</div>
+          <p className="mt-2 text-sm leading-6 text-sky-800">{details.what_if}</p>
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {Object.entries(suggestions).map(([path, items]) => (
+          <div key={path} className="rounded-3xl bg-slate-50 p-4">
+            <div className="text-sm font-semibold text-slate-900">{path}</div>
+            <div className="mt-3 space-y-2">
+              {(items || []).map((item, index) => (
+                <div key={`${item}-${index}`} className="rounded-2xl bg-white p-3 text-sm leading-6 text-slate-700">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Chatbot() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -81,19 +166,24 @@ export default function Chatbot() {
                     <div className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
                       {domainLabels[item.payload.intent] || 'Decision'} answer
                     </div>
-                    <InsightPanel
-                      result={{
-                        ...item.payload,
-                        summary: `Instant ${domainLabels[item.payload.intent] || 'decision'} guidance powered by the chatbot.`,
-                        next_step: item.payload.suggestions?.[0] || 'Review the strongest factor and iterate.',
-                        score_band: item.payload.intent,
-                        score_label: `${Math.round((item.payload.probability || 0) * 100)}% confidence`,
-                      }}
-                      domain={item.payload.intent}
-                      title="Chat insight"
-                      subtitle="Structured guidance generated from your question."
-                      input={item.payload.parsed_input}
-                    />
+                    {item.payload.mode === 'comparison' ? (
+                      <ComparisonPanel payload={item.payload} />
+                    ) : (
+                      <InsightPanel
+                        result={{
+                          ...item.payload,
+                          summary: item.payload.summary || `Instant ${domainLabels[item.payload.intent] || 'decision'} guidance powered by the chatbot.`,
+                          next_step: item.payload.next_step || item.payload.suggestions?.[0] || 'Review the strongest factor and iterate.',
+                          score_band: item.payload.score_band || item.payload.intent,
+                          score_label: item.payload.score_label || `${Math.round((item.payload.probability || 0) * 100)}% confidence`,
+                          target_score: item.payload.target_score,
+                        }}
+                        domain={item.payload.intent}
+                        title="Chat insight"
+                        subtitle="Structured guidance generated from your question."
+                        input={item.payload.parsed_input}
+                      />
+                    )}
                   </div>
                 ) : (
                   <div className="max-w-[90%] rounded-3xl bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">

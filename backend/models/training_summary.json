@@ -1,18 +1,30 @@
 {
   "career": {
-    "accuracy": 0.7238,
-    "f1": 0.7755
+    "model": "extra_trees",
+    "accuracy": 0.8285,
+    "f1": 0.853,
+    "roc_auc": 0.8788
+  },
+  "career_path": {
+    "accuracy": 0.9959,
+    "f1_macro": 0.9961
   },
   "finance": {
-    "accuracy": 0.9148,
-    "f1": 0.9196
+    "model": "random_forest",
+    "accuracy": 0.9198,
+    "f1": 0.9238,
+    "roc_auc": 0.9692
   },
   "startup": {
-    "accuracy": 0.643,
-    "f1": 0.6006
+    "model": "random_forest",
+    "accuracy": 0.6322,
+    "f1": 0.587,
+    "roc_auc": 0.679
   },
   "policy": {
-    "accuracy": 0.6309,
-    "f1": 0.5739
+    "model": "random_forest",
+    "accuracy": 0.6134,
+    "f1": 0.5625,
+    "roc_auc": 0.6452
   }
 }

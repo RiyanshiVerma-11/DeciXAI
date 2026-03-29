@@ -17,6 +17,27 @@ def load_domain_bundle(domain):
     return joblib.load(model_path)
 
 
+def get_domain_profiles(domain):
+    bundle = load_domain_bundle(domain)
+    if bundle is None:
+        return {}
+    return bundle.get('profiles', {})
+
+
+def get_feature_labels(domain):
+    bundle = load_domain_bundle(domain)
+    if bundle is None:
+        return {}
+    return bundle.get('feature_labels', {})
+
+
+def get_career_comparison_bundle():
+    bundle = load_domain_bundle('career')
+    if bundle is None:
+        return None
+    return bundle.get('comparison')
+
+
 def _score_label(probability):
     if probability >= 0.8:
         return 'Strong', '80-100'
@@ -60,4 +81,6 @@ def predict_with_model(domain, frame):
         'key_factors': key_factors,
         'metrics': bundle.get('metrics', {}),
         'samples': bundle.get('samples', 0),
+        'profiles': bundle.get('profiles', {}),
+        'feature_labels': bundle.get('feature_labels', {}),
     }
