@@ -13,10 +13,10 @@ AI-powered Explainable Decision Intelligence System.
 1. Set environment variables from `.env.example` if needed.
 
 2. Build and run:
-
-```bash
+   
+python backend/train_models.py
 docker compose up --build
-```
+
 
 3. Open: `http://localhost:3000`
 
