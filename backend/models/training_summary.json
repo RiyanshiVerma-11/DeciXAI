@@ -1,0 +1,18 @@
+{
+  "career": {
+    "accuracy": 0.7238,
+    "f1": 0.7755
+  },
+  "finance": {
+    "accuracy": 0.9148,
+    "f1": 0.9196
+  },
+  "startup": {
+    "accuracy": 0.643,
+    "f1": 0.6006
+  },
+  "policy": {
+    "accuracy": 0.6309,
+    "f1": 0.5739
+  }
+}
