@@ -41,3 +41,33 @@ body {
   border-radius: 999px;
   background: linear-gradient(180deg, #38bdf8, #14b8a6);
 }
+
+@keyframes report-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+@keyframes report-rise {
+  from {
+    transform: scaleX(0.72);
+    opacity: 0.65;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.report-float {
+  animation: report-float 7s ease-in-out infinite;
+}
+
+.report-rise {
+  transform-origin: left center;
+  animation: report-rise 0.7s ease-out both;
+}

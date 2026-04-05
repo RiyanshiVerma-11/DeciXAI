@@ -35,7 +35,9 @@ const bandStyles = {
   'Watch closely': 'bg-amber-100 text-amber-800',
   Risky: 'bg-rose-100 text-rose-800',
   'Investor ready': 'bg-emerald-100 text-emerald-800',
+  'Investor Ready': 'bg-emerald-100 text-emerald-800',
   'Early stage': 'bg-amber-100 text-amber-800',
+  'Early Stage': 'bg-amber-100 text-amber-800',
   Fragile: 'bg-rose-100 text-rose-800',
   'Strong case': 'bg-emerald-100 text-emerald-800',
   Feasible: 'bg-sky-100 text-sky-800',
@@ -119,6 +121,17 @@ const parseExplanationFactors = (text) => {
 }
 
 const buildFactorData = (result) => {
+  if ((!result.explanation || !String(result.explanation).trim()) && Array.isArray(result.key_factors)) {
+    return result.key_factors.slice(0, 5).map((item, index) => ({
+      rawLabel: item,
+      label: String(item),
+      value: 1,
+      magnitude: Math.max(1, 5 - index),
+      direction: 'positive',
+      color: POSITIVE_COLORS[index % POSITIVE_COLORS.length],
+    }))
+  }
+
   const fromKeys = Array.isArray(result.key_factors)
     ? result.key_factors.map(parseKeyFactorLine).filter(Boolean)
     : []
@@ -137,7 +150,11 @@ const buildFactorData = (result) => {
 }
 
 const buildActionItems = (result) => {
-  const steps = [result.next_step, ...(Array.isArray(result.suggestions) ? result.suggestions : [])]
+  const steps = [
+    result.next_step,
+    ...(Array.isArray(result.action_plan) ? result.action_plan : []),
+    ...(Array.isArray(result.suggestions) ? result.suggestions : []),
+  ]
     .map((item) => String(item || '').trim())
     .filter(Boolean)
 
@@ -151,12 +168,33 @@ const buildActionItems = (result) => {
   return unique.slice(0, 3)
 }
 
+const buildNarrativePoints = (result) => {
+  const insights = Array.isArray(result.insights) ? result.insights : []
+  const risks = Array.isArray(result.risks) ? result.risks : []
+  if (insights.length || risks.length) {
+    return [...insights.slice(0, 2), ...risks.slice(0, 1)]
+  }
+  return []
+}
+
+const buildBlockingFactors = (result) =>
+  (Array.isArray(result.blocking_factors) ? result.blocking_factors : [])
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+    .slice(0, 3)
+
 const splitExplanation = (text) =>
   String(text || '')
-    .split('.')
+    .split(/(?<!\d)\.(?:\s+|$)|(?<=\))\s+(?=[A-Z])/)
     .map((part) => part.trim())
     .filter(Boolean)
     .slice(0, 3)
+
+const withSentencePunctuation = (text) => {
+  const cleaned = String(text || '').trim()
+  if (!cleaned) return ''
+  return /[.!?]$/.test(cleaned) ? cleaned : `${cleaned}.`
+}
 
 const segmentPercent = (magnitude, total) => `${Math.round((magnitude / total) * 100)}%`
 
@@ -208,7 +246,15 @@ function MetricCard({ label, value, tone = 'text-slate-900' }) {
 }
 
 function StoryCards({ result, domain }) {
-  const points = splitExplanation(result.explanation)
+  const dynamicPoints = buildNarrativePoints(result)
+  const points = dynamicPoints.length
+    ? dynamicPoints
+    : result.explanation
+      ? splitExplanation(result.explanation)
+    : [
+        ...(Array.isArray(result.key_factors) ? result.key_factors.slice(0, 2) : []),
+        ...(Array.isArray(result.risks) ? result.risks.slice(0, 1) : []),
+      ].filter(Boolean)
 
   return (
     <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -225,7 +271,7 @@ function StoryCards({ result, domain }) {
           points.map((point, index) => (
             <div key={`${point}-${index}`} className="rounded-2xl bg-slate-50 p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Insight {index + 1}</div>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{point}.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">{withSentencePunctuation(point)}</p>
             </div>
           ))
         ) : (
@@ -238,7 +284,7 @@ function StoryCards({ result, domain }) {
   )
 }
 
-function ImpactMix({ factors }) {
+function ImpactMix({ factors, domain }) {
   if (!factors.length) return null
 
   const total = factors.reduce((sum, factor) => sum + factor.magnitude, 0) || 1
@@ -258,9 +304,15 @@ function ImpactMix({ factors }) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-slate-900">Impact mix</h3>
-          <p className="text-sm text-slate-500">A compact view of which factors matter most right now.</p>
+          <p className="text-sm text-slate-500">
+            {domain === 'startup'
+              ? 'A relative view of the startup factors emphasized by the current scoring rules.'
+              : 'A compact view of which factors matter most right now.'}
+          </p>
         </div>
-        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">Horizontal view</div>
+        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+          {domain === 'startup' ? 'Rule-based emphasis' : 'Horizontal view'}
+        </div>
       </div>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[220px,1fr]">
@@ -308,14 +360,32 @@ function ActionCards({ actions }) {
       <div className="mt-4 grid gap-3">
         {actions.length ? (
           actions.map((action, index) => (
-            <div key={`${action}-${index}`} className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{index === 0 ? 'Do this first' : `Step ${index + 1}`}</div>
-              <div className="mt-2 text-sm font-medium leading-6 text-slate-700">{action}</div>
+            <div key={`${action}-${index}`} className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-4 shadow-sm">
+              <div className="text-xs uppercase tracking-[0.18em] text-emerald-700">{index === 0 ? 'Do this first' : `Step ${index + 1}`}</div>
+              <div className="mt-2 text-sm font-medium leading-6 text-emerald-950">{action}</div>
             </div>
           ))
         ) : (
           <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">No actions available.</div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function BlockingFactorsCard({ items }) {
+  if (!items.length) return null
+
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-lg font-semibold text-slate-900">Blocking factors</h3>
+      <div className="mt-4 grid gap-3">
+        {items.map((item, index) => (
+          <div key={`${item}-${index}`} className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-rose-50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-amber-700">Watchout {index + 1}</div>
+            <div className="mt-2 text-sm font-medium leading-6 text-slate-800">{item}</div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -355,10 +425,13 @@ export default function InsightPanel({
   if (!result) return null
 
   const styles = DOMAIN_STYLES[domain] || DOMAIN_STYLES.default
-  const score = clampPercent(result.probability)
-  const bandClass = bandStyles[result.score_label] || bandStyles[result.score_band] || 'bg-slate-100 text-slate-800'
+  const score = typeof result.score === 'number' ? Math.round(result.score) : clampPercent(result.probability)
+  const confidenceSource = typeof result.confidence === 'number' ? result.confidence : (result.confidence_ratio ?? result.probability ?? 0)
+  const confidence = Math.round(confidenceSource > 1 ? confidenceSource : confidenceSource * 100)
+  const bandClass = bandStyles[result.score_label] || bandStyles[result.score_band] || bandStyles[result.band] || 'bg-slate-100 text-slate-800'
   const factors = buildFactorData(result)
   const actions = buildActionItems(result)
+  const blockingFactors = buildBlockingFactors(result)
   const ringId = `scoreRingGradient-${domain}-${score}-${title.replace(/\s+/g, '-').toLowerCase()}`
 
   return (
@@ -378,15 +451,15 @@ export default function InsightPanel({
             <div className="mt-6 grid gap-4 md:grid-cols-[170px,1fr]">
               <ScoreRing score={score} accentClass={styles.accent} ringId={ringId} />
               <div className="grid gap-4 sm:grid-cols-2">
-                <MetricCard label="Confidence" value={`${score}% likely`} />
-                <MetricCard label="Priority" value={result.next_step || 'Proceed with the next best move'} />
+                <MetricCard label="Confidence" value={`${confidence}% confidence`} />
+                <MetricCard label="Priority" value={result.next_step || result.action_plan?.[0] || 'Proceed with the next best move'} />
                 <MetricCard
                   label="Decision band"
-                  value={<span className={`inline-flex rounded-full px-3 py-1 text-sm ${bandClass}`}>{result.score_label || result.score_band || 'Evaluated'}</span>}
+                  value={<span className={`inline-flex rounded-full px-3 py-1 text-sm ${bandClass}`}>{result.score_label || result.score_band || result.band || 'Evaluated'}</span>}
                 />
                 <MetricCard
-                  label="Target score"
-                  value={result.target_score ? `Aim for ${result.target_score}/100` : 'Keep improving the strongest levers'}
+                  label="Focus"
+                  value={result.action_plan?.[0] || 'Keep improving the strongest levers'}
                   tone="text-slate-700"
                 />
               </div>
@@ -396,11 +469,12 @@ export default function InsightPanel({
           <div className="grid gap-4">
             <StoryCards result={result} domain={domain} />
             <ActionCards actions={actions} />
+            <BlockingFactorsCard items={blockingFactors} />
           </div>
         </div>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[1fr,0.95fr]">
-          <ImpactMix factors={factors} />
+          <ImpactMix factors={factors} domain={domain} />
           <InputSnapshot input={input} />
         </div>
       </div>

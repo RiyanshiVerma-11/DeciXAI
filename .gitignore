@@ -1,18 +1,58 @@
+# -----------------------------
 # Python
+# -----------------------------
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 *.joblib
+*.pkl
 
 .Python
 env/
 venv/
+.venv/
 .ipynb_checkpoints/
 
-# Node
-node_modules/
-/dist
+# -----------------------------
+# Environment variables
+# -----------------------------
+.env
+.env.*
+!.env.example
 
+# -----------------------------
+# Node / Frontend
+# -----------------------------
+node_modules/
+dist/
+build/
+
+# -----------------------------
 # Docker
+# -----------------------------
 *.log
+docker-compose.override.yml
+
+# -----------------------------
+# Ollama (VERY IMPORTANT)
+# -----------------------------
+.ollama/
+
+# -----------------------------
+# OS files
+# -----------------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+# IDEs / Editors
+# -----------------------------
+.vscode/
+.idea/
+
+# -----------------------------
+# Misc
+# -----------------------------
+*.tmp
+*.swp

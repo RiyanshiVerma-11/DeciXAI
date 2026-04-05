@@ -2,24 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   submitCareer,
+  submitCareerPrompt,
   submitFinance,
   submitStartup,
+  submitStartupPrompt,
   submitPolicy,
 } from '../api'
+import DecisionReport from '../components/DecisionReport'
 import InsightPanel from '../components/InsightPanel'
 
 const domainConfig = {
   career: {
     title: 'Career',
     subtitle: 'Translate your academic profile and interests into a clearer career direction.',
-    freeTextExample: 'Example: cgpa 8.4, skills python sql react, projects fraud detector dashboard, interest technical',
+    freeTextExample: 'Example: cgpa 8.4, course btech cse, specialization ai and ml, skills python sql react, certifications aws cloud practitioner, projects fraud detector dashboard, interest software development',
     fields: [
       { name: 'cgpa', label: 'CGPA', type: 'number' },
+      { name: 'course', label: 'Course / Degree', type: 'text' },
+      { name: 'specialization', label: 'Specialization', type: 'text' },
+      { name: 'education_level', label: 'Education Level', type: 'text' },
+      { name: 'year_of_study', label: 'Year Of Study', type: 'number' },
       { name: 'skills', label: 'Skills (comma-separated)', type: 'text' },
+      { name: 'certifications', label: 'Certifications (comma-separated)', type: 'text' },
       { name: 'projects', label: 'Projects (comma-separated)', type: 'text' },
       { name: 'interest', label: 'Interest', type: 'text' },
     ],
     submit: submitCareer,
+    submitFreeText: (prompt) => submitCareerPrompt({ message: prompt }),
   },
   finance: {
     title: 'Finance',
@@ -31,6 +40,7 @@ const domainConfig = {
       { name: 'credit_score', label: 'Credit Score', type: 'number' },
     ],
     submit: submitFinance,
+    submitFreeText: (prompt) => submitFinance(parseFreeText('finance', prompt)),
   },
   startup: {
     title: 'Startup',
@@ -43,6 +53,7 @@ const domainConfig = {
       { name: 'experience', label: 'Experience (years)', type: 'number' },
     ],
     submit: submitStartup,
+    submitFreeText: (prompt) => submitStartupPrompt({ message: prompt }),
   },
   policy: {
     title: 'Government Policy',
@@ -54,10 +65,11 @@ const domainConfig = {
       { name: 'population', label: 'Population', type: 'number' },
     ],
     submit: submitPolicy,
+    submitFreeText: (prompt) => submitPolicy(parseFreeText('policy', prompt)),
   },
 }
 
-const sectionBreaks = '(?=\\b(?:cgpa|gpa|skills?|expertise|projects?|interest|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people)\\b|$)'
+const sectionBreaks = '(?=\\b(?:cgpa|gpa|skills?|expertise|projects?|interest|certifications?|course|degree|specialization|education level|year of study|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people)\\b|$)'
 
 const splitItems = (value) =>
   String(value)
@@ -71,6 +83,16 @@ const pickNumber = (...values) => {
   }
   return null
 }
+
+const parseOptionalNumber = (value) => {
+  if (value === null || value === undefined) return null
+  const text = String(value).trim()
+  if (!text) return null
+  const parsed = Number(text)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const clamp = (value, minimum, maximum) => Math.max(minimum, Math.min(value, maximum))
 
 const extractNumber = (text, keys) => {
   const lower = text.toLowerCase()
@@ -100,17 +122,28 @@ const parseFreeText = (domain, text) => {
 
   switch (domain) {
     case 'career': {
-      const cgpa = pickNumber(extractNumber(text, ['cgpa', 'gpa']), Number(commaParts[0])) ?? 7.0
+      const cgpa = pickNumber(extractNumber(text, ['cgpa', 'gpa']), Number(commaParts[0])) ?? null
+      const course = extractSection(text, ['course', 'degree']) || commaParts[1] || ''
+      const specialization = extractSection(text, ['specialization']) || ''
+      const educationLevel = extractSection(text, ['education level']) || ''
+      const yearOfStudy = pickNumber(extractNumber(text, ['year of study', 'year']), null)
       const skillsSection = extractSection(text, ['skills', 'skill', 'expertise'])
+      const certificationsSection = extractSection(text, ['certifications', 'certification'])
       const projectsSection = extractSection(text, ['projects', 'project'])
-      const skills = skillsSection ? splitItems(skillsSection) : splitItems(commaParts[1] || 'communication, teamwork')
-      const projects = projectsSection ? splitItems(projectsSection) : splitItems(commaParts[2] || 'capstone')
-      const interest = lower.includes('technical') ? 'technical' : lower.includes('management') ? 'management' : lower.includes('data') ? 'data' : (commaParts[3] || 'data')
+      const skills = skillsSection ? splitItems(skillsSection) : splitItems(commaParts[2] || '')
+      const certifications = certificationsSection ? splitItems(certificationsSection) : []
+      const projects = projectsSection ? splitItems(projectsSection) : splitItems(commaParts[3] || '')
+      const interest = extractSection(text, ['interest', 'domain']) || (commaParts[4] || 'technical')
 
       return {
         cgpa,
-        skills: skills.length ? skills : ['communication', 'teamwork'],
-        projects: projects.length ? projects : ['capstone'],
+        course,
+        specialization,
+        education_level: educationLevel,
+        year_of_study: yearOfStudy,
+        skills: skills.length ? skills : [],
+        certifications: certifications.length ? certifications : [],
+        projects: projects.length ? projects : [],
         interest,
       }
     }
@@ -118,7 +151,7 @@ const parseFreeText = (domain, text) => {
       return {
         income: pickNumber(extractNumber(text, ['income', 'salary']), Number(commaParts[0])) ?? 60000,
         loan: pickNumber(extractNumber(text, ['loan', 'debt']), Number(commaParts[1])) ?? 15000,
-        credit_score: pickNumber(extractNumber(text, ['credit score', 'credit']), Number(commaParts[2])) ?? 680,
+        credit_score: clamp(pickNumber(extractNumber(text, ['credit score', 'credit']), Number(commaParts[2])) ?? 680, 300, 850),
       }
     case 'startup': {
       const marketSection = extractSection(text, ['market'])
@@ -180,8 +213,24 @@ export default function DomainPage() {
     const payload = {}
     for (const field of config.fields) {
       let value = rawInput[field.name]
-      if (field.type === 'number') value = Number(value) || 0
-      if (field.name === 'skills' || field.name === 'projects') {
+      if (value === undefined || value === null || value === '') {
+        // Provide defaults for required fields
+        if (field.name === 'skills' || field.name === 'projects' || field.name === 'certifications') {
+          value = []
+        } else if (field.type === 'number') {
+          value = null
+        } else {
+          value = ''
+        }
+      }
+      if (field.type === 'number') value = parseOptionalNumber(value)
+      if (domain === 'finance' && field.name === 'credit_score' && value !== null) {
+        value = clamp(value, 300, 850)
+      }
+      if (domain === 'finance' && (field.name === 'income' || field.name === 'loan') && value !== null) {
+        value = Math.max(0, value)
+      }
+      if (field.name === 'skills' || field.name === 'projects' || field.name === 'certifications') {
         if (Array.isArray(value)) {
           value = value.map((v) => String(v).trim()).filter(Boolean)
         } else {
@@ -207,13 +256,32 @@ export default function DomainPage() {
     }
   }
 
+  const runFreeTextAnalysis = async (prompt) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const parsedPayload = parseFreeText(domain, prompt)
+      const res = await config.submitFreeText(prompt)
+      setResult(res)
+      setInput(res.parsed_input || parsedPayload)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const submit = async (e) => {
     e.preventDefault()
     setError(null)
 
     if (mode === 'free') {
-      const structured = parseFreeText(domain, textPrompt)
-      await runAnalysis(structured)
+      if (textPrompt.trim()) {
+        await runFreeTextAnalysis(textPrompt)
+      } else {
+        const structured = parseFreeText(domain, textPrompt)
+        await runAnalysis(structured)
+      }
     } else {
       const payload = normalizePayload(input)
       await runAnalysis(payload)
@@ -221,8 +289,26 @@ export default function DomainPage() {
   }
 
   const recalc = async () => {
+    if (mode === 'free') {
+      await runFreeTextAnalysis(textPrompt)
+      return
+    }
     await runAnalysis(normalizePayload(input))
   }
+
+  const hasComparisonResult = Boolean(
+    result && (
+      result.mode === 'comparison'
+      || result.mode === 'model-driven'
+      || (Array.isArray(result.options) && result.options.length > 1)
+      || (Array.isArray(result.details?.option_scores) && result.details.option_scores.length > 1)
+      || (Array.isArray(result.details?.probabilities) && result.details.probabilities.length > 1)
+    )
+  )
+
+  const resultInput = mode === 'free'
+    ? (result?.parsed_input || input)
+    : input
 
   return (
     <div className="p-6 md:p-8">
@@ -313,18 +399,22 @@ export default function DomainPage() {
 
           {result && (
             <div ref={resultRef} className="mt-8 scroll-mt-24">
-              <InsightPanel
-                result={result}
-                domain={domain}
-                title={`${config.title} decision`}
-                subtitle={config.subtitle}
-                input={input}
-                footerAction={(
-                  <button onClick={recalc} className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20">
-                    Recalculate What-if
-                  </button>
-                )}
-              />
+              {hasComparisonResult ? (
+                <DecisionReport payload={result} />
+              ) : (
+                <InsightPanel
+                  result={result}
+                  domain={domain}
+                  title={`${config.title} decision`}
+                  subtitle={config.subtitle}
+                  input={resultInput}
+                  footerAction={(
+                    <button onClick={recalc} className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20">
+                      Recalculate What-if
+                    </button>
+                  )}
+                />
+              )}
             </div>
           )}
         </div>

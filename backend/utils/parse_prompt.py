@@ -2,28 +2,91 @@ import re
 
 
 SECTION_BREAKS = r"(?=\b(?:cgpa|gpa|skills?|expertise|projects?|interest|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people)\b|$)"
-CAREER_PATH_ALIASES = {
-    'data science': 'data_science',
-    'data scientist': 'data_science',
-    'machine learning': 'data_science',
+VALID_CAREER_CLASSES = [
+    'cloud_devops',
+    'cybersecurity',
+    'data_science',
+    'product_management',
+    'software_development',
+]
+
+CAREER_OPTION_NORMALIZATION = {
+    'hr': 'product_management',
+    'human resources': 'product_management',
+    'management': 'product_management',
+    'managerial': 'product_management',
+    'mba': 'product_management',
+    'product management': 'product_management',
+    'business analyst': 'product_management',
+    'technical': 'software_development',
+    'developer': 'software_development',
+    'development': 'software_development',
+    'coding': 'software_development',
+    'software': 'software_development',
     'software development': 'software_development',
-    'software developer': 'software_development',
     'software engineering': 'software_development',
-    'software engineer': 'software_development',
-    'web development': 'software_development',
+    'technical jobs': 'software_development',
+    'cybersecurity': 'cybersecurity',
+    'security': 'cybersecurity',
     'cloud': 'cloud_devops',
     'devops': 'cloud_devops',
-    'cybersecurity': 'cybersecurity',
-    'product management': 'product_management',
+    'cloud devops': 'cloud_devops',
+    'cloud / devops': 'cloud_devops',
+    'data science': 'data_science',
+    'data scientist': 'data_science',
+    'ai': 'data_science',
+    'ml': 'data_science',
+    'machine learning': 'data_science',
 }
+
+FILLER_PATTERNS = [
+    r'\bplease compare\b',
+    r'\btell me\b',
+    r'\bwhat should i do\b',
+    r'\bwhat are my chances\b',
+    r'\bwhat is my chance\b',
+    r'\bmy chances of success\b',
+    r'\btell me my chances of success\b',
+    r'\bwhat i should focus on\b',
+    r'\bwhat should i focus on\b',
+    r'\bsuggest me\b',
+    r'\bsuggest\b',
+    r'\bcan you\b',
+    r'\bhelp me decide\b',
+    r'\bi am confused\b',
+]
+
+GENERIC_OPTION_PATTERNS = [
+    r'chances? of success',
+    r'focus on',
+    r'should i do',
+    r'tell me',
+    r'suggest me',
+    r'what should',
+    r'which is better',
+    r'better for me',
+]
+
+
+def clean_prompt_text(text):
+    cleaned = str(text or '').lower()
+    cleaned = re.sub(r'[\?\!]+', ' ', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    for pattern in FILLER_PATTERNS:
+        cleaned = re.sub(pattern, ' ', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    return cleaned.strip(' ,.-')
 
 
 def _extract_number(text, keys, allow_fallback=True):
     text_lower = text.lower()
     for key in keys:
-      m = re.search(rf"\b{re.escape(key)}\b\D*([0-9]+(?:\.[0-9]+)?)", text_lower)
-      if m:
-          return float(m.group(1))
+        m = re.search(rf"\b{re.escape(key)}\b\D*([0-9]+(?:\.[0-9]+)?)", text_lower)
+        if m:
+            return float(m.group(1))
+        m = re.search(rf"\b([0-9]+(?:\.[0-9]+)?)\b\D{{0,10}}\b{re.escape(key)}\b", text_lower)
+        if m:
+            return float(m.group(1))
 
     if not allow_fallback:
         return None
@@ -35,9 +98,12 @@ def _extract_number(text, keys, allow_fallback=True):
 def _split_items(value):
     items = re.split(r",|;|\band\b|\bor\b|/|\n", value)
     cleaned = []
+    seen = set()
     for item in items:
         candidate = item.strip(" .:-")
-        if candidate:
+        candidate_key = candidate.lower()
+        if candidate and candidate_key not in seen:
+            seen.add(candidate_key)
             cleaned.append(candidate)
     return cleaned
 
@@ -60,13 +126,82 @@ def _extract_list(text, keys, fallback=None):
     return fallback or []
 
 
-def _extract_paths(text):
+def _normalize_candidate_option(option_text):
+    candidate = re.sub(r'^(?:a|an|the)\s+', '', str(option_text or '').strip().lower())
+    candidate = re.sub(r'\s+', ' ', candidate).strip(' .,:;-')
+    if not candidate:
+        return None
+    if len(candidate.split()) > 5:
+        return None
+    if any(re.search(pattern, candidate) for pattern in GENERIC_OPTION_PATTERNS):
+        return None
+    for phrase, normalized in sorted(CAREER_OPTION_NORMALIZATION.items(), key=lambda item: len(item[0]), reverse=True):
+        if re.search(rf'\b{re.escape(phrase)}\b', candidate):
+            return normalized
+    return None
+
+
+def _extract_career_option_segments(cleaned_text):
+    segments = []
+    patterns = [
+        r'whether i should\s+(.+?)(?:$|\b(?:based on|for my|with my|considering)\b)',
+        r'choose between\s+(.+?)(?:$|\b(?:based on|for my|with my|considering)\b)',
+        r'confused between\s+(.+?)(?:$|\b(?:based on|for my|with my|considering)\b)',
+        r'between\s+(.+?)(?:$|\b(?:based on|for my|with my|considering)\b)',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, cleaned_text, flags=re.IGNORECASE)
+        if match:
+            segments.append(match.group(1))
+    return segments
+
+
+def extract_career_options(text, interest=None):
+    cleaned = clean_prompt_text(text)
+    segments = _extract_career_option_segments(cleaned)
+    candidates = []
+    for segment in segments:
+        candidates.extend(re.split(r'\s*(?:,|/|\bvs\b|\bversus\b|\bor\b|\band\b)\s*', segment, flags=re.IGNORECASE))
+
+    normalized = []
+    for candidate in candidates:
+        mapped = _normalize_candidate_option(candidate)
+        if mapped and mapped in VALID_CAREER_CLASSES and mapped not in normalized:
+            normalized.append(mapped)
+
+    if not normalized and interest:
+        fallback = _normalize_candidate_option(interest)
+        if fallback and fallback in VALID_CAREER_CLASSES:
+            normalized.append(fallback)
+
+    return normalized
+
+
+def _extract_interest(prompt_lower):
+    if any(token in prompt_lower for token in ['hr', 'human resources', 'management', 'mba', 'product']):
+        return 'management'
+    if any(token in prompt_lower for token in ['technical', 'developer', 'coding', 'software']):
+        return 'technical'
+    if any(token in prompt_lower for token in ['data science', 'machine learning', 'ml', 'ai']):
+        return 'data'
+    return ''
+
+
+def _extract_policy_options(text):
     lowered = text.lower()
-    paths = []
-    for phrase, normalized in CAREER_PATH_ALIASES.items():
-        if phrase in lowered and normalized not in paths:
-            paths.append(normalized)
-    return paths
+    primary = ''
+    alternative = ''
+
+    if 'free laptop' in lowered or 'free laptops' in lowered:
+        primary = 'free laptops for students'
+    if 'digital infrastructure' in lowered or 'smart classrooms' in lowered or 'internet access' in lowered:
+        alternative = 'digital infrastructure like internet access and smart classrooms'
+
+    alt_match = re.search(r'alternative policy\s*\((.*?)\)', text, flags=re.IGNORECASE)
+    if alt_match:
+        alternative = alt_match.group(1).strip()
+
+    return primary, alternative
 
 
 def _extract_skills_from_sentence(text):
@@ -85,53 +220,52 @@ def parse_prompt(domain, prompt_text):
         skills = _extract_skills_from_sentence(prompt_text)
         if not skills:
             skills = _extract_list(prompt_text, ['skills', 'skill', 'expertise'], None)
-        if not skills:
-            skills = ['communication', 'teamwork']
-        projects = _extract_list(prompt_text, ['projects', 'project'], ['capstone'])
-        year_match = re.search(r'([1-5](?:st|nd|rd|th)?)[-\s]?year', prompt_text.lower())
-        year_of_study = float(re.search(r'[1-5]', year_match.group(1)).group()) if year_match else 2.0
-        specialization_match = re.search(r'(computer science|information technology|electronics|mechanical|civil|business|mathematics)', prompt_text, flags=re.IGNORECASE)
-        specialization = specialization_match.group(1) if specialization_match else 'computer science'
-        paths = _extract_paths(prompt_text)
-        if len(paths) >= 2:
-            interest = 'technical'
-        else:
-            interest = 'technical' if 'technical' in prompt_lower else 'management' if 'management' in prompt_lower else 'data'
+        projects = _extract_list(prompt_text, ['projects', 'project'], [])
+        interest = _extract_interest(prompt_lower)
+        options = extract_career_options(prompt_text, interest=interest)
         return {
-            'cgpa': _extract_number(prompt_text, ['cgpa', 'gpa'], allow_fallback=False) or 7.0,
-            'skills': skills,
-            'projects': projects,
-            'interest': interest,
-            'paths': paths,
-            'year_of_study': year_of_study,
-            'specialization': specialization,
-            'goal': prompt_text,
+            'options': options,
+            'features': {
+                'cgpa': _extract_number(prompt_text, ['cgpa', 'gpa'], allow_fallback=False),
+                'skills': skills,
+                'projects': projects,
+                'interest': interest,
+                'experience': _extract_number(prompt_text, ['experience', 'years'], allow_fallback=False),
+            },
         }
 
     if domain == 'finance':
         return {
-            'income': _extract_number(prompt_text, ['income', 'salary']) or 50000,
-            'loan': _extract_number(prompt_text, ['loan', 'debt']) or 15000,
-            'credit_score': _extract_number(prompt_text, ['credit score', 'credit']) or 650,
+            'options': [],
+            'features': {
+                'income': _extract_number(prompt_text, ['income', 'salary'], allow_fallback=False),
+                'loan': _extract_number(prompt_text, ['loan', 'debt'], allow_fallback=False),
+                'credit_score': _extract_number(prompt_text, ['credit score', 'credit'], allow_fallback=False),
+            },
         }
 
     if domain == 'startup':
-        market = _extract_section(prompt_text, ['market']) or ('enterprise' if 'enterprise' in prompt_lower else 'consumer')
+        market = _extract_section(prompt_text, ['market']) or ('enterprise' if 'enterprise' in prompt_lower else 'consumer' if 'consumer' in prompt_lower else '')
         return {
-            'funding': _extract_number(prompt_text, ['funding', 'capital']) or 100000,
-            'team_size': _extract_number(prompt_text, ['team size', 'team']) or 5,
-            'market': 'enterprise' if 'enterprise' in market else 'consumer' if 'consumer' in market else market or 'consumer',
-            'experience': _extract_number(prompt_text, ['experience', 'years']) or 2,
+            'options': [],
+            'features': {
+                'funding': _extract_number(prompt_text, ['funding', 'capital'], allow_fallback=False),
+                'team_size': _extract_number(prompt_text, ['team size', 'team'], allow_fallback=False),
+                'market': 'enterprise' if 'enterprise' in market else 'consumer' if 'consumer' in market else market,
+                'experience': _extract_number(prompt_text, ['experience', 'years'], allow_fallback=False),
+            },
         }
 
     if domain == 'policy':
         sector = _extract_section(prompt_text, ['sector'])
-        if not sector:
-            sector = 'healthcare' if 'health' in prompt_lower else 'education' if 'education' in prompt_lower else 'infrastructure'
+        primary_option, alternative_option = _extract_policy_options(prompt_text)
         return {
-            'sector': sector,
-            'budget': _extract_number(prompt_text, ['budget', 'funds']) or 1000000,
-            'population': _extract_number(prompt_text, ['population', 'people']) or 500000,
+            'options': [item for item in [primary_option, alternative_option] if item],
+            'features': {
+                'sector': sector,
+                'budget': _extract_number(prompt_text, ['budget', 'funds'], allow_fallback=False),
+                'population': _extract_number(prompt_text, ['population', 'people'], allow_fallback=False),
+            },
         }
 
-    return {}
+    return {'options': [], 'features': {}}

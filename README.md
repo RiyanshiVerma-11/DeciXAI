@@ -1,61 +1,116 @@
 # DecisionAI Engine (Docker-first)
 
-AI-powered Explainable Decision Intelligence System.
+AI-powered Explainable Decision Intelligence System with a real-time conversational AI interface.
 
-## Tech stack
-- Frontend: React + Vite + Tailwind CSS
-- Backend: Python + FastAPI
-- ML: scikit-learn, SHAP
-- Database: none (in-memory / local model files)
-- Chatbot: rule-based intent detection + SHAP explanation
+## Overview
 
-## Quick start
-1. Set environment variables from `.env.example` if needed.
+DecisionAI combines machine learning and LLM-based reasoning to help users make smarter decisions across:
 
-2. Build and run:
-   
-python backend/train_models.py
+* Career
+* Startups
+* Finance
+* Policy
+
+It provides:
+
+* Predictive scores from ML models
+* Explainability with SHAP
+* A conversational chatbot with streaming responses
+
+## Tech Stack
+
+* Frontend: React + Vite + Tailwind CSS
+* Backend: Python + FastAPI
+* ML Models: scikit-learn + SHAP
+* LLM Chatbot: Ollama
+* Database: None
+
+## Quick Start
+
+### 1. Install and run Ollama
+
+Download Ollama from `https://ollama.com`, then start it:
+
+```bash
+ollama serve
+```
+
+Pull the model configured in `.env`:
+
+```bash
+ollama pull llama3.2:1b
+```
+
+### 2. Create `.env`
+
+Use `.env.example` as the base:
+
+```env
+VITE_API_BASE_URL=http://localhost:8000
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
+MODEL_DIR=./models
+OLLAMA_API_URL=http://host.docker.internal:11434/v1/chat/completions
+OLLAMA_MODEL=llama3.2:1b
+OLLAMA_TIMEOUT_SECONDS=60
+```
+
+### 3. Start the app
+
+```bash
 docker compose up --build
+```
 
+### 4. Open the UI
 
-3. Open: `http://localhost:3000`
+`http://localhost:3000`
 
-## Train models with local datasets
+## Chatbot Notes
 
-Run:
+* Domain questions in career, finance, startup, and policy are answered from the app's own decision logic first.
+* General conversation uses Ollama.
+* If Ollama is unavailable or the configured model crashes, the chatbot now returns a friendly status message instead of a raw backend error.
+* If the model is missing, run `ollama pull <model-name>`.
+
+## Train Models
 
 ```bash
 python backend/train_models.py
 ```
 
-This reads the datasets from `backend/datasets/*` and writes trained model artifacts to `backend/models`.
+Datasets are read from `backend/datasets/*` and trained artifacts are written to `backend/models`.
 
-## API endpoints
-POST `/career`, `/finance`, `/startup`, `/policy`, `/chatbot`
+## API Endpoints
 
-Request and response structure:
+### Decision APIs
+
+* `POST /career`
+* `POST /finance`
+* `POST /startup`
+* `POST /policy`
+
+### Chat API
+
+* `POST /chatbot`
+
+Example request:
 
 ```json
 {
-  "input": { ... }
-}
-
-// response
-{
-  "decision": "...",
-  "probability": 0.82,
-  "key_factors": ["..."],
-  "explanation": "...",
-  "suggestions": ["..."]
+  "messages": [
+    { "role": "user", "content": "Hi" }
+  ],
+  "stream": true
 }
 ```
 
-## Folder structure
-- `/backend`: FastAPI backend and ML service
-- `/backend/datasets`: place real datasets for training by domain
-- `/frontend`: Vite React frontend
+## Folder Structure
 
-## Notes
-- backend stores models in `backend/models`
-- store domain datasets in `backend/datasets/career`, `finance`, `startup`, and `policy`
-- SHAP explanations are generated at runtime
+* `/backend` -> FastAPI backend and ML services
+* `/backend/datasets` -> domain datasets
+* `/backend/models` -> trained model files
+* `/frontend` -> Vite React frontend
+
+## Key Highlight
+
+This project combines traditional ML, explainability, and conversational reasoning into one hybrid decision-intelligence system.

@@ -7,6 +7,13 @@ class CareerInput(BaseModel):
     skills: List[str]
     projects: List[str]
     interest: str
+    certifications: Optional[List[str]] = None
+    internships: Optional[List[str]] = None
+    course: Optional[str] = None
+    specialization: Optional[str] = None
+    education_level: Optional[str] = None
+    year_of_study: Optional[float] = None
+    experience_years: Optional[float] = None
 
 
 class FinanceInput(BaseModel):
@@ -22,6 +29,14 @@ class StartupInput(BaseModel):
     experience: float
 
 
+class StartupPromptInput(BaseModel):
+    message: str
+
+
+class CareerPromptInput(BaseModel):
+    message: str
+
+
 class PolicyInput(BaseModel):
     sector: str
     budget: float
@@ -29,7 +44,9 @@ class PolicyInput(BaseModel):
 
 
 class ChatbotInput(BaseModel):
-    message: str
+    messages: Optional[List[Dict[str, Any]]] = None
+    message: Optional[str] = None
+    stream: Optional[bool] = True
 
 
 class DecisionResponse(BaseModel):
@@ -43,6 +60,18 @@ class DecisionResponse(BaseModel):
     key_factors: List[str]
     explanation: str
     suggestions: List[str]
+
+
+class StartupDecisionResponse(BaseModel):
+    score: float
+    decision: str
+    band: str
+    confidence: float
+    summary: str
+    key_factors: List[str]
+    risks: List[str]
+    action_plan: List[str]
+    blocking_factors: List[str]
 
 
 class SimpleResponse(BaseModel):

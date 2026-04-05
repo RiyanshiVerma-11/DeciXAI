@@ -1,3 +1,5 @@
+
+
 services:
   backend:
     build:
@@ -5,11 +7,16 @@ services:
       dockerfile: Dockerfile
     container_name: decisionai-backend
     ports:
-      - '8000:8000'
+      - "8000:8000"
     volumes:
       - ./backend/models:/app/models
     env_file:
-      - .env.example
+      - .env
+    environment:
+      - OLLAMA_API_URL=http://host.docker.internal:11434/v1/chat/completions
+      - OLLAMA_MODEL=${OLLAMA_MODEL}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - decisionai-net
 
@@ -19,9 +26,9 @@ services:
       dockerfile: Dockerfile
     container_name: decisionai-frontend
     ports:
-      - '3000:80'
+      - "3000:80"
     env_file:
-      - .env.example
+      - .env
     depends_on:
       - backend
     networks:

@@ -64,16 +64,45 @@ SKILL_PATTERNS = {
 
 CAREER_PATHS = {
     'data_science': [
-        'data scientist', 'data science', 'machine learning', 'ml engineer', 'ai engineer',
-        'data analyst', 'business intelligence', 'analytics', 'bi analyst',
+        'data scientist', 'data science', 'machine learning engineer', 'machine learning',
+        'ml engineer', 'ai engineer', 'data analyst', 'business intelligence',
+        'bi analyst', 'analytics',
     ],
     'software_development': [
         'software engineer', 'software developer', 'full stack', 'frontend', 'backend',
-        'web developer', 'application developer', 'sde', 'programmer',
+        'web developer', 'application developer', 'sde', 'programmer', 'mobile developer',
+        'ios developer', 'android developer', 'game developer',
     ],
-    'cloud_devops': ['devops', 'site reliability', 'sre', 'cloud engineer', 'platform engineer'],
-    'cybersecurity': ['security analyst', 'cybersecurity', 'soc analyst', 'security engineer'],
-    'product_management': ['product manager', 'product owner', 'program manager', 'business analyst'],
+    'cloud_devops': [
+        'devops', 'site reliability', 'sre', 'cloud engineer', 'platform engineer',
+        'aws engineer', 'azure engineer', 'gcp engineer', 'infrastructure engineer',
+    ],
+    'cybersecurity': [
+        'security analyst', 'cybersecurity', 'soc analyst', 'security engineer',
+        'penetration tester', 'ethical hacker', 'information security',
+    ],
+    'product_management': [
+        'product manager', 'product owner', 'program manager', 'business analyst',
+        'product analyst', 'growth hacker', 'technical product manager',
+        'project manager', 'project management',
+    ],
+    'ui_ux_design': [
+        'ui designer', 'ux designer', 'user experience', 'user interface', 'design',
+        'graphic designer', 'interaction designer',
+    ],
+    'data_engineering': [
+        'data engineer', 'analytics engineer', 'big data engineer', 'big data',
+        'hadoop', 'spark', 'etl developer', 'etl engineer',
+    ],
+    'marketing': [
+        'marketing', 'digital marketing', 'seo', 'content marketing', 'brand manager',
+    ],
+    'finance': [
+        'finance', 'financial analyst', 'investment banker', 'quantitative analyst',
+    ],
+    'consulting': [
+        'consultant', 'management consultant', 'strategy consultant',
+    ],
 }
 
 PATH_DISPLAY_NAMES = {
@@ -82,7 +111,15 @@ PATH_DISPLAY_NAMES = {
     'cloud_devops': 'Cloud / DevOps',
     'cybersecurity': 'Cybersecurity',
     'product_management': 'Product Management',
+    'ui_ux_design': 'UI/UX Design',
+    'data_engineering': 'Data Engineering',
+    'marketing': 'Marketing',
+    'finance': 'Finance',
+    'consulting': 'Consulting',
 }
+
+EXPECTED_CAREER_CLASSES = list(PATH_DISPLAY_NAMES.keys())
+CAREER_PATH_PRIORITY = {path: index for index, path in enumerate(EXPECTED_CAREER_CLASSES)}
 
 
 def safe_float(value, default=0.0):
@@ -190,10 +227,38 @@ def normalize_course(text):
 
 def classify_career_path(text):
     lowered = normalize_text(text)
+    best_path = None
+    best_score = 0.0
+
     for path_name, patterns in CAREER_PATHS.items():
-        if any(pattern in lowered for pattern in patterns):
-            return path_name
-    return None
+        score = 0.0
+        for pattern in patterns:
+            escaped = re.escape(pattern).replace(r'\ ', r'[\s/-]+')
+            if re.search(rf'(?<!\w){escaped}(?!\w)', lowered):
+                score += 1.0 + min(len(pattern.split()) * 0.15, 0.45)
+        if score > best_score or (
+            score == best_score
+            and best_path is not None
+            and CAREER_PATH_PRIORITY[path_name] < CAREER_PATH_PRIORITY[best_path]
+        ):
+            best_path = path_name
+            best_score = score
+
+    return best_path if best_score >= 1.0 else None
+
+
+def build_career_label_audit(posting_labels, salary_labels, learned_classes):
+    expected_set = set(EXPECTED_CAREER_CLASSES)
+    learned_set = set(learned_classes)
+
+    return {
+        'expected_classes': EXPECTED_CAREER_CLASSES,
+        'posting_label_counts': {key: int(value) for key, value in posting_labels.value_counts(dropna=False).items()},
+        'salary_label_counts': {key: int(value) for key, value in salary_labels.value_counts(dropna=False).items()},
+        'learned_classes': list(learned_classes),
+        'missing_expected_classes': sorted(expected_set - learned_set),
+        'unexpected_classes': sorted(learned_set - expected_set),
+    }
 
 
 def build_profile_metadata(dataset, y, numeric_features, categorical_features):
@@ -516,7 +581,8 @@ def build_career_path_bundle():
         + ' '
         + posting_part['description'].astype(str)
     )
-    posting_part['path'] = (posting_part['title'].astype(str) + ' ' + posting_part['skills_text'].astype(str)).apply(classify_career_path)
+    posting_labels = (posting_part['title'].astype(str) + ' ' + posting_part['skills_text'].astype(str)).apply(classify_career_path)
+    posting_part['path'] = posting_labels
 
     salary_part = pd.DataFrame()
     salary_part['title'] = salary_df['job_title'].fillna('')
@@ -535,7 +601,8 @@ def build_career_path_bundle():
         + ' '
         + salary_df['remote_work'].fillna('').astype(str)
     )
-    salary_part['path'] = salary_part['title'].apply(classify_career_path)
+    salary_labels = salary_part['title'].apply(classify_career_path)
+    salary_part['path'] = salary_labels
 
     combined = pd.concat([posting_part, salary_part], ignore_index=True)
     combined = combined[combined['path'].notna()].copy()
@@ -558,13 +625,13 @@ def build_career_path_bundle():
 
     pipeline = Pipeline([
         ('preprocessor', ColumnTransformer([
-            ('text', TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=3000), 'text'),
+            ('text', TfidfVectorizer(ngram_range=(1, 2), min_df=2, max_features=5000), 'text'),
             ('num', Pipeline([
                 ('imputer', SimpleImputer(strategy='median')),
                 ('scaler', StandardScaler()),
             ]), ['experience_years', 'skills_count', 'certifications', 'salary']),
         ])),
-        ('model', LogisticRegression(max_iter=2000, class_weight='balanced')),
+        ('model', RandomForestClassifier(n_estimators=200, max_depth=20, random_state=42, class_weight='balanced')),
     ])
 
     pipeline.fit(X_train, y_train)
@@ -587,8 +654,13 @@ def build_career_path_bundle():
 
     for class_index, path_name in enumerate(class_order):
         subset = combined[combined['path'] == path_name]
-        coefficient_vector = pipeline.named_steps['model'].coef_[class_index][:len(vocabulary)]
-        top_indices = np.argsort(coefficient_vector)[-12:][::-1]
+        model = pipeline.named_steps['model']
+        if hasattr(model, 'coef_'):
+            text_signal = model.coef_[class_index][:len(vocabulary)]
+        else:
+            # Tree models expose global feature importance rather than per-class coefficients.
+            text_signal = model.feature_importances_[:len(vocabulary)]
+        top_indices = np.argsort(text_signal)[-12:][::-1]
         top_terms = [term.replace('_', ' ') for term in vocabulary[top_indices] if term not in STOPWORDS][:8]
 
         skill_counter = Counter()
@@ -620,6 +692,7 @@ def build_career_path_bundle():
         'metrics': metrics,
         'class_order': class_order,
         'path_profiles': path_profiles,
+        'label_audit': build_career_label_audit(posting_labels, salary_labels, class_order),
     }
 
 

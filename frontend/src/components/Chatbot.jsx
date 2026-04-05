@@ -1,126 +1,89 @@
-import { useState } from 'react'
-import { submitChatbot } from '../api'
-import InsightPanel from './InsightPanel'
+import { useState, useRef, useEffect } from 'react'
 
-const domainLabels = {
-  career: 'Career',
-  finance: 'Finance',
-  startup: 'Startup',
-  policy: 'Policy',
-}
-
-function ComparisonPanel({ payload }) {
-  const details = payload.details || {}
-  const probabilities = Array.isArray(details.probabilities) ? details.probabilities : []
-  const explanations = Array.isArray(details.explanations) ? details.explanations : []
-  const risks = Array.isArray(details.risks) ? details.risks : []
-  const suggestions = details.actionable_suggestions || {}
-
-  return (
-    <div className="space-y-4 rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="rounded-3xl bg-[linear-gradient(135deg,_rgba(15,23,42,1),_rgba(14,165,233,0.82))] p-5 text-white">
-        <div className="text-xs uppercase tracking-[0.24em] text-slate-200">Career comparison</div>
-        <div className="mt-2 text-2xl font-semibold">{payload.decision}</div>
-        <p className="mt-3 text-sm leading-6 text-slate-100">{payload.summary}</p>
-      </div>
-
-      <div className="rounded-3xl bg-slate-50 p-4">
-        <div className="text-sm font-semibold text-slate-900">Success probability</div>
-        <div className="mt-4 space-y-3">
-          {probabilities.map((item) => {
-            const percent = Math.round((item.probability || 0) * 100)
-            return (
-              <div key={item.label}>
-                <div className="flex items-center justify-between text-sm font-medium text-slate-700">
-                  <span>{item.label}</span>
-                  <span>{percent}%</span>
-                </div>
-                <div className="mt-2 h-3 overflow-hidden rounded-full bg-slate-200">
-                  <div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-emerald-500" style={{ width: `${percent}%` }} />
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-3xl bg-slate-50 p-4">
-          <div className="text-sm font-semibold text-slate-900">Explanation</div>
-          <div className="mt-3 space-y-3">
-            {explanations.map((item, index) => (
-              <div key={`${item}-${index}`} className="rounded-2xl bg-white p-3 text-sm leading-6 text-slate-700">
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-3xl bg-slate-50 p-4">
-          <div className="text-sm font-semibold text-slate-900">Risk analysis</div>
-          <div className="mt-3 space-y-3">
-            {risks.map((item) => (
-              <div key={item.path} className="rounded-2xl bg-white p-3 text-sm leading-6 text-slate-700">
-                <div className="font-semibold text-slate-900">{item.path}</div>
-                <div>{item.risk}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {details.what_if && (
-        <div className="rounded-3xl border border-sky-200 bg-sky-50 p-4">
-          <div className="text-sm font-semibold text-sky-900">Alternative scenario</div>
-          <p className="mt-2 text-sm leading-6 text-sky-800">{details.what_if}</p>
-        </div>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {Object.entries(suggestions).map(([path, items]) => (
-          <div key={path} className="rounded-3xl bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-900">{path}</div>
-            <div className="mt-3 space-y-2">
-              {(items || []).map((item, index) => (
-                <div key={`${item}-${index}`} className="rounded-2xl bg-white p-3 text-sm leading-6 text-slate-700">
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
+const defaultApiBase = `${window.location.protocol}//${window.location.hostname}:8000`
+const API_BASE = import.meta.env.VITE_API_BASE_URL || defaultApiBase
 
 export default function Chatbot() {
   const [open, setOpen] = useState(false)
-  const [query, setQuery] = useState('')
-  const [history, setHistory] = useState([])
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
+  const listRef = useRef(null)
 
-  const send = async () => {
-    if (!query.trim()) return
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight
+    }
+  }, [messages, loading])
 
-    const prompt = query
-    const user = { id: `${Date.now()}-user`, from: 'user', message: prompt }
-    setHistory((h) => [...h, user])
+  const sendMessage = async () => {
+    const trimmed = input.trim()
+    if (!trimmed) return
+
+    const userMessage = {
+      id: `${Date.now()}-user`,
+      role: 'user',
+      content: trimmed,
+    }
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
+    setInput('')
     setLoading(true)
 
+    const payload = {
+      messages: nextMessages.slice(-10).map(({ role, content }) => ({ role, content })),
+      stream: true,
+    }
+
+    const assistantId = `${Date.now()}-assistant`
+    setMessages((prev) => [
+      ...prev,
+      { id: assistantId, role: 'assistant', content: '' },
+    ])
+
     try {
-      const response = await submitChatbot({ message: prompt })
-      const bot = {
-        id: `${Date.now()}-bot`,
-        from: 'bot',
-        payload: response,
+      const response = await fetch(`${API_BASE}/chatbot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(errorText || 'Chat API error')
       }
-      setHistory((h) => [...h, bot])
-      setQuery('')
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        const text = await response.text()
+        setMessages((prev) => prev.map((msg) => msg.id === assistantId ? { ...msg, content: text } : msg))
+        return
+      }
+
+      const decoder = new TextDecoder()
+      let done = false
+      let assistantText = ''
+
+      while (!done) {
+        const { value, done: finished } = await reader.read()
+        done = finished
+        if (value) {
+          assistantText += decoder.decode(value, { stream: true })
+          setMessages((prev) => prev.map((msg) => msg.id === assistantId ? { ...msg, content: assistantText } : msg))
+        }
+      }
     } catch (err) {
-      setHistory((h) => [...h, { id: `${Date.now()}-error`, from: 'bot', message: `Error: ${err.message}` }])
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setMessages((prev) => prev.map((msg) => msg.id === assistantId ? { ...msg, content: `Error: ${errorMessage}` } : msg))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      sendMessage()
     }
   }
 
@@ -132,6 +95,7 @@ export default function Chatbot() {
       >
         {open ? 'Close deciXAI Chat' : 'Open deciXAI Chat'}
       </button>
+
       {open && (
         <div className="mt-3 flex h-[76vh] w-[min(30rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/95 shadow-2xl backdrop-blur">
           <div className="border-b border-slate-200 bg-[linear-gradient(135deg,_rgba(15,23,42,1),_rgba(14,165,233,0.88))] p-4 text-white">
@@ -143,71 +107,56 @@ export default function Chatbot() {
               />
               <div>
                 <div className="font-semibold">deciXAI Chat</div>
-                <div className="text-xs uppercase tracking-[0.24em] text-slate-200">Ask, compare, understand</div>
+                <div className="text-xs uppercase tracking-[0.24em] text-slate-200">Chat naturally, get conversational answers</div>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3">
-            {history.length === 0 && (
+          <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3">
+            {messages.length === 0 && (
               <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
-                Ask a decision question and the answer will show up as visual cards with factors and actions.
+                Start a conversation and the bot will reply conversationally.
               </div>
             )}
 
-            {history.map((item) => (
-              <div key={item.id} className={item.from === 'user' ? 'pl-8' : ''}>
-                {item.from === 'user' ? (
-                  <div className="ml-auto max-w-[90%] rounded-3xl bg-slate-900 px-4 py-3 text-sm text-white shadow-sm">
-                    {item.message}
-                  </div>
-                ) : item.payload ? (
-                  <div className="max-w-full">
-                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                      {domainLabels[item.payload.intent] || 'Decision'} answer
-                    </div>
-                    {item.payload.mode === 'comparison' ? (
-                      <ComparisonPanel payload={item.payload} />
-                    ) : (
-                      <InsightPanel
-                        result={{
-                          ...item.payload,
-                          summary: item.payload.summary || `Instant ${domainLabels[item.payload.intent] || 'decision'} guidance powered by the chatbot.`,
-                          next_step: item.payload.next_step || item.payload.suggestions?.[0] || 'Review the strongest factor and iterate.',
-                          score_band: item.payload.score_band || item.payload.intent,
-                          score_label: item.payload.score_label || `${Math.round((item.payload.probability || 0) * 100)}% confidence`,
-                          target_score: item.payload.target_score,
-                        }}
-                        domain={item.payload.intent}
-                        title="Chat insight"
-                        subtitle="Structured guidance generated from your question."
-                        input={item.payload.parsed_input}
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <div className="max-w-[90%] rounded-3xl bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
-                    {item.message}
-                  </div>
-                )}
+            {messages.map((message) => (
+              <div key={message.id} className={message.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+                <div
+                  className={`max-w-[80%] rounded-3xl px-4 py-3 text-sm shadow-sm ${
+                    message.role === 'user'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white text-slate-900 border border-slate-200'
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">{message.content}</div>
+                </div>
               </div>
             ))}
+
+            {loading && (
+              <div className="flex justify-start">
+                <div className="max-w-[50%] animate-pulse rounded-3xl bg-slate-200 px-4 py-3 text-sm text-slate-500 shadow-sm">
+                  deciXAI is typing...
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="border-t border-slate-200 bg-white p-3">
             <textarea
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
               rows={3}
               className="w-full resize-none rounded-3xl border border-slate-200 px-4 py-3 outline-none transition focus:border-sky-400"
-              placeholder="Type your decision question..."
+              placeholder="Type your message and press Enter to send..."
             />
             <button
               disabled={loading}
-              onClick={send}
+              onClick={sendMessage}
               className="mt-3 w-full rounded-full bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
             >
-              {loading ? 'Processing...' : 'Send'}
+              {loading ? 'Sending...' : 'Send'}
             </button>
           </div>
         </div>

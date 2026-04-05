@@ -6,8 +6,8 @@
     "roc_auc": 0.8788
   },
   "career_path": {
-    "accuracy": 0.9959,
-    "f1_macro": 0.9961
+    "accuracy": 0.9539,
+    "f1_macro": 0.8508
   },
   "finance": {
     "model": "random_forest",

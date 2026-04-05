@@ -63,12 +63,26 @@ def predict_with_model(domain, frame):
 
     explanation = 'Model prediction generated successfully.'
     key_factors = list(frame.columns)
+    shap_result = {'raw_shap': []}
+    
     if 'preprocessor' in pipeline.named_steps and 'model' in pipeline.named_steps:
         transformed_row = pipeline.named_steps['preprocessor'].transform(frame)
         if hasattr(transformed_row, 'toarray'):
             transformed_row = transformed_row.toarray()
         feature_names = pipeline.named_steps['preprocessor'].get_feature_names_out().tolist()
-        shap_result = compute_shap_explanation(pipeline.named_steps['model'], transformed_row, feature_names)
+        
+        # Pass profiles and labels for human-readable SHAP
+        profiles = bundle.get('profiles', {})
+        feature_labels = bundle.get('feature_labels', {})
+        shap_result = compute_shap_explanation(
+            pipeline.named_steps['model'], 
+            transformed_row, 
+            feature_names, 
+            raw_row=frame.iloc[0].to_dict(),
+            profiles=profiles,
+            feature_labels=feature_labels,
+            positive_class_index=positive_index,
+        )
         explanation, key_factors = convert_shap_for_response(shap_result)
 
     score_label, score_band = _score_label(probability)
@@ -83,4 +97,6 @@ def predict_with_model(domain, frame):
         'samples': bundle.get('samples', 0),
         'profiles': bundle.get('profiles', {}),
         'feature_labels': bundle.get('feature_labels', {}),
+        'human_shap': shap_result.get('human_shap', []),
+        'raw_shap': shap_result.get('raw_shap', []),
     }

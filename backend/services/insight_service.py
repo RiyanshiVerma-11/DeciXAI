@@ -75,12 +75,29 @@ def build_model_driven_guidance(domain: str, input_row: dict[str, Any], model_re
 
         direction = _preferred_direction(domain, feature, profile)
         label = _feature_label(domain, feature, model_result)
-        target = profile.get('positive_p25') if direction == 'higher' else profile.get('positive_p75')
-        if target is None:
-            target = profile.get('positive_median')
-        if target is None:
+        
+        # For finance domain, calculate dynamic targets based on income
+        if domain == 'finance':
+            income = float(input_row.get('income', 50000))
+            if feature == 'loan':
+                # Recommend loan as ~30% of annual income for healthy finances
+                target_value = income * 0.30
+            elif feature == 'loan_to_income':
+                # Ideal loan-to-income ratio for healthy finances
+                target_value = 0.30
+            else:
+                target_value = profile.get('positive_p25') if direction == 'higher' else profile.get('positive_p75')
+                if target_value is None:
+                    target_value = profile.get('positive_median')
+        else:
+            target = profile.get('positive_p25') if direction == 'higher' else profile.get('positive_p75')
+            if target is None:
+                target = profile.get('positive_median')
+            target_value = float(target) if target is not None else None
+        
+        if target_value is None:
             continue
-        target_value = float(target)
+
         denominator = max(abs(target_value), 1.0)
         if direction == 'higher':
             gap_ratio = (target_value - current_value) / denominator
@@ -94,11 +111,11 @@ def build_model_driven_guidance(domain: str, input_row: dict[str, Any], model_re
     gaps.sort(reverse=True)
     for _, feature, label, current_value, target_value, direction in gaps[:3]:
         if direction == 'higher':
-            suggestions.append(f'Increase {label.lower()} toward {target_value:.2f}; the model sees stronger outcomes around that level than your current {current_value:.2f}.')
-            risks.append(f'{label} is below the successful-profile median ({current_value:.2f} vs {target_value:.2f}).')
+            suggestions.append(f'Increase {label.lower()} toward {target_value:.2f}; stronger outcomes align with that level (your current: {current_value:.2f}).')
+            risks.append(f'{label} is below the healthy threshold ({current_value:.2f} vs target {target_value:.2f}).')
         else:
-            suggestions.append(f'Reduce {label.lower()} closer to {target_value:.2f}; stronger outcomes in the training data usually stayed below your current {current_value:.2f}.')
-            risks.append(f'{label} is above the successful-profile median ({current_value:.2f} vs {target_value:.2f}).')
+            suggestions.append(f'Reduce {label.lower()} to around {target_value:.2f}; healthier profiles typically maintain this level (your current: {current_value:.2f}).')
+            risks.append(f'{label} is elevated compared to healthier benchmarks ({current_value:.2f} vs target {target_value:.2f}).')
 
     for feature, ranked_categories in categorical_profiles.items():
         if not ranked_categories:
@@ -109,19 +126,19 @@ def build_model_driven_guidance(domain: str, input_row: dict[str, Any], model_re
         if current and current_option and top_option['value'] and current_option['success_rate'] + 0.12 < top_option['success_rate']:
             label = _feature_label(domain, feature, model_result)
             suggestions.append(
-                f'{label} currently aligns with a lower-success segment than "{top_option["value"]}". Consider building signals that move you closer to that stronger segment.'
+                f'{label} could be optimized toward "{top_option["value"]}" for better alignment with successful profiles.'
             )
             risks.append(
-                f'{label} is currently closer to a weaker-performing segment than the strongest segment seen in training.'
+                f'{label} is currently in a lower-success segment compared to stronger options.'
             )
 
     if not suggestions:
-        suggestions.append('Your current inputs already sit close to the stronger training profile. Focus on maintaining consistency and improving the top positive factor.')
+        suggestions.append('Your financial profile aligns well with healthy benchmarks. Continue maintaining your current discipline and monitor key metrics.')
 
     explanation = model_result.get('explanation', '')
     if gaps:
         top_gap = gaps[0][2]
-        explanation = f'{explanation} The biggest improvement gap versus successful examples is {top_gap.lower()}.'.strip()
+        explanation = f'{explanation} The key area to improve is {top_gap.lower()}.'.strip()
 
     return {
         'suggestions': suggestions[:3],
