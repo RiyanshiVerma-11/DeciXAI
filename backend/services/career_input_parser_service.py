@@ -329,6 +329,9 @@ def _map_synonyms(text: str) -> str:
         "ds": "data science",
         "ml": "machine learning",
         "ai ml": "data science",
+        "proj": "projects",
+        "pr": "projects",
+        "cert": "certifications",
         "b tech": "btech",
         "bachelor of technology": "btech",
         "bachelor of engineering": "be",
@@ -474,11 +477,6 @@ def _split_project_phrases(section: str) -> list[str]:
     explicit_items = _split_section_items(section)
     if len(explicit_items) > 1:
         return explicit_items
-
-    pattern = rf"\b(?:[a-z0-9]+\s+){{0,3}}(?:{'|'.join(PROJECT_ENDINGS)})\b"
-    matches = [match.strip() for match in re.findall(pattern, section, flags=re.IGNORECASE)]
-    if matches:
-        return _dedupe_preserve_order(matches)
 
     tokens = section.split()
     if not tokens:

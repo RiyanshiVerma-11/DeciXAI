@@ -376,6 +376,18 @@ def normalize_career_input(data: dict[str, Any]) -> dict[str, Any]:
     projects = _split_items(data.get("projects"))
     certifications = _split_items(data.get("certifications"))
     internships = _split_items(data.get("internships") or data.get("internship"))
+
+    # Users often paste internships under "certifications". Treat those as experience proof.
+    if certifications:
+        moved = []
+        for item in certifications:
+            lowered = _clean_token(item)
+            if any(hint in lowered for hint in INTERNSHIP_HINTS):
+                moved.append(item)
+        if moved:
+            internships = _unique_text_items([*internships, *moved])
+            certifications = [item for item in certifications if item not in moved]
+
     raw_interest = _clean_text(data.get("interest"))
     course_value = _clean_text(data.get("course") or data.get("degree") or data.get("education_level"))
     specialization_value = _clean_text(data.get("specialization") or course_value)

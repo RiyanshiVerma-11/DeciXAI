@@ -61,9 +61,36 @@ def _practical_finance_probability(income: float, loan: float, credit_score: flo
 
 
 def get_finance_decision(data):
-    income = max(safe_float(data.get('income', 50000)), 1.0)
-    loan = max(safe_float(data.get('loan', 15000)), 0.0)
-    credit_score = min(max(safe_float(data.get('credit_score', 650)), 300.0), 850.0)
+    # Do not silently assume defaults for missing fields; it produces untrustworthy outputs.
+    missing = []
+    if data.get('income') is None:
+        missing.append('income')
+    if data.get('loan') is None:
+        missing.append('loan')
+    if data.get('credit_score') is None:
+        missing.append('credit_score')
+    if missing:
+        return {
+            'decision': 'Need more details to assess finance risk',
+            'probability': 0.5,
+            'score_label': 'Unknown',
+            'score_band': 'Unknown',
+            'summary': 'The finance model needs your income, loan amount, and credit score to produce a reliable result.',
+            'next_step': 'Share income, loan amount, and credit score (or approximate ranges).',
+            'target_score': 75.0,
+            'key_factors': ['missing_inputs'],
+            'explanation': f'Missing required inputs: {", ".join(missing)}.',
+            'suggestions': [
+                'Provide: income (annual), loan amount, and credit score.',
+                'If unsure, provide approximate ranges.',
+            ],
+            'risks': ['Inputs were missing, so any score would be unreliable.'],
+            'meta': {'missing_fields': missing},
+        }
+
+    income = max(safe_float(data.get('income'), 0.0), 1.0)
+    loan = max(safe_float(data.get('loan'), 0.0), 0.0)
+    credit_score = min(max(safe_float(data.get('credit_score'), 0.0), 300.0), 850.0)
     loan_to_income = min(loan / max(income, 1.0), 5.0)
 
     model_frame = pd.DataFrame([{

@@ -189,7 +189,7 @@ def detect_domain(message: str) -> str:
     for domain in DOMAIN_PRIORITY:
         if scores[domain] > 0:
             return domain
-    return None
+    return 'career'
 
 
 def extract_options(text: str, domain: str | None = None) -> list[str]:
