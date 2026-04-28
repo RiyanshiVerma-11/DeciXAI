@@ -5,7 +5,8 @@ import re
 
 import pandas as pd
 
-from services.model_service import predict_with_model
+from services.model_service import build_runtime_frame, predict_with_model
+from services.llm_action_plan_service import generate_action_plan
 
 
 DEFAULT_STARTUP_INPUT = {
@@ -421,13 +422,17 @@ def get_startup_decision(data: dict | None):
 
     market_type = startup.get('market_type', '')
     market_segment = startup.get('market_segment', market)
-    model_frame = pd.DataFrame([{
+    feature_values = {
         'funding': funding,
         'team_size': team_size,
         'market': market,
         'experience': experience,
         'funding_per_team': funding / _safe_divisor(team_size),
-    }])
+        'runway_score': min(funding / 300000.0, 2.5),
+        'experience_per_team_member': experience / _safe_divisor(team_size),
+        'capital_efficiency': (funding / _safe_divisor(team_size)) / 100000.0,
+    }
+    model_frame = build_runtime_frame('startup', feature_values)
 
     model_result = predict_with_model('startup', model_frame)
     if model_result is None:
@@ -484,7 +489,7 @@ def get_startup_decision(data: dict | None):
                 changed.append(feature)
                 ranked_gaps.append((target_value - row[feature], feature, row[feature], target_value))
         updated['funding_per_team'] = updated['funding'] / _safe_divisor(updated['team_size'])
-        rerun = predict_with_model('startup', pd.DataFrame([updated]))
+        rerun = predict_with_model('startup', build_runtime_frame('startup', updated))
         what_if = ''
         if rerun is not None:
             what_if = (
@@ -535,11 +540,34 @@ def get_startup_decision(data: dict | None):
             'explanation': ' '.join(positive + negative),
             'suggestions': action_plan[:3],
         }
-    return response | {
+    merged = response | {
         'intent': 'startup',
         'mode': 'single',
         'parsed_input': _sanitize_startup_payload(startup),
     }
+
+    llm_plan = generate_action_plan(
+        domain="startup",
+        user_input={
+            "funding": funding,
+            "team_size": team_size,
+            "experience": experience,
+            "market": market,
+            "market_segment": market_segment,
+        },
+        decision=str(merged.get("decision") or ""),
+        score=float(merged.get("score", 0.0) or 0.0),
+        risks=[str(item) for item in (merged.get("risks") or [])],
+        insights=[str(item) for item in (merged.get("insights") or [])],
+    )
+    if llm_plan:
+        merged["action_plan"] = llm_plan
+        merged["suggestions"] = llm_plan[:3]
+        merged["next_step"] = llm_plan[0]
+        merged["meta"] = dict((merged.get("meta") or {}))
+        merged["meta"]["action_plan_source"] = "ollama"
+
+    return merged
 
 
 def get_startup_decision_from_text(text: str) -> dict:

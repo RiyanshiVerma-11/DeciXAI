@@ -1,16 +1,6 @@
 
 
 services:
-  ollama:
-    image: ollama/ollama:latest
-    container_name: decisionai-ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama:/root/.ollama
-    networks:
-      - decisionai-net
-
   backend:
     build:
       context: ./backend
@@ -23,10 +13,10 @@ services:
     env_file:
       - .env
     environment:
-      - OLLAMA_API_URL=http://ollama:11434
+      - OLLAMA_API_URL=http://host.docker.internal:11434/v1/chat/completions
       - OLLAMA_MODEL=${OLLAMA_MODEL}
-    depends_on:
-      - ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - decisionai-net
 
@@ -47,6 +37,3 @@ services:
 networks:
   decisionai-net:
     driver: bridge
-
-volumes:
-  ollama:

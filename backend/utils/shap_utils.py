@@ -1,5 +1,4 @@
 import numpy as np
-import shap
 from typing import List, Dict, Any, Tuple
 
 
@@ -136,6 +135,7 @@ def compute_shap_explanation(
     positive_class_index: int = 1,
 ) -> Dict[str, Any]:
     try:
+        import shap
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(row)
         if isinstance(shap_values, list):

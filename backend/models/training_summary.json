@@ -1,30 +1,30 @@
 {
   "career": {
-    "model": "extra_trees",
-    "accuracy": 0.8285,
-    "f1": 0.853,
-    "roc_auc": 0.8788
+    "model": "xgboost",
+    "accuracy": 0.7435,
+    "f1": 0.6596,
+    "roc_auc": 0.8426
   },
   "career_path": {
-    "accuracy": 0.9539,
-    "f1_macro": 0.8508
+    "accuracy": 0.9404,
+    "f1_macro": 0.8603
   },
   "finance": {
-    "model": "random_forest",
-    "accuracy": 0.9198,
-    "f1": 0.9238,
-    "roc_auc": 0.9692
+    "model": "xgboost",
+    "accuracy": 0.9188,
+    "f1": 0.9226,
+    "roc_auc": 0.968
   },
   "startup": {
-    "model": "random_forest",
-    "accuracy": 0.6322,
-    "f1": 0.587,
-    "roc_auc": 0.679
+    "model": "xgboost",
+    "accuracy": 0.8289,
+    "f1": 0.8506,
+    "roc_auc": 0.9027
   },
   "policy": {
-    "model": "random_forest",
-    "accuracy": 0.6134,
-    "f1": 0.5625,
-    "roc_auc": 0.6452
+    "model": "xgboost",
+    "accuracy": 0.9288,
+    "f1": 0.9285,
+    "roc_auc": 0.9796
   }
 }

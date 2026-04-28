@@ -121,6 +121,22 @@ const parseExplanationFactors = (text) => {
 }
 
 const buildFactorData = (result) => {
+  if (Array.isArray(result.factor_impacts) && result.factor_impacts.length) {
+    return result.factor_impacts.slice(0, 5).map((item, index) => {
+      const value = Number(item.value ?? 0)
+      const direction = value >= 0 ? 'positive' : 'negative'
+      return {
+        rawLabel: item.factor,
+        label: humanizeFeatureLabel(item.factor),
+        value,
+        magnitude: Math.max(Math.abs(value), 0.01),
+        direction,
+        color: direction === 'positive'
+          ? POSITIVE_COLORS[index % POSITIVE_COLORS.length]
+          : NEGATIVE_COLORS[index % NEGATIVE_COLORS.length],
+      }
+    })
+  }
   if ((!result.explanation || !String(result.explanation).trim()) && Array.isArray(result.key_factors)) {
     return result.key_factors.slice(0, 5).map((item, index) => ({
       rawLabel: item,
@@ -150,10 +166,13 @@ const buildFactorData = (result) => {
 }
 
 const buildActionItems = (result) => {
+  const planSteps = Array.isArray(result?.action_plan) ? result.action_plan : []
+  const suggestionSteps = Array.isArray(result?.suggestions) ? result.suggestions : []
+
+  // The UI already surfaces `next_step` as "Priority". Keep the step cards focused on the plan itself.
   const steps = [
-    result.next_step,
-    ...(Array.isArray(result.action_plan) ? result.action_plan : []),
-    ...(Array.isArray(result.suggestions) ? result.suggestions : []),
+    ...planSteps,
+    ...suggestionSteps,
   ]
     .map((item) => String(item || '').trim())
     .filter(Boolean)
@@ -391,6 +410,176 @@ function BlockingFactorsCard({ items }) {
   )
 }
 
+function QuestionsCard({ questions }) {
+  if (!Array.isArray(questions) || !questions.length) return null
+
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-lg font-semibold text-slate-900">Quick questions</h3>
+      <p className="mt-1 text-sm text-slate-500">Answering these makes the recommendation much more reliable.</p>
+      <div className="mt-4 grid gap-3">
+        {questions.slice(0, 4).map((item, index) => (
+          <div key={`${item}-${index}`} className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-sky-50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-indigo-700">Question {index + 1}</div>
+            <div className="mt-2 text-sm font-medium leading-6 text-slate-800">{item}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AlignmentPill({ label, value }) {
+  const styles = {
+    match: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    mismatch: 'bg-rose-100 text-rose-800 border-rose-200',
+    missing: 'bg-amber-100 text-amber-800 border-amber-200',
+  }
+  const normalized = String(value || '').toLowerCase()
+  const style = styles[normalized] || styles.missing
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border bg-white px-4 py-3 shadow-sm">
+      <div className="text-sm font-medium text-slate-800">{label}</div>
+      <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${style}`}>
+        {normalized || 'missing'}
+      </span>
+    </div>
+  )
+}
+
+function RoadmapBlock({ title, items, tone = 'slate' }) {
+  const tones = {
+    slate: 'border-slate-200 bg-slate-50',
+    cyan: 'border-cyan-200 bg-cyan-50',
+    indigo: 'border-indigo-200 bg-indigo-50',
+    emerald: 'border-emerald-200 bg-emerald-50',
+  }
+
+  return (
+    <div className={`rounded-2xl border p-4 ${tones[tone] || tones.slate}`}>
+      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">{title}</div>
+      <div className="mt-3 grid gap-2">
+        {(items || []).slice(0, 4).map((item, index) => (
+          <div key={`${title}-${index}`} className="rounded-xl bg-white/80 px-3 py-2 text-sm font-medium text-slate-800 shadow-sm">
+            {item}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DualRoadmapCard({ intel }) {
+  if (!intel || typeof intel !== 'object') return null
+  const best = intel.best_fit
+  const interest = intel.interest
+  if (!best || !interest) return null
+
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">Roadmap (Best Fit vs Interest)</h3>
+          <p className="mt-1 text-sm text-slate-500">Two-track plan so the user gets a clear decision and a clear pivot path.</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+          {intel.recommended_view === 'dual_track' ? 'Dual track' : 'Single track'}
+        </span>
+      </div>
+
+      {Array.isArray(intel.difference) && intel.difference.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">What’s different</div>
+          <div className="mt-2 grid gap-2">
+            {intel.difference.slice(0, 3).map((line, index) => (
+              <div key={`diff-${index}`} className="text-sm leading-6 text-slate-700">{line}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-[22px] border border-slate-200 bg-gradient-to-br from-cyan-50 to-sky-50 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-cyan-700">Best fit (current)</div>
+          <div className="mt-2 text-base font-semibold text-slate-900">{best.path_label}</div>
+          <div className="mt-3 grid gap-2">
+            <AlignmentPill label="Skills" value={best.alignment?.skills} />
+            <AlignmentPill label="Projects" value={best.alignment?.projects} />
+            <AlignmentPill label="Certifications" value={best.alignment?.certifications} />
+            <AlignmentPill label="Interest" value={best.alignment?.interest} />
+          </div>
+          <div className="mt-4 grid gap-3">
+            <RoadmapBlock title="Skills to add" items={best.roadmap?.skills_to_add || []} tone="cyan" />
+            <RoadmapBlock title="4 project ideas" items={best.roadmap?.project_ideas || []} tone="indigo" />
+          </div>
+        </div>
+
+        <div className="rounded-[22px] border border-slate-200 bg-gradient-to-br from-amber-50 to-rose-50 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-rose-700">Interest track (target)</div>
+          <div className="mt-2 text-base font-semibold text-slate-900">{interest.path_label}</div>
+          <div className="mt-3 grid gap-2">
+            <AlignmentPill label="Skills" value={interest.alignment?.skills} />
+            <AlignmentPill label="Projects" value={interest.alignment?.projects} />
+            <AlignmentPill label="Certifications" value={interest.alignment?.certifications} />
+            <AlignmentPill label="Interest" value={interest.alignment?.interest} />
+          </div>
+          <div className="mt-4 grid gap-3">
+            <RoadmapBlock title="Skills to add" items={interest.roadmap?.skills_to_add || []} tone="amber" />
+            <RoadmapBlock title="4 project ideas" items={interest.roadmap?.project_ideas || []} tone="emerald" />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <RoadmapBlock title="Certifications (best fit)" items={best.roadmap?.certifications || []} tone="slate" />
+        <RoadmapBlock title="Certifications (interest)" items={interest.roadmap?.certifications || []} tone="slate" />
+      </div>
+    </div>
+  )
+}
+
+function EvidenceCard({ sources }) {
+  if (!Array.isArray(sources) || !sources.length) return null
+
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <h3 className="text-lg font-semibold text-slate-900">Evidence (O*NET)</h3>
+      <p className="mt-1 text-sm text-slate-500">Matched occupations and skill signals related to your profile.</p>
+      <div className="mt-4 grid gap-3">
+        {sources.slice(0, 4).map((item, index) => (
+          <div key={`${item.code || item.title}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-900">{item.title || 'O*NET Occupation'}</div>
+                <div className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{item.code || 'O*NET'}</div>
+              </div>
+              {typeof item.score === 'number' && (
+                <div className="shrink-0 rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
+                  {Math.round(item.score * 100)}%
+                </div>
+              )}
+            </div>
+            {item.snippet && <p className="mt-3 text-sm leading-6 text-slate-700">{item.snippet}</p>}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(Array.isArray(item.top_skills) ? item.top_skills : []).slice(0, 4).map((skill) => (
+                <span key={`${item.code}-skill-${skill}`} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                  {skill}
+                </span>
+              ))}
+              {(Array.isArray(item.technology_skills) ? item.technology_skills : []).slice(0, 3).map((skill) => (
+                <span key={`${item.code}-tech-${skill}`} className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 shadow-sm">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function InputSnapshot({ input }) {
   if (!input || typeof input !== 'object') return null
 
@@ -414,12 +603,56 @@ function InputSnapshot({ input }) {
   )
 }
 
+function LiveControls({ fields, onChange, isLiveUpdating }) {
+  if (!fields?.length || !onChange) return null
+
+  return (
+    <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">What-if sliders</h3>
+          <p className="text-sm text-slate-500">Adjust numeric inputs and the score refreshes automatically.</p>
+        </div>
+        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+          {isLiveUpdating ? 'Updating' : 'Live'}
+        </div>
+      </div>
+      <div className="mt-4 grid gap-4">
+        {fields.map((field) => (
+          <div key={field.name} className="rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="text-sm font-medium text-slate-800">{field.label}</div>
+              <div className="text-sm font-semibold text-slate-600">{field.value}</div>
+            </div>
+            <input
+              type="range"
+              min={field.range?.min}
+              max={field.range?.max}
+              step={field.range?.step || 1}
+              value={field.value ?? field.range?.min ?? 0}
+              onChange={(event) => onChange(field.name, Number(event.target.value))}
+              className="mt-4 w-full accent-sky-500"
+            />
+            <div className="mt-2 flex justify-between text-xs text-slate-400">
+              <span>{field.range?.min}</span>
+              <span>{field.range?.max}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function InsightPanel({
   result,
   domain = 'default',
   title = 'Decision insight',
   subtitle = 'A visual summary of the latest recommendation.',
   input,
+  interactiveFields,
+  onInteractiveChange,
+  isLiveUpdating,
   footerAction,
 }) {
   if (!result) return null
@@ -432,6 +665,9 @@ export default function InsightPanel({
   const factors = buildFactorData(result)
   const actions = buildActionItems(result)
   const blockingFactors = buildBlockingFactors(result)
+  const followupQuestions = Array.isArray(result.followup_questions) ? result.followup_questions : []
+  const evidenceSources = result?.details?.retrieved_sources || []
+  const careerIntel = result?.details?.career_intelligence || null
   const ringId = `scoreRingGradient-${domain}-${score}-${title.replace(/\s+/g, '-').toLowerCase()}`
 
   return (
@@ -452,14 +688,15 @@ export default function InsightPanel({
               <ScoreRing score={score} accentClass={styles.accent} ringId={ringId} />
               <div className="grid gap-4 sm:grid-cols-2">
                 <MetricCard label="Confidence" value={`${confidence}% confidence`} />
-                <MetricCard label="Priority" value={result.next_step || result.action_plan?.[0] || 'Proceed with the next best move'} />
+                {/* Priority is a separate, single-line highlight. Do not fall back to action_plan[0] (that would duplicate "Do this first"). */}
+                <MetricCard label="Priority" value={result.next_step || 'Proceed with the next best move'} />
                 <MetricCard
                   label="Decision band"
                   value={<span className={`inline-flex rounded-full px-3 py-1 text-sm ${bandClass}`}>{result.score_label || result.score_band || result.band || 'Evaluated'}</span>}
                 />
                 <MetricCard
                   label="Focus"
-                  value={result.action_plan?.[0] || 'Keep improving the strongest levers'}
+                  value={result.focus || actions[1] || 'Keep improving the strongest levers'}
                   tone="text-slate-700"
                 />
               </div>
@@ -468,7 +705,10 @@ export default function InsightPanel({
 
           <div className="grid gap-4">
             <StoryCards result={result} domain={domain} />
+            {domain === 'career' && <DualRoadmapCard intel={careerIntel} />}
+            {domain === 'career' && <EvidenceCard sources={evidenceSources} />}
             <ActionCards actions={actions} />
+            <QuestionsCard questions={domain === 'career' ? followupQuestions : []} />
             <BlockingFactorsCard items={blockingFactors} />
           </div>
         </div>
@@ -476,6 +716,10 @@ export default function InsightPanel({
         <div className="mt-5 grid gap-5 lg:grid-cols-[1fr,0.95fr]">
           <ImpactMix factors={factors} domain={domain} />
           <InputSnapshot input={input} />
+        </div>
+
+        <div className="mt-5">
+          <LiveControls fields={interactiveFields} onChange={onInteractiveChange} isLiveUpdating={isLiveUpdating} />
         </div>
       </div>
     </section>

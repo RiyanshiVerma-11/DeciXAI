@@ -63,6 +63,7 @@ docker compose up --build
 
 ### 4. Open the UI
 
+
 `http://localhost:3000`
 
 ## Chatbot Notes
@@ -79,6 +80,13 @@ python backend/train_models.py
 ```
 
 Datasets are read from `backend/datasets/*` and trained artifacts are written to `backend/models`.
+
+### Dataset Sources (If Files Are Too Large For GitHub)
+
+Some upstream sources can be re-downloaded here:
+
+* Indian Student Placement Dataset 2025 (career readiness): https://www.kaggle.com/datasets/sakharebharat/indian-student-placement-dataset-2025
+* O*NET 29.0 Database (career skills/occupations): https://www.kaggle.com/datasets/emarkhauser/onet-29-0-database
 
 ## API Endpoints
 

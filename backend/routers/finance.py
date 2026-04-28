@@ -7,4 +7,4 @@ router = APIRouter()
 
 @router.post('/', response_model=DecisionResponse)
 def evaluate_finance(input: FinanceInput):
-    return get_finance_decision(input.dict())
+    return get_finance_decision(input.model_dump())

@@ -1,14 +1,314 @@
 from __future__ import annotations
 
+import math
+
 import pandas as pd
 
-from services.insight_service import build_model_driven_guidance
-from services.model_service import predict_with_model
+from services.model_service import build_runtime_frame, predict_with_model
+from services.policy_rag_service import retrieve_policy_sources
+from services.llm_action_plan_service import generate_action_plan
 
 
 POLICY_PROFILES = {
     # Removed hardcoded profiles - using model predictions only
 }
+
+_SCALE_ALIASES = {
+    "low": {"low", "poor", "weak", "limited", "minimal"},
+    "medium": {"medium", "moderate", "ok", "average"},
+    "high": {"high", "strong", "good", "robust"},
+}
+
+
+def _clean_text(value) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _normalize_scale(value: str, default: str = "medium") -> str:
+    text = _clean_text(value)
+    if not text:
+        return default
+    for label, variants in _SCALE_ALIASES.items():
+        if any(token in text for token in variants):
+            return label
+    if text in {"weak"}:
+        return "low"
+    if text in {"strong"}:
+        return "high"
+    return default
+
+
+def _normalize_urgency(value: str) -> str:
+    text = _clean_text(value)
+    if not text:
+        return "medium"
+    if any(token in text for token in ("high", "urgent", "immediate", "asap")):
+        return "high"
+    if any(token in text for token in ("low", "later", "non urgent", "non-urgent")):
+        return "low"
+    return "medium"
+
+
+def _governance_adjustment_points(
+    *,
+    political_support: str,
+    infrastructure_readiness: str,
+    risk_level: str,
+    urgency: str,
+    budget: float,
+    population: float,
+) -> tuple[float, list[dict]]:
+    """
+    Convert governance + execution signals into score-point adjustments.
+    Returns (delta_points, contributions).
+    """
+    contributions: list[dict] = []
+    delta = 0.0
+
+    support = _normalize_scale(political_support, default="medium")
+    infra = _normalize_scale(infrastructure_readiness, default="medium")
+    risk = _normalize_scale(risk_level, default="medium")
+    urg = _normalize_urgency(urgency)
+
+    # Governance penalties must be strong enough to counter budget dominance,
+    # but not so strong that every high-risk scenario collapses to ~0.
+    support_points = {"high": 5.0, "medium": 0.0, "low": -4.0}[support]
+    infra_points = {"high": 4.0, "medium": 0.0, "low": -4.0}[infra]
+    # Risk is enforced mainly via the mandatory constraint layer to avoid double-penalizing.
+    risk_points = {"high": 0.0, "medium": -1.0, "low": 1.0}[risk]
+    urgency_points = {"high": 2.0, "medium": 0.0, "low": -2.0}[urg]
+
+    for name, points, value in (
+        ("political_support", support_points, support),
+        ("infrastructure_readiness", infra_points, infra),
+        ("risk_level", risk_points, risk),
+        ("urgency", urgency_points, urg),
+    ):
+        if points != 0.0:
+            contributions.append({"factor": name, "value": value, "points": points})
+        delta += points
+
+    # Small-population + high urgency tends to be easier to execute quickly.
+    if urg == "high" and population > 0:
+        pop_boost = 0.0
+        if population <= 250_000:
+            pop_boost = 4.0
+        elif population <= 600_000:
+            pop_boost = 2.0
+        if pop_boost:
+            delta += pop_boost
+            contributions.append({"factor": "delivery_scale", "value": f"population={int(population)}", "points": pop_boost})
+
+    # Avoid unnecessary optimism: low urgency + very high budget can indicate overspend or poor prioritization.
+    if urg == "low" and budget >= 10_000_000:
+        delta -= 4.0
+        contributions.append({"factor": "urgency_budget_alignment", "value": "low_urgency_high_budget", "points": -4.0})
+
+    return delta, contributions
+
+
+def _apply_policy_constraints(
+    score: float,
+    *,
+    political_support: str,
+    infrastructure_readiness: str,
+    risk_level: str,
+) -> tuple[float, list[str]]:
+    """
+    Hard feasibility constraints that override the ML score when governance is weak.
+    Returns (score, constraint_notes).
+    """
+    notes: list[str] = []
+    support = _normalize_scale(political_support, default="medium")
+    infra = _normalize_scale(infrastructure_readiness, default="medium")
+    risk = _normalize_scale(risk_level, default="medium")
+
+    capped = float(score)
+    if support == "low" and infra == "low":
+        capped = min(capped, 50.0)
+        notes.append("Capped score because political support is weak and infrastructure readiness is low.")
+
+    if risk == "high":
+        # Reduce by at least 10% for high-risk scenarios.
+        capped = max(0.0, capped * 0.90)
+        notes.append("Reduced score due to high risk level.")
+
+    return capped, notes
+
+
+def _policy_band(score: float) -> tuple[str, str]:
+    if score < 40:
+        return "Not Feasible", "0-40"
+    if score < 60:
+        return "Risky", "40-60"
+    if score < 75:
+        return "Conditional", "60-75"
+    return "Strong", "75+"
+
+
+def _unique_lines(items: list[str]) -> list[str]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        text = " ".join(str(item or "").split())
+        key = text.lower()
+        if text and key not in seen:
+            seen.add(key)
+            unique.append(text)
+    return unique
+
+
+def _confidence(score: float, contributions: list[dict], missing_fields: list[str]) -> float:
+    # Lower confidence when key governance fields are missing.
+    base = 70.0
+    base -= 10.0 * len(missing_fields)
+    # More constraints/adjustments means we are overriding the base score more.
+    base -= min(15.0, 2.5 * len(contributions))
+    # Extreme scores tend to be more confident if inputs are complete.
+    if score >= 80 or score <= 25:
+        base += 5.0
+    return max(10.0, min(base, 90.0))
+
+
+def _policy_insights(
+    *,
+    base_score: float,
+    final_score: float,
+    contributions: list[dict],
+    constraint_notes: list[str],
+    sector: str,
+    per_capita_budget: float,
+) -> list[str]:
+    insights: list[str] = []
+    if abs(final_score - base_score) >= 6:
+        direction = "down" if final_score < base_score else "up"
+        insights.append(f"Governance constraints adjusted the score {direction} from {round(base_score, 1)} to {round(final_score, 1)}.")
+
+    # Explain the biggest positive/negative governance drivers.
+    ranked = sorted(contributions, key=lambda x: abs(float(x.get("points", 0.0))), reverse=True)
+    for item in ranked[:4]:
+        points = float(item.get("points", 0.0))
+        factor = str(item.get("factor") or "").replace("_", " ")
+        value = str(item.get("value") or "")
+        if points > 0:
+            insights.append(f"{factor.title()} ({value}) supports feasibility (+{int(round(points))} points).")
+        else:
+            insights.append(f"{factor.title()} ({value}) increases execution risk ({int(round(points))} points).")
+
+    for note in constraint_notes:
+        insights.append(note)
+
+    if per_capita_budget > 0:
+        insights.append(f"Per-capita budget is about {round(per_capita_budget, 2)} for sector '{sector}'.")
+    return _unique_lines(insights)[:6]
+
+
+def _budget_signal(per_capita_budget: float, sector: str) -> tuple[str, str]:
+    if sector == "education":
+        if per_capita_budget < 10:
+            return "thin", "the budget is very thin per person, so a universal rollout would likely underdeliver unless you narrow the target group"
+        if per_capita_budget < 50:
+            return "tight", "the budget is usable but still tight per person, so phasing and targeting matter"
+        return "strong", "the per-person budget is strong enough to support broader delivery"
+    if per_capita_budget < 20:
+        return "tight", "the budget is tight per person, so the policy needs tight targeting and cost control"
+    if per_capita_budget < 100:
+        return "moderate", "the budget is moderate per person, so execution quality will determine outcomes"
+    return "strong", "the per-person budget is strong enough to support wider coverage"
+
+
+def _policy_priority_label(
+    *,
+    band_label: str,
+    risk_level: str,
+    infrastructure_readiness: str,
+    political_support: str,
+    per_capita_budget: float,
+    sector: str,
+) -> str:
+    risk = _normalize_scale(risk_level, default="medium")
+    infra = _normalize_scale(infrastructure_readiness, default="medium")
+    support = _normalize_scale(political_support, default="medium")
+    budget_signal, _ = _budget_signal(per_capita_budget, sector)
+
+    if band_label == "Strong" and risk != "high" and infra == "high" and support == "high":
+        return "Proceed with guarded rollout"
+    if band_label == "Strong" and budget_signal in {"thin", "tight"}:
+        return "Pilot before scaling"
+    if band_label == "Conditional":
+        return "Fix delivery gaps first"
+    if risk == "high":
+        return "Reduce risk before rollout"
+    return "Run a controlled pilot"
+
+
+def _policy_summary(
+    *,
+    final_score: float,
+    band_label: str,
+    sector: str,
+    per_capita_budget: float,
+    political_support: str,
+    infrastructure_readiness: str,
+    risk_level: str,
+) -> str:
+    support = _normalize_scale(political_support, default="medium")
+    infra = _normalize_scale(infrastructure_readiness, default="medium")
+    risk = _normalize_scale(risk_level, default="medium")
+    budget_signal, budget_meaning = _budget_signal(per_capita_budget, sector)
+
+    if band_label == "Strong":
+        opening = "This policy looks feasible enough to move forward"
+    elif band_label == "Conditional":
+        opening = "This policy looks workable, but only with tighter execution controls"
+    elif band_label == "Risky":
+        opening = "This policy is risky in its current form"
+    else:
+        opening = "This policy is not ready to move forward in its current form"
+
+    summary = f"{opening}. The score is {round(final_score, 1)}/100 and the current stance should be to "
+    if band_label == "Strong" and budget_signal in {"thin", "tight"}:
+        summary += "pilot first rather than scale immediately. "
+    elif band_label == "Strong":
+        summary += "proceed in phases with clear review checkpoints. "
+    elif band_label == "Conditional":
+        summary += "fix the main bottlenecks before approving rollout. "
+    else:
+        summary += "pause expansion until the weak signals improve. "
+
+    summary += f"For {sector}, per-person funding is about {round(per_capita_budget, 2)}, which means {budget_meaning}. "
+    summary += f"Political support is {support}, infrastructure readiness is {infra}, and risk is {risk}."
+    return summary
+
+
+def _policy_action_plan(
+    *,
+    political_support: str,
+    infrastructure_readiness: str,
+    risk_level: str,
+    urgency: str,
+) -> list[str]:
+    steps: list[str] = []
+    support = _normalize_scale(political_support, default="medium")
+    infra = _normalize_scale(infrastructure_readiness, default="medium")
+    risk = _normalize_scale(risk_level, default="medium")
+    urg = _normalize_urgency(urgency)
+
+    if support == "low":
+        steps.append("Secure political backing: identify champions, align incentives, and lock governance ownership.")
+    if infra == "low":
+        steps.append("Run a readiness-first pilot: fix infrastructure bottlenecks before scaling beneficiaries.")
+    if risk == "high":
+        steps.append("Add strong risk controls: monitoring, audit trails, and clear eligibility/verification checks.")
+    if urg == "high":
+        steps.append("Phase delivery: ship a minimal viable rollout in 6-8 weeks, then expand based on adoption data.")
+
+    if not steps:
+        steps.append("Run a phased pilot first instead of a full rollout.")
+    steps.append("Track three KPIs from day one: adoption, cost per beneficiary, and outcome improvement.")
+    steps.append("Set a stop-go review after the first implementation cycle before expanding coverage.")
+
+    return _unique_lines(steps)[:3]
 
 
 def _normalize_policy_option(text):
@@ -21,51 +321,169 @@ def _normalize_policy_option(text):
 
 
 def _build_policy_frame(data):
-    sector = str(data.get('sector', 'infrastructure')).lower()
+    sector = _clean_text(data.get('sector', 'infrastructure')).strip("=, ")
     budget = float(data.get('budget', 1000000))
     population = max(float(data.get('population', 500000)), 1.0)
-    return pd.DataFrame([{
+    return build_runtime_frame('policy', {
         'sector': sector,
         'budget': budget,
         'population': population,
         'per_capita_budget': budget / population,
-    }])
+        'budget_log': math.log10(max(budget, 1.0)),
+        'population_log': math.log10(max(population, 1.0)),
+        'coverage_pressure': population / max(budget, 1.0),
+    })
 
 
 def get_policy_decision(data):
     model_frame = _build_policy_frame(data)
     model_result = predict_with_model('policy', model_frame)
-    if model_result is not None:
-        probability = model_result['probability']
-        score_percent = round(probability * 100, 1)
-        guidance = build_model_driven_guidance('policy', model_frame.iloc[0].to_dict(), model_result)
+    sector = str(model_frame.iloc[0]["sector"])
+    budget = float(model_frame.iloc[0]["budget"])
+    population = float(model_frame.iloc[0]["population"])
+    per_capita_budget = float(model_frame.iloc[0]["per_capita_budget"])
 
-        return {
-            'decision': 'Feasible policy initiative' if probability >= 0.5 else 'Requires revisit and risk mitigation',
-            'probability': probability,
-            'score_label': model_result['score_label'],
-            'score_band': model_result['score_band'],
-            'summary': f'Policy feasibility is estimated at {score_percent}/100 using the trained model and comparable public-program profiles.',
-            'next_step': guidance['suggestions'][0],
-            'target_score': 70.0,
-            'key_factors': model_result['key_factors'],
-            'explanation': guidance['explanation'],
-            'suggestions': guidance['suggestions'],
-            'risks': guidance['risks'],
-        }
+    # Pull governance features (structured inputs or parsed text payloads).
+    political_support = data.get("political_support") or data.get("political") or ""
+    infrastructure_readiness = data.get("infrastructure_readiness") or data.get("infrastructure") or ""
+    risk_level = data.get("risk_level") or data.get("risk") or ""
+    urgency = data.get("urgency") or data.get("priority") or ""
 
-    score = min(1.0, (model_frame.iloc[0]['per_capita_budget'] / 10000) + {'healthcare': 0.3, 'education': 0.25, 'infrastructure': 0.2}.get(model_frame.iloc[0]['sector'], 0.2))
+    missing_fields = [name for name, value in (
+        ("political_support", political_support),
+        ("infrastructure_readiness", infrastructure_readiness),
+        ("risk_level", risk_level),
+        ("urgency", urgency),
+    ) if not str(value or "").strip()]
+
+    # Hybrid base: blend ML score with a small per-capita heuristic so the baseline is stable,
+    # but governance constraints still dominate final feasibility.
+    per_capita_norm = min(max(per_capita_budget / 12000.0, 0.0), 1.0)
+    budget_norm = 0.0
+    if budget > 0:
+        # Log scale keeps large budgets from dominating.
+        budget_norm = min(max(math.log10(budget + 1.0) / 8.0, 0.0), 1.0)
+
+    heuristic_base = 0.35 + (0.22 * budget_norm) + (0.22 * per_capita_norm)
+    if sector in {"education", "healthcare"}:
+        heuristic_base += 0.03
+    heuristic_base = max(0.05, min(0.95, heuristic_base))
+
+    ml_base = float(model_result["probability"]) if model_result is not None else heuristic_base
+    base_probability = (0.6 * ml_base) + (0.4 * heuristic_base)
+    base_probability = max(0.05, min(0.95, base_probability))
+    base_score = base_probability * 100.0
+
+    delta_points, contributions = _governance_adjustment_points(
+        political_support=political_support,
+        infrastructure_readiness=infrastructure_readiness,
+        risk_level=risk_level,
+        urgency=urgency,
+        budget=budget,
+        population=population,
+    )
+
+    pre_constraint_score = max(0.0, min(base_score + delta_points, 100.0))
+    final_score, constraint_notes = _apply_policy_constraints(
+        pre_constraint_score,
+        political_support=political_support,
+        infrastructure_readiness=infrastructure_readiness,
+        risk_level=risk_level,
+    )
+    final_score = max(0.0, min(final_score, 100.0))
+
+    band_label, band = _policy_band(final_score)
+    action_plan_steps = _policy_action_plan(
+        political_support=political_support,
+        infrastructure_readiness=infrastructure_readiness,
+        risk_level=risk_level,
+        urgency=urgency,
+    )
+
+    # RAG grounding (optional, but makes explanations more trustworthy).
+    retrieved = retrieve_policy_sources(str(data.get('raw_prompt') or data.get('policy') or data.get('option') or ''), k=3)
+
+    insights = _policy_insights(
+        base_score=base_score,
+        final_score=final_score,
+        contributions=contributions,
+        constraint_notes=constraint_notes,
+        sector=sector,
+        per_capita_budget=per_capita_budget,
+    )
+    if retrieved:
+        titles = ", ".join(item["title"] for item in retrieved[:3] if item.get("title"))
+        if titles:
+            insights.append(f"Related schemes from the dataset: {titles}.")
+
+    confidence = _confidence(final_score, contributions, missing_fields)
+
+    llm_plan = generate_action_plan(
+        domain="policy",
+        user_input={
+            "sector": sector,
+            "budget": budget,
+            "population": population,
+            "per_capita_budget": per_capita_budget,
+            "urgency": urgency,
+            "political_support": political_support,
+            "infrastructure_readiness": infrastructure_readiness,
+            "risk_level": risk_level,
+        },
+        decision=band_label,
+        score=final_score,
+        risks=[line for line in insights if "risk" in line.lower()][:4],
+        insights=insights[:6],
+    )
+    if llm_plan:
+        action_plan_steps = _unique_lines(llm_plan[:3])
+
+    priority_label = _policy_priority_label(
+        band_label=band_label,
+        risk_level=risk_level,
+        infrastructure_readiness=infrastructure_readiness,
+        political_support=political_support,
+        per_capita_budget=per_capita_budget,
+        sector=sector,
+    )
+    summary = _policy_summary(
+        final_score=final_score,
+        band_label=band_label,
+        sector=sector,
+        per_capita_budget=per_capita_budget,
+        political_support=political_support,
+        infrastructure_readiness=infrastructure_readiness,
+        risk_level=risk_level,
+    )
+    focus = action_plan_steps[1] if len(action_plan_steps) > 1 else "Improve delivery assumptions before scaling"
+
+    # Keep legacy keys for compatibility, while adding a cleaner structured output.
     return {
-        'decision': 'Feasible policy initiative' if score >= 0.6 else 'Requires revisit and risk mitigation',
-        'probability': round(score, 4),
-        'score_label': 'Strong case' if score >= 0.8 else 'Feasible' if score >= 0.6 else 'Borderline' if score >= 0.4 else 'Weak case',
-        'score_band': '80-100' if score >= 0.8 else '60-79' if score >= 0.6 else '40-59' if score >= 0.4 else '0-39',
-        'summary': f'Fallback policy feasibility score: {round(score * 100, 1)}/100.',
-        'next_step': 'Increase per-capita impact and tighten rollout scope.',
-        'target_score': 70.0,
-        'key_factors': ['sector', 'budget', 'population', 'per_capita_budget'],
-        'explanation': 'The fallback scorer is using sector, total budget, population scale, and per-capita allocation.',
-        'suggestions': ['Improve targeting.', 'Raise effective per-capita budget.', 'Phase delivery more tightly.'],
+        "score": round(final_score, 1),
+        "decision": band_label,
+        "confidence": round(confidence, 1),
+        "insights": insights[:6],
+        "action_plan": action_plan_steps,
+        "probability": round(final_score / 100.0, 4),
+        "score_label": band_label,
+        "score_band": band,
+        "summary": summary,
+        "next_step": priority_label,
+        "priority_detail": action_plan_steps[0] if action_plan_steps else "",
+        "focus": focus,
+        "target_score": 70.0,
+        "key_factors": [item.get("factor") for item in sorted(contributions, key=lambda x: abs(float(x.get("points", 0.0))), reverse=True)[:4]],
+        "explanation": " ".join(insights[:4]),
+        "suggestions": action_plan_steps[:3],
+        "risks": [line for line in insights if "risk" in line.lower() or "capped" in line.lower()][:3],
+        "meta": {
+            "base_model_probability": round(base_probability, 4),
+            "governance_delta_points": round(delta_points, 2),
+            "constraints": constraint_notes,
+            "missing_fields": missing_fields,
+            "retrieved_sources": retrieved,
+            "action_plan_source": "ollama" if llm_plan else "backend",
+        },
     }
 
 
@@ -103,6 +521,8 @@ def get_policy_comparison(data):
 
     base_budget = float(data.get('budget', 5000000))
     base_population = float(data.get('population', 200000))
+    retrieved_primary = retrieve_policy_sources(primary_option, k=2)
+    retrieved_alternative = retrieve_policy_sources(alternative_option, k=2)
 
     primary_probability, primary_profile, primary_base = _option_probability(primary_option, base_budget, base_population)
     alternative_probability, alternative_profile, alternative_base = _option_probability(alternative_option, base_budget, base_population)
@@ -181,6 +601,12 @@ def get_policy_comparison(data):
                     'Add monitoring, maintenance, and beneficiary verification.',
                     'Pair it with infrastructure so the benefit does not remain one-time only.',
                 ],
+            },
+            'meta': {
+                'retrieved_sources': {
+                    options[0]['label']: retrieved_primary,
+                    options[1]['label']: retrieved_alternative,
+                },
             },
         },
     }

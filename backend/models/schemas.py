@@ -1,19 +1,22 @@
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class CareerInput(BaseModel):
     cgpa: float
-    skills: List[str]
-    projects: List[str]
+    skills: list[str] = Field(default_factory=list)
+    projects: list[str] = Field(default_factory=list)
     interest: str
-    certifications: Optional[List[str]] = None
-    internships: Optional[List[str]] = None
-    course: Optional[str] = None
-    specialization: Optional[str] = None
-    education_level: Optional[str] = None
-    year_of_study: Optional[float] = None
-    experience_years: Optional[float] = None
+    certifications: list[str] = Field(default_factory=list)
+    internships: list[str] = Field(default_factory=list)
+    course: str | None = None
+    specialization: str | None = None
+    education_level: str | None = None
+    year_of_study: float | None = None
+    experience_years: float | None = None
 
 
 class FinanceInput(BaseModel):
@@ -41,12 +44,51 @@ class PolicyInput(BaseModel):
     sector: str
     budget: float
     population: float
+    political_support: str | None = None
+    infrastructure_readiness: str | None = None
+    risk_level: str | None = None
+    urgency: str | None = None
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
 
 
 class ChatbotInput(BaseModel):
-    messages: Optional[List[Dict[str, Any]]] = None
-    message: Optional[str] = None
-    stream: Optional[bool] = True
+    messages: list[ChatMessage] | None = None
+    message: str | None = None
+    stream: bool = True
+
+    @model_validator(mode="after")
+    def validate_payload(self) -> "ChatbotInput":
+        if not self.message and not self.messages:
+            raise ValueError("Either 'message' or 'messages' is required.")
+        return self
+
+
+class FactorImpact(BaseModel):
+    factor: str
+    impact: str
+    value: float | None = None
+    reason: str | None = None
+
+
+class OptionScore(BaseModel):
+    name: str
+    score: float | None = None
+    probability: float | None = None
+    reason: str | None = None
+    mapped_label: str | None = None
+
+
+class DomainDetectionResponse(BaseModel):
+    domain: str
+    confidence: float
+    scores: dict[str, float]
+    ambiguous: bool = False
+    language: str = "english"
+    margin: float | None = None
 
 
 class DecisionResponse(BaseModel):
@@ -56,28 +98,31 @@ class DecisionResponse(BaseModel):
     score_band: str
     summary: str
     next_step: str
-    target_score: float
-    key_factors: List[str]
+    target_score: float | None = None
+    key_factors: list[str] = Field(default_factory=list)
     explanation: str
-    suggestions: List[str]
+    suggestions: list[str] = Field(default_factory=list)
+    score: float | None = None
+    confidence: float | None = None
+    insights: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    action_plan: list[str] = Field(default_factory=list)
+    what_if: str | None = None
+    factor_impacts: list[FactorImpact] = Field(default_factory=list)
+    options: list[OptionScore] = Field(default_factory=list)
+    details: dict[str, Any] | None = None
+    parsed_input: dict[str, Any] | None = None
+    intent: str | None = None
+    mode: str | None = None
+    blocking_factors: list[str] = Field(default_factory=list)
+    followup_questions: list[str] = Field(default_factory=list)
+    meta: dict[str, Any] | None = None
 
 
-class StartupDecisionResponse(BaseModel):
-    score: float
-    decision: str
-    band: str
-    confidence: float
-    summary: str
-    key_factors: List[str]
-    risks: List[str]
-    action_plan: List[str]
-    blocking_factors: List[str]
-
-
-class SimpleResponse(BaseModel):
-    decision: str
-    probability: float
-    key_factors: List[str]
-    explanation: str
-    suggestions: List[str]
-    details: Optional[Dict[str, Any]] = None
+class ChatbotResponse(BaseModel):
+    role: str = "assistant"
+    content: str
+    intent: str = "general"
+    mode: str = "chat"
+    detection: DomainDetectionResponse | None = None
+    meta: dict[str, Any] | None = None

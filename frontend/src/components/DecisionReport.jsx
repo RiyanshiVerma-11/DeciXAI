@@ -49,9 +49,26 @@ const normalizeRisks = (payload) => {
 
 const normalizeActions = (payload) => {
   const details = payload.details || {}
-  if (Array.isArray(details.action_plan) && details.action_plan.length) return details.action_plan
-  if (Array.isArray(payload.action_plan) && payload.action_plan.length) return payload.action_plan
-  return []
+  const raw =
+    (Array.isArray(details.action_plan) && details.action_plan.length ? details.action_plan : null) ||
+    (Array.isArray(payload.action_plan) && payload.action_plan.length ? payload.action_plan : null) ||
+    []
+
+  // Normalize + dedupe: backend may already dedupe, but we treat UI input as untrusted.
+  // This prevents "Do this first" being repeated as "Step 2" when strings are identical.
+  const normalized = raw
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+
+  const unique = []
+  for (const step of normalized) {
+    const key = step.toLowerCase().replace(/\s+/g, ' ')
+    if (!unique.some((existing) => existing.toLowerCase().replace(/\s+/g, ' ') === key)) {
+      unique.push(step)
+    }
+  }
+
+  return unique
 }
 
 const normalizeImpacts = (payload) => {
@@ -61,11 +78,98 @@ const normalizeImpacts = (payload) => {
   return []
 }
 
+const normalizeCareerIntel = (payload) => payload?.details?.career_intelligence || null
+
 function RadarGlyph({ positive }) {
   return (
     <div className={`relative flex h-10 w-10 items-center justify-center rounded-2xl border ${positive ? 'border-emerald-300/60 bg-emerald-400/10' : 'border-rose-300/60 bg-rose-400/10'}`}>
       <div className={`absolute h-5 w-5 rounded-full border ${positive ? 'border-emerald-300/70' : 'border-rose-300/70'}`} />
       <div className={`absolute h-2.5 w-2.5 rounded-full ${positive ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+    </div>
+  )
+}
+
+function AlignmentChip({ value }) {
+  const normalized = String(value || '').toLowerCase()
+  const styles = {
+    match: 'border-emerald-200 bg-emerald-100 text-emerald-800',
+    mismatch: 'border-rose-200 bg-rose-100 text-rose-800',
+    missing: 'border-amber-200 bg-amber-100 text-amber-800',
+  }
+  const style = styles[normalized] || styles.missing
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${style}`}>
+      {normalized || 'missing'}
+    </span>
+  )
+}
+
+function RoadmapCard({ eyebrow, title, alignment, roadmap, tone = 'slate' }) {
+  const tones = {
+    slate: 'border-slate-200 bg-white',
+    cyan: 'border-cyan-200 bg-[linear-gradient(180deg,_rgba(236,254,255,1),_rgba(240,249,255,1))]',
+    rose: 'border-rose-200 bg-[linear-gradient(180deg,_rgba(255,241,242,1),_rgba(255,247,237,1))]',
+  }
+
+  return (
+    <div className={`rounded-[30px] border p-5 shadow-sm ${tones[tone] || tones.slate}`}>
+      <div className="text-[11px] uppercase tracking-[0.28em] text-slate-500">{eyebrow}</div>
+      <div className="mt-2 text-xl font-semibold text-slate-950">{title}</div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
+          <div className="text-sm font-medium text-slate-800">Skills</div>
+          <AlignmentChip value={alignment?.skills} />
+        </div>
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
+          <div className="text-sm font-medium text-slate-800">Projects</div>
+          <AlignmentChip value={alignment?.projects} />
+        </div>
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
+          <div className="text-sm font-medium text-slate-800">Certifications</div>
+          <AlignmentChip value={alignment?.certifications} />
+        </div>
+        <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-4 py-3">
+          <div className="text-sm font-medium text-slate-800">Interest</div>
+          <AlignmentChip value={alignment?.interest} />
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Skills to add</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(roadmap?.skills_to_add || []).slice(0, 6).map((item) => (
+              <span key={`${title}-skill-${item}`} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                {item}
+              </span>
+            ))}
+            {!(roadmap?.skills_to_add || []).length && <div className="text-sm text-slate-600">No major skill gaps detected.</div>}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">4 project ideas</div>
+          <div className="mt-3 grid gap-2">
+            {(roadmap?.project_ideas || []).slice(0, 4).map((item, index) => (
+              <div key={`${title}-project-${index}`} className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+          <div className="text-xs uppercase tracking-[0.18em] text-slate-500">Certifications</div>
+          <div className="mt-3 grid gap-2">
+            {(roadmap?.certifications || []).slice(0, 2).map((item, index) => (
+              <div key={`${title}-cert-${index}`} className="rounded-xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-800">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -250,12 +354,13 @@ function StoryCard({ title, items, emptyText, tone }) {
   )
 }
 
-export default function DecisionReport({ payload }) {
+export default function DecisionReport({ payload, interactiveFields, onInteractiveChange, isLiveUpdating, onRefresh }) {
   const options = normalizeOptions(payload)
   const insights = normalizeInsights(payload)
   const risks = normalizeRisks(payload)
   const actions = normalizeActions(payload)
   const impacts = normalizeImpacts(payload)
+  const careerIntel = normalizeCareerIntel(payload)
   const bestPercent = typeof payload.score === 'number'
     ? Math.round(payload.score)
     : (options[0]?.percent || 0)
@@ -263,6 +368,8 @@ export default function DecisionReport({ payload }) {
     ? Math.round(payload.confidence)
     : clampPercent(payload.probability)
   const whatIf = payload.what_if || payload.details?.what_if || ''
+  const sliders = Array.isArray(interactiveFields) ? interactiveFields : []
+  const showSliders = Boolean(sliders.length && typeof onInteractiveChange === 'function')
 
   return (
     <section className="overflow-hidden rounded-[36px] bg-[linear-gradient(145deg,_rgba(243,248,255,1),_rgba(233,246,255,1)_35%,_rgba(240,253,250,1)_100%)] p-1.5 shadow-[0_28px_90px_-32px_rgba(14,165,233,0.45)]">
@@ -288,7 +395,18 @@ export default function DecisionReport({ payload }) {
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <MetricTile label="Confidence" value={`${confidence}%`} tone="cyan" symbol="C" />
                   <MetricTile label="Top Path" value={options[0]?.name || payload.decision} tone="lime" symbol="P" />
-                  <MetricTile label="Next Move" value={actions[0] || payload.next_step || 'Review the strongest factor first'} tone="amber" symbol="N" />
+                  <MetricTile
+                    label="Next Move"
+                    value={(() => {
+                      const next = String(payload.next_step || '').trim()
+                      const first = String(actions[0] || '').trim()
+                      // Avoid duplicating step 1 as "Next Move" if the backend also sent it as `next_step`.
+                      if (next && first && next.toLowerCase() === first.toLowerCase()) return first
+                      return first || next || 'Review the strongest factor first'
+                    })()}
+                    tone="amber"
+                    symbol="N"
+                  />
                 </div>
               </div>
 
@@ -320,6 +438,92 @@ export default function DecisionReport({ payload }) {
             )}
           </div>
         </div>
+
+        {careerIntel?.best_fit && careerIntel?.interest && (
+          <div className="mt-5 rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(246,250,255,0.98))] p-5 shadow-sm">
+            <PanelTitle
+              eyebrow="Decision clarity"
+              title="Roadmap (Best Fit vs Interest)"
+              count={careerIntel.recommended_view === 'dual_track' ? 'Dual track' : 'Single track'}
+              tone="slate"
+            />
+            {Array.isArray(careerIntel.difference) && careerIntel.difference.length > 0 && (
+              <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                {careerIntel.difference.slice(0, 3).map((line, index) => (
+                  <div key={`career-diff-${index}`}>{line}</div>
+                ))}
+              </div>
+            )}
+            {careerIntel.recommended_view === 'dual_track' ? (
+              <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                <RoadmapCard
+                  eyebrow="Best fit (current)"
+                  title={careerIntel.best_fit.path_label || 'Best fit'}
+                  alignment={careerIntel.best_fit.alignment}
+                  roadmap={careerIntel.best_fit.roadmap}
+                  tone="cyan"
+                />
+                <RoadmapCard
+                  eyebrow="Interest track (target)"
+                  title={careerIntel.interest.path_label || 'Interest track'}
+                  alignment={careerIntel.interest.alignment}
+                  roadmap={careerIntel.interest.roadmap}
+                  tone="rose"
+                />
+              </div>
+            ) : (
+              <div className="mt-5">
+                <RoadmapCard
+                  eyebrow="Single track"
+                  title={careerIntel.best_fit.path_label || payload.decision || 'Roadmap'}
+                  alignment={careerIntel.best_fit.alignment}
+                  roadmap={careerIntel.best_fit.roadmap}
+                  tone="cyan"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {showSliders && (
+          <div className="mt-5 rounded-[30px] border border-slate-200/80 bg-[linear-gradient(180deg,_rgba(255,255,255,0.96),_rgba(246,250,255,0.98))] p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <PanelTitle eyebrow="What-if" title="Live sliders" tone="slate" />
+              {typeof onRefresh === 'function' && (
+                <button
+                  type="button"
+                  onClick={onRefresh}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  {isLiveUpdating ? 'Updating...' : 'Refresh What-if'}
+                </button>
+              )}
+            </div>
+            <div className="mt-4 grid gap-4">
+              {sliders.map((field) => (
+                <div key={field.name} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="text-sm font-semibold text-slate-800">{field.label}</div>
+                    <div className="text-sm font-black text-slate-700">{field.value ?? field.range?.min ?? 0}</div>
+                  </div>
+                  <input
+                    type="range"
+                    min={field.range?.min}
+                    max={field.range?.max}
+                    step={field.range?.step || 1}
+                    value={field.value ?? field.range?.min ?? 0}
+                    onChange={(event) => onInteractiveChange(field.name, Number(event.target.value))}
+                    className="mt-4 w-full accent-sky-500"
+                  />
+                  <div className="mt-2 flex justify-between text-xs text-slate-400">
+                    <span>{field.range?.min}</span>
+                    <span>{field.range?.max}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mt-5 grid gap-5 xl:grid-cols-3">
           <StoryCard
