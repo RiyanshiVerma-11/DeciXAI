@@ -5,7 +5,8 @@ import re
 
 import pandas as pd
 
-from services.model_service import predict_with_model
+from services.model_service import build_runtime_frame, predict_with_model
+from services.llm_action_plan_service import generate_action_plan
 
 
 DEFAULT_STARTUP_INPUT = {
@@ -350,6 +351,19 @@ def _build_action_plan(funding: float, team_size: int, market: str, experience: 
     return _dedupe_texts(suggestions, limit=3)
 
 
+def _bounded_team_target(current: float, target: float) -> float:
+    """
+    The startup training data can produce very large 'ideal' team sizes (e.g. 79).
+    That may reflect later-stage companies, but it is not practical early-stage guidance.
+    """
+    if target != target:
+        return target
+    bounded = min(float(target), 12.0)
+    if current == current:
+        bounded = max(bounded, min(max(float(current), 4.0), 12.0))
+    return bounded
+
+
 def _build_startup_response(score: float, funding: float, team_size: int, market: str, experience: float, market_segment: str | None = None) -> dict:
     label = _startup_decision_label(score, experience)
     confidence = _calculate_startup_confidence(score, experience, funding, team_size, market_segment or market)
@@ -408,13 +422,17 @@ def get_startup_decision(data: dict | None):
 
     market_type = startup.get('market_type', '')
     market_segment = startup.get('market_segment', market)
-    model_frame = pd.DataFrame([{
+    feature_values = {
         'funding': funding,
         'team_size': team_size,
         'market': market,
         'experience': experience,
         'funding_per_team': funding / _safe_divisor(team_size),
-    }])
+        'runway_score': min(funding / 300000.0, 2.5),
+        'experience_per_team_member': experience / _safe_divisor(team_size),
+        'capital_efficiency': (funding / _safe_divisor(team_size)) / 100000.0,
+    }
+    model_frame = build_runtime_frame('startup', feature_values)
 
     model_result = predict_with_model('startup', model_frame)
     if model_result is None:
@@ -462,6 +480,8 @@ def get_startup_decision(data: dict | None):
             if target is None:
                 continue
             target_value = float(target)
+            if feature == 'team_size':
+                target_value = _bounded_team_target(row.get('team_size', float('nan')), target_value)
             if updated[feature] != updated[feature]:
                 continue
             if target_value > updated[feature]:
@@ -469,7 +489,7 @@ def get_startup_decision(data: dict | None):
                 changed.append(feature)
                 ranked_gaps.append((target_value - row[feature], feature, row[feature], target_value))
         updated['funding_per_team'] = updated['funding'] / _safe_divisor(updated['team_size'])
-        rerun = predict_with_model('startup', pd.DataFrame([updated]))
+        rerun = predict_with_model('startup', build_runtime_frame('startup', updated))
         what_if = ''
         if rerun is not None:
             what_if = (
@@ -479,9 +499,14 @@ def get_startup_decision(data: dict | None):
 
         ranked_gaps.sort(reverse=True)
         for _, feature, current, target in ranked_gaps[:4]:
-            action_plan.append(
-                f"Improve {feature}; current value {round(float(current), 2)} is below the stronger model profile range near {round(float(target), 2)}."
-            )
+            if feature == 'team_size':
+                action_plan.append(
+                    f"Improve team size; current core team is {int(round(float(current)))}. Aim for about {int(round(float(target)))} people to increase execution capacity."
+                )
+            else:
+                action_plan.append(
+                    f"Improve {feature}; current value {round(float(current), 2)} is below the stronger model profile range near {round(float(target), 2)}."
+                )
 
         score = round(model_result['probability'] * 100, 2)
         label = _startup_decision_label(score, experience)
@@ -515,11 +540,34 @@ def get_startup_decision(data: dict | None):
             'explanation': ' '.join(positive + negative),
             'suggestions': action_plan[:3],
         }
-    return response | {
+    merged = response | {
         'intent': 'startup',
         'mode': 'single',
         'parsed_input': _sanitize_startup_payload(startup),
     }
+
+    llm_plan = generate_action_plan(
+        domain="startup",
+        user_input={
+            "funding": funding,
+            "team_size": team_size,
+            "experience": experience,
+            "market": market,
+            "market_segment": market_segment,
+        },
+        decision=str(merged.get("decision") or ""),
+        score=float(merged.get("score", 0.0) or 0.0),
+        risks=[str(item) for item in (merged.get("risks") or [])],
+        insights=[str(item) for item in (merged.get("insights") or [])],
+    )
+    if llm_plan:
+        merged["action_plan"] = llm_plan
+        merged["suggestions"] = llm_plan[:3]
+        merged["next_step"] = llm_plan[0]
+        merged["meta"] = dict((merged.get("meta") or {}))
+        merged["meta"]["action_plan_source"] = "ollama"
+
+    return merged
 
 
 def get_startup_decision_from_text(text: str) -> dict:

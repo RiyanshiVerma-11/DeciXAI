@@ -3,7 +3,8 @@ from __future__ import annotations
 import pandas as pd
 
 from services.insight_service import build_model_driven_guidance
-from services.model_service import predict_with_model
+from services.model_service import build_runtime_frame, predict_with_model
+from services.llm_action_plan_service import generate_action_plan
 
 
 def safe_float(value, default=0.0):
@@ -61,17 +62,48 @@ def _practical_finance_probability(income: float, loan: float, credit_score: flo
 
 
 def get_finance_decision(data):
-    income = max(safe_float(data.get('income', 50000)), 1.0)
-    loan = max(safe_float(data.get('loan', 15000)), 0.0)
-    credit_score = min(max(safe_float(data.get('credit_score', 650)), 300.0), 850.0)
+    # Do not silently assume defaults for missing fields; it produces untrustworthy outputs.
+    missing = []
+    if data.get('income') is None:
+        missing.append('income')
+    if data.get('loan') is None:
+        missing.append('loan')
+    if data.get('credit_score') is None:
+        missing.append('credit_score')
+    if missing:
+        return {
+            'decision': 'Need more details to assess finance risk',
+            'probability': 0.5,
+            'score_label': 'Unknown',
+            'score_band': 'Unknown',
+            'summary': 'The finance model needs your income, loan amount, and credit score to produce a reliable result.',
+            'next_step': 'Share income, loan amount, and credit score (or approximate ranges).',
+            'target_score': 75.0,
+            'key_factors': ['missing_inputs'],
+            'explanation': f'Missing required inputs: {", ".join(missing)}.',
+            'suggestions': [
+                'Provide: income (annual), loan amount, and credit score.',
+                'If unsure, provide approximate ranges.',
+            ],
+            'risks': ['Inputs were missing, so any score would be unreliable.'],
+            'meta': {'missing_fields': missing},
+        }
+
+    income = max(safe_float(data.get('income'), 0.0), 1.0)
+    loan = max(safe_float(data.get('loan'), 0.0), 0.0)
+    credit_score = min(max(safe_float(data.get('credit_score'), 0.0), 300.0), 850.0)
     loan_to_income = min(loan / max(income, 1.0), 5.0)
 
-    model_frame = pd.DataFrame([{
+    feature_values = {
         'income': income,
         'loan': loan,
         'credit_score': credit_score,
         'loan_to_income': loan_to_income,
-    }])
+        'monthly_income': income / 12.0,
+        'disposable_income_estimate': max(income - loan, 0.0),
+        'credit_buffer': max(credit_score - 650.0, 0.0),
+    }
+    model_frame = build_runtime_frame('finance', feature_values)
     model_result = predict_with_model('finance', model_frame)
     if model_result is not None:
         raw_probability = float(model_result['probability'])
@@ -119,7 +151,7 @@ def get_finance_decision(data):
             if urgent_step not in suggestions:
                 suggestions.insert(0, urgent_step)
 
-        return {
+        result = {
             'decision': 'Low risk profile' if probability >= 0.5 else 'Moderate-to-high risk profile',
             'probability': probability,
             'score_label': score_label,
@@ -132,6 +164,25 @@ def get_finance_decision(data):
             'suggestions': suggestions[:3],
             'risks': risks[:3],
         }
+        llm_plan = generate_action_plan(
+            domain="finance",
+            user_input={
+                "income": income,
+                "loan": loan,
+                "credit_score": credit_score,
+                "loan_to_income": loan_to_income,
+            },
+            decision=result["decision"],
+            score=score_percent,
+            risks=list(result.get("risks") or []),
+            insights=[result.get("summary") or ""],
+        )
+        if llm_plan:
+            result["suggestions"] = llm_plan[:3]
+            result["next_step"] = llm_plan[0]
+            result["meta"] = dict(result.get("meta") or {})
+            result["meta"]["action_plan_source"] = "ollama"
+        return result
 
     # If model fails, return error instead of hardcoded fallback
     return {

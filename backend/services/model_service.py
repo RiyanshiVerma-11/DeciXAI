@@ -2,6 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import joblib
+import pandas as pd
 
 from utils.shap_utils import compute_shap_explanation, convert_shap_for_response
 
@@ -29,6 +30,22 @@ def get_feature_labels(domain):
     if bundle is None:
         return {}
     return bundle.get('feature_labels', {})
+
+
+def get_domain_feature_schema(domain):
+    bundle = load_domain_bundle(domain)
+    if bundle is None:
+        return {'numeric': [], 'categorical': []}
+    return bundle.get('features', {'numeric': [], 'categorical': []})
+
+
+def build_runtime_frame(domain, feature_values: dict):
+    schema = get_domain_feature_schema(domain)
+    ordered_features = list(schema.get('numeric', [])) + list(schema.get('categorical', []))
+    if not ordered_features:
+        ordered_features = list(feature_values.keys())
+    payload = {feature: feature_values.get(feature) for feature in ordered_features}
+    return pd.DataFrame([payload])
 
 
 def get_career_comparison_bundle():

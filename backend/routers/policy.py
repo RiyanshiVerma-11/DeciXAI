@@ -7,4 +7,4 @@ router = APIRouter()
 
 @router.post('/', response_model=DecisionResponse)
 def evaluate_policy(input: PolicyInput):
-    return get_policy_decision(input.dict())
+    return get_policy_decision(input.model_dump())

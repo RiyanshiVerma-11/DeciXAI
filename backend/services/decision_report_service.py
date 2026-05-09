@@ -251,37 +251,11 @@ def generate_explanations(domain: str, ranked_results: list[dict]) -> list[str]:
             f'Founder experience at about {experience:.0f} years {"helps reduce execution risk" if experience >= 3 else "suggests the venture will benefit from stronger advisors or operators"} and the {market} market choice shapes how quickly traction must be proven.',
         ]
 
-    if other and domain == 'policy':
-        return [
-            f'{best["option"]} scores better than {other["option"]} after comparing both options with the existing policy model.',
-            f'{best["option"]} has the stronger long-term impact and wider shared educational reach.',
-            f'{other["option"]} carries more misuse, maintenance, or rollout friction in the current scenario.',
-            f'Budget efficiency and accessibility together make {best["option"]} the more durable public decision.',
-        ]
-
-    if other and domain in {'startup', 'business'}:
-        return [
-            f'{best["option"]} scores better than {other["option"]} after separate evaluation with the same startup model.',
-            f'{best["option"]} shows the better balance of market fit, execution risk, and capital efficiency.',
-            f'{other["option"]} needs stronger evidence that the current team and funding plan can support delivery.',
-        ]
-
-    if other and domain == 'finance':
-        return [
-            f'{best["option"]} scores better than {other["option"]} after the options were scored separately with the same finance model.',
-            f'{best["option"]} keeps a healthier balance between affordability, debt pressure, and score stability.',
-            f'{other["option"]} looks weaker because repayment risk is more exposed in the current profile.',
-        ]
-
     explanation = _meaningful_factor_sentences(domain, best['option'], best['model_result'])
     if other:
-        explanation.insert(0, f'{best["option"]} scores better than {other["option"]} after comparing each option separately with the same model pipeline.')
-        if domain == 'policy':
-            explanation.append(f'{best["option"]} looks stronger on long-term impact and implementation quality, while {other["option"]} carries more operational risk.')
-        elif domain in {'startup', 'business'}:
-            explanation.append(f'{best["option"]} shows a better balance of market fit, capital readiness, and execution risk.')
-        else:
-            explanation.append(f'{best["option"]} has the safer balance of affordability, risk, and score stability.')
+        best_pct = round(float(best.get("score", 0.0)) * 100)
+        other_pct = round(float(other.get("score", 0.0)) * 100)
+        explanation.insert(0, f'{best["option"]} scored {best_pct}% vs {other["option"]} at {other_pct}% in the same model run.')
     return list(dict.fromkeys(explanation))[:4]
 
 
@@ -413,9 +387,11 @@ def validate_report(report: dict, compare_requested: bool) -> dict:
     report['explanation'] = cleaned[:4]
 
     if compare_requested and len(probabilities) < 2:
-        report['recommendation'] = 'Need more distinct options to compare'
+        report['meta'] = dict(report.get('meta') or {})
+        report['meta']['comparison_limited'] = True
+        report['meta']['comparison_note'] = 'Only one distinct option was scored; comparison may be unreliable.'
     if not report['explanation']:
-        report['explanation'] = ['The system compared the options using the existing trained model and selected the option with the stronger overall score.']
+        report['explanation'] = ['The result is based on the current model score and the extracted input factors.']
     if not report.get('action_plan'):
         report['action_plan'] = ['Refine the key assumptions and run the comparison again with clearer option details.']
     return report
@@ -425,12 +401,43 @@ def generate_decision_report(message: str) -> dict:
     structured = parse_natural_language_input(message)
     domain = structured['domain']
     if domain == 'career':
-        raise ValueError('Career prompts are handled by the hybrid career service.')
+        report = {
+            'probabilities': {},
+            'recommendation': '',
+            'explanation': ['This prompt looks like a career profile. Use the career analysis pipeline for scoring and recommendations.'],
+            'risks': {},
+            'what_if': 'Route this request to the career endpoint/service.',
+            'action_plan': ['Use the career analysis service for this prompt.'],
+            'confidence': 'low',
+            'meta': {
+                'router_note': 'career_domain_detected',
+            },
+        }
+        return {
+            'structured_input': structured,
+            'report': report,
+            'details': {
+                'probabilities': [],
+                'recommendation': report['recommendation'],
+                'explanations': report['explanation'],
+                'risks': [],
+                'what_if': report['what_if'],
+                'action_plan': report['action_plan'],
+                'factor_impacts': [],
+                'actionable_suggestions': {'Routing': report['action_plan']},
+                'confidence': 'low',
+                'error': 'career_domain_detected',
+                'meta': report.get('meta') or {},
+            },
+            'domain': domain,
+            'best_score': 0.0,
+            'best_result': {'model_result': {'key_factors': []}},
+        }
     if structured['factors'].get('compare_requested') and len(structured['options']) < 2:
         report = {
             'probabilities': {},
-            'recommendation': 'Could not detect multiple options',
-            'explanation': ['The parser could not confidently identify two distinct options from the prompt.'],
+            'recommendation': (structured.get('options') or [domain.title()])[0],
+            'explanation': ['Only one distinct option was detected; provide two options to run a comparison.'],
             'risks': {},
             'what_if': 'Add clearer option phrasing such as "between X and Y" or numbered options.',
             'action_plan': [
@@ -438,6 +445,11 @@ def generate_decision_report(message: str) -> dict:
                 'Use patterns like "1. ... 2. ..." or "between X and Y".',
             ],
             'confidence': 'low',
+            'meta': {
+                'parser_issue': 'insufficient_options',
+                'options_detected': structured.get('options') or [],
+                'compare_requested': True,
+            },
         }
         return {
             'structured_input': structured,
@@ -452,7 +464,8 @@ def generate_decision_report(message: str) -> dict:
                 'factor_impacts': [],
                 'actionable_suggestions': {'How to fix the prompt': report['action_plan']},
                 'confidence': 'low',
-                'error': 'Could not detect multiple options',
+                'error': 'insufficient_options',
+                'meta': report.get('meta') or {},
             },
             'domain': domain,
             'best_score': 0.0,

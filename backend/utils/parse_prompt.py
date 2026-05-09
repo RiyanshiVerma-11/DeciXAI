@@ -1,7 +1,7 @@
 import re
 
 
-SECTION_BREAKS = r"(?=\b(?:cgpa|gpa|skills?|expertise|projects?|interest|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people)\b|$)"
+SECTION_BREAKS = r"(?=\b(?:cgpa|gpa|skills?|expertise|projects?|interest|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people|urgency|priority|political support|political|infrastructure readiness|infrastructure|risk level|risk)\b|$)"
 VALID_CAREER_CLASSES = [
     'cloud_devops',
     'cybersecurity',
@@ -110,10 +110,10 @@ def _split_items(value):
 
 def _extract_section(text, keys):
     for key in keys:
-        pattern = rf"\b{re.escape(key)}\b[:\s-]*(.*?){SECTION_BREAKS}"
+        pattern = rf"\b{re.escape(key)}\b[:\s=\-]*(.*?){SECTION_BREAKS}"
         match = re.search(pattern, text.lower(), flags=re.IGNORECASE | re.DOTALL)
         if match:
-            return match.group(1).strip(" .:-")
+            return match.group(1).strip(" .:-,=")
     return ""
 
 
@@ -259,12 +259,29 @@ def parse_prompt(domain, prompt_text):
     if domain == 'policy':
         sector = _extract_section(prompt_text, ['sector'])
         primary_option, alternative_option = _extract_policy_options(prompt_text)
+        urgency = _extract_section(prompt_text, ['urgency', 'priority'])
+        political_support = _extract_section(prompt_text, ['political_support', 'political support', 'political'])
+        infrastructure = _extract_section(prompt_text, ['infrastructure_readiness', 'infrastructure readiness', 'infrastructure', 'infra'])
+        risk_level = _extract_section(prompt_text, ['risk_level', 'risk level', 'risk'])
+
+        # Many real prompts are comma-separated key/value pairs. If section parsing
+        # still captures trailing fields, trim at the first comma.
+        def _trim(value: str) -> str:
+            value = (value or "").strip()
+            if "," in value:
+                value = value.split(",", 1)[0].strip()
+            return value
+
         return {
             'options': [item for item in [primary_option, alternative_option] if item],
             'features': {
-                'sector': sector,
+                'sector': _trim(sector),
                 'budget': _extract_number(prompt_text, ['budget', 'funds'], allow_fallback=False),
                 'population': _extract_number(prompt_text, ['population', 'people'], allow_fallback=False),
+                'urgency': _trim(urgency),
+                'political_support': _trim(political_support),
+                'infrastructure_readiness': _trim(infrastructure),
+                'risk_level': _trim(risk_level),
             },
         }
 

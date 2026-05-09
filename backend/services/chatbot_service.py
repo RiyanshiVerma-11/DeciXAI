@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime
 from difflib import SequenceMatcher
 from typing import Any
@@ -10,8 +11,8 @@ from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from services.career_service import get_career_analysis_from_text
+from services.domain_classifier_service import build_chat_language_instruction, classify_domain
 from services.finance_service import get_finance_decision
-from services.input_parser_service import detect_domain
 from services.policy_service import get_policy_comparison, get_policy_decision
 from services.startup_service import get_startup_decision_from_text
 from utils.parse_prompt import parse_prompt
@@ -29,16 +30,17 @@ RETRY_ATTEMPTS = 2
 PROJECT_DOMAINS = ('career', 'finance', 'startup', 'policy')
 
 
-def _build_system_prompt() -> str:
+def _build_system_prompt(language_instruction: str = 'Reply in concise English.') -> str:
     return (
         'You are deciXAI, an AI Decision Intelligence assistant. '
         'You help users explore career, finance, startup, and policy decisions through natural conversation. '
         'When a user asks for guidance, answer directly first, then ask at most one clarifying question only if it is truly needed. '
-        'Avoid generic motivational filler. Give practical next steps, stay concise, and do not use tables.'
+        'Avoid generic motivational filler. Give practical next steps, stay concise, and do not use tables. '
+        + language_instruction
     )
 
 
-def _prepare_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
+def _prepare_messages(payload: dict[str, Any], language_instruction: str) -> list[dict[str, str]]:
     raw_messages = payload.get('messages')
     if isinstance(raw_messages, list):
         filtered = []
@@ -49,11 +51,11 @@ def _prepare_messages(payload: dict[str, Any]) -> list[dict[str, str]]:
                 continue
             filtered.append({'role': role, 'content': content})
         trimmed = filtered[-MAX_HISTORY:]
-        return [{'role': 'system', 'content': _build_system_prompt()}] + trimmed
+        return [{'role': 'system', 'content': _build_system_prompt(language_instruction)}] + trimmed
 
     message = str(payload.get('message', '')).strip()
     return [
-        {'role': 'system', 'content': _build_system_prompt()},
+        {'role': 'system', 'content': _build_system_prompt(language_instruction)},
         {'role': 'user', 'content': message},
     ]
 
@@ -178,9 +180,9 @@ def _is_close_phrase(text: str, phrases: tuple[str, ...], threshold: float = 0.8
 
 
 def _infer_domain(message: str) -> str | None:
-    detected = detect_domain(message)
-    if detected:
-        return detected
+    detection = classify_domain(message)
+    if detection.get('domain') and detection.get('confidence', 0) >= 0.34:
+        return detection['domain']
 
     text = str(message or '').strip().lower()
     if not text:
@@ -317,6 +319,7 @@ def _grounded_domain_reply(message: str) -> str | None:
 
     if not isinstance(result, dict):
         return None
+
     return _format_grounded_reply(domain, result)
 
 
@@ -341,6 +344,65 @@ def _extract_chat_content(payload: dict[str, Any]) -> str:
         return response_text
 
     return ''
+
+def _looks_like_career_profile(text: str) -> bool:
+    lowered = str(text or "").lower()
+    # Treat as a profile only when we see multiple strong signals, not just a generic word like "projects".
+    strong = 0
+    if re.search(r"\b(?:cgpa|gpa)\b[^\d]{0,10}\d+(?:\.\d+)?", lowered) or re.search(r"\b\d+(?:\.\d+)?\b[^\n]{0,10}\b(?:cgpa|gpa)\b", lowered):
+        strong += 2
+    if any(token in lowered for token in ("btech", "b.tech", "bba", "mba", "bca", "mca", "be", "degree", "course")):
+        strong += 1
+    if any(token in lowered for token in ("skills", "certifications", "certification", "projects", "specialization", "year", "interest")):
+        strong += 1
+    return strong >= 2
+
+
+def _looks_like_career_followup(text: str) -> bool:
+    lowered = str(text or "").lower()
+    # Follow-ups typically ask for examples/roadmap without repeating the profile.
+    return any(token in lowered for token in (
+        "give example", "examples", "project ideas", "projects i should make", "what projects", "roadmap",
+        "how can i", "what should i do", "improve", "top companies", "google", "microsoft", "amazon",
+        "faang", "resume", "portfolio",
+    ))
+
+
+def _find_last_user_profile_message(payload: dict[str, Any]) -> str:
+    messages = payload.get("messages") or []
+    if not isinstance(messages, list):
+        return ""
+
+    # Find the latest user message that looks like it contains structured profile info.
+    for entry in reversed(messages):
+        if not isinstance(entry, dict):
+            continue
+        if (entry.get("role") or "").lower() != "user":
+            continue
+        content = entry.get("content")
+        if isinstance(content, str) and _looks_like_career_profile(content):
+            return content
+    return ""
+
+
+def _augment_career_followup_with_context(payload: dict[str, Any], latest_message: str) -> str:
+    """
+    Users naturally ask follow-ups without repeating their profile.
+    If this looks like a career follow-up, prepend the last profile-bearing user message.
+    """
+    if not latest_message:
+        return latest_message
+    if _looks_like_career_profile(latest_message):
+        return latest_message
+    if not _looks_like_career_followup(latest_message):
+        return latest_message
+
+    prior_profile = _find_last_user_profile_message(payload)
+    if not prior_profile:
+        return latest_message
+
+    # Keep it simple: prepend the profile context so the career parser sees the full info.
+    return f"{prior_profile}\n\nFollow-up: {latest_message}"
 
 
 def _read_streamed_response(response):
@@ -417,13 +479,18 @@ def _friendly_ollama_error(error: RuntimeError) -> str:
     return str(error)
 
 
-def _call_ollama_chat_once(messages: list[dict[str, str]]) -> str:
+def _call_ollama_chat_once(
+    messages: list[dict[str, str]],
+    timeout_seconds: int | None = None,
+    max_attempts: int | None = None,
+) -> str:
     request = _build_ollama_request(messages, stream=False)
 
     attempt = 0
-    while attempt < RETRY_ATTEMPTS:
+    limit = int(max_attempts) if max_attempts is not None else RETRY_ATTEMPTS
+    while attempt < limit:
         try:
-            with urlopen(request, timeout=TIMEOUT_SECONDS) as response:
+            with urlopen(request, timeout=timeout_seconds or TIMEOUT_SECONDS) as response:
                 raw = response.read().decode('utf-8')
                 data = json.loads(raw)
                 content = _extract_chat_content(data).strip()
@@ -507,6 +574,36 @@ def _stream_chat_response(messages: list[dict[str, str]]):
 
 def get_chatbot_response(payload: dict[str, Any], stream: bool = True):
     latest_message = _extract_latest_user_message(payload)
+    latest_message = _augment_career_followup_with_context(payload, latest_message)
+    detection = classify_domain(latest_message)
+    language_instruction = build_chat_language_instruction(detection.get('language', 'english'))
+
+    # For open-ended follow-ups like "project ideas", prefer generation over fixed app templates.
+    # We still attach the user's last profile context via `_augment_career_followup_with_context`.
+    if _looks_like_career_followup(latest_message) and 'project' in latest_message.lower():
+        messages = _prepare_messages({'message': latest_message, 'messages': payload.get('messages')}, language_instruction)
+        if stream:
+            return _stream_chat_response(messages)
+        try:
+            text = _call_ollama_chat_once(messages, timeout_seconds=5, max_attempts=1)
+            return {
+                'role': 'assistant',
+                'content': text,
+                'intent': 'career',
+                'mode': 'chat',
+                'detection': detection,
+            }
+        except RuntimeError as error:
+            # Fallback to grounded reply if the chat model is unavailable.
+            grounded = _grounded_domain_reply(latest_message)
+            return {
+                'role': 'assistant',
+                'content': grounded or _friendly_ollama_error(error),
+                'intent': 'career',
+                'mode': 'chat',
+                'detection': detection,
+            }
+
     direct_reply = (
         _smalltalk_reply(latest_message)
         or _project_scope_reply(latest_message)
@@ -519,11 +616,12 @@ def get_chatbot_response(payload: dict[str, Any], stream: bool = True):
         return {
             'role': 'assistant',
             'content': direct_reply,
-            'intent': 'general',
+            'intent': detection.get('domain', 'general'),
             'mode': 'chat',
+            'detection': detection,
         }
 
-    messages = _prepare_messages(payload)
+    messages = _prepare_messages({'message': latest_message, 'messages': payload.get('messages')}, language_instruction)
     if stream:
         return _stream_chat_response(messages)
 
@@ -532,13 +630,15 @@ def get_chatbot_response(payload: dict[str, Any], stream: bool = True):
         return {
             'role': 'assistant',
             'content': text,
-            'intent': 'general',
+            'intent': detection.get('domain', 'general'),
             'mode': 'chat',
+            'detection': detection,
         }
     except RuntimeError as error:
         return {
             'role': 'assistant',
             'content': _friendly_ollama_error(error),
-            'intent': 'general',
+            'intent': detection.get('domain', 'general'),
             'mode': 'chat',
+            'detection': detection,
         }

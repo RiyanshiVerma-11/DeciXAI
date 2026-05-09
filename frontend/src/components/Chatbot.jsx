@@ -2,6 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 
 const defaultApiBase = `${window.location.protocol}//${window.location.hostname}:8000`
 const API_BASE = import.meta.env.VITE_API_BASE_URL || defaultApiBase
+const starterPrompts = [
+  'Suggest a career path from my CGPA, projects, and skills',
+  'Loan safe hai kya if my income is 90000 and credit score is 720?',
+  'Evaluate my B2B SaaS startup with funding and team size',
+  'Compare a laptop policy vs digital infrastructure policy',
+]
 
 export default function Chatbot() {
   const [open, setOpen] = useState(false)
@@ -80,6 +86,10 @@ export default function Chatbot() {
     }
   }
 
+  const useStarter = (prompt) => {
+    setInput(prompt)
+  }
+
   const handleKeyDown = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
@@ -88,7 +98,7 @@ export default function Chatbot() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-4 right-4 z-50 max-w-[calc(100vw-1rem)]">
       <button
         onClick={() => setOpen(!open)}
         className="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-xl transition hover:bg-slate-800"
@@ -97,7 +107,7 @@ export default function Chatbot() {
       </button>
 
       {open && (
-        <div className="mt-3 flex h-[76vh] w-[min(30rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/95 shadow-2xl backdrop-blur">
+        <div className="mt-3 flex h-[78vh] w-[min(32rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/95 shadow-2xl backdrop-blur">
           <div className="border-b border-slate-200 bg-[linear-gradient(135deg,_rgba(15,23,42,1),_rgba(14,165,233,0.88))] p-4 text-white">
             <div className="flex items-center gap-3">
               <img
@@ -107,16 +117,30 @@ export default function Chatbot() {
               />
               <div>
                 <div className="font-semibold">deciXAI Chat</div>
-                <div className="text-xs uppercase tracking-[0.24em] text-slate-200">Chat naturally, get conversational answers</div>
+                <div className="text-xs uppercase tracking-[0.24em] text-slate-200">Chat naturally in English or Hindi</div>
               </div>
             </div>
           </div>
 
           <div ref={listRef} className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3">
             {messages.length === 0 && (
-              <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
-                Start a conversation and the bot will reply conversationally.
-              </div>
+              <>
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-4 text-sm text-slate-500">
+                  Start a conversation and the bot will reply conversationally with domain-aware guidance.
+                </div>
+                <div className="grid gap-2">
+                  {starterPrompts.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => useStarter(prompt)}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm text-slate-700 transition hover:border-sky-300 hover:bg-sky-50"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
 
             {messages.map((message) => (
@@ -149,7 +173,7 @@ export default function Chatbot() {
               onKeyDown={handleKeyDown}
               rows={3}
               className="w-full resize-none rounded-3xl border border-slate-200 px-4 py-3 outline-none transition focus:border-sky-400"
-              placeholder="Type your message and press Enter to send..."
+              placeholder="Type in English or Hindi and press Enter to send..."
             />
             <button
               disabled={loading}

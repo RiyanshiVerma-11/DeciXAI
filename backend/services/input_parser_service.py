@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 
+from services.domain_classifier_service import classify_domain
 from utils.parse_prompt import clean_prompt_text, parse_prompt
 
 
@@ -172,24 +173,15 @@ def _extract_list_after(text: str, labels: list[str]) -> list[str]:
 
 
 def detect_domain(message: str) -> str:
+    classified = classify_domain(message)
+    if classified.get('domain'):
+        return classified['domain']
+
     lowered = message.lower()
-    scores = {}
-    for domain, keywords in DOMAIN_KEYWORDS.items():
-        score = 0
-        for keyword in keywords:
-            if keyword in lowered:
-                score += 3 if ' ' in keyword else 1
-        scores[domain] = score
-
-    if scores['startup'] >= 2 and scores['startup'] > scores['career']:
-        return 'startup'
-    if scores['career'] >= 2 and scores['career'] >= scores['startup']:
-        return 'career'
-
     for domain in DOMAIN_PRIORITY:
-        if scores[domain] > 0:
+        if any(keyword in lowered for keyword in DOMAIN_KEYWORDS[domain]):
             return domain
-    return None
+    return 'career'
 
 
 def extract_options(text: str, domain: str | None = None) -> list[str]:
@@ -233,11 +225,18 @@ def extract_factors(message: str, domain: str) -> dict:
         'projects': parsed_features.get('projects') or _extract_list_after(message, ['projects', 'project']) or [],
         'interest': parsed_features.get('interest') or '',
         'market_type': 'enterprise' if any(word in lowered for word in ['enterprise', 'b2b', 'saas']) else 'consumer',
-        'sector': 'education' if 'education' in lowered or 'college' in lowered or 'student' in lowered else 'infrastructure',
+        # Prefer structured sector extraction for policy prompts.
+        'sector': parsed_features.get('sector') or ('education' if 'education' in lowered or 'college' in lowered or 'student' in lowered else 'infrastructure'),
         'risk_focus': 'high' if any(word in lowered for word in ['risk', 'misuse', 'challenge']) else 'medium',
         'impact_focus': 'high' if any(word in lowered for word in ['long-term impact', 'future scope', 'growth']) else 'medium',
         'compare_requested': len(parsed.get('options', [])) > 1 or any(word in lowered for word in ['compare', 'between', 'alternative', 'vs', 'versus', 'confused']),
     }
+
+    # Policy governance fields (used by the hybrid policy scorer).
+    if domain == 'policy':
+        for key in ('urgency', 'political_support', 'infrastructure_readiness', 'risk_level'):
+            if parsed_features.get(key):
+                factors[key] = parsed_features.get(key)
 
     if domain == 'policy' and factors['population'] == 500_000 and 'college' in lowered:
         factors['population'] = 200_000
@@ -246,7 +245,8 @@ def extract_factors(message: str, domain: str) -> dict:
 
 
 def parse_natural_language_input(message: str) -> dict:
-    domain = detect_domain(message)
+    detection = classify_domain(message)
+    domain = detection['domain']
     factors = extract_factors(message, domain)
     try:
         options = extract_options(message, domain)
@@ -257,4 +257,5 @@ def parse_natural_language_input(message: str) -> dict:
         'domain': domain,
         'options': options,
         'factors': factors,
+        'detection': detection,
     }
