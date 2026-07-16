@@ -1,13 +1,36 @@
 from functools import lru_cache
 from pathlib import Path
+import threading
 
 import joblib
 import pandas as pd
+import shap
 
 from utils.shap_utils import compute_shap_explanation, convert_shap_for_response
 
-
 MODELS_DIR = Path(__file__).resolve().parents[1] / 'models'
+
+# Global Thread-Safe Cache for SHAP Explainers
+_EXPLAINER_CACHE = {}
+_CACHE_LOCK = threading.Lock()
+
+
+def get_shap_explainer(domain: str):
+    """Retrieve or cache the TreeExplainer for the domain model thread-safely."""
+    if domain not in _EXPLAINER_CACHE:
+        with _CACHE_LOCK:
+            if domain not in _EXPLAINER_CACHE:
+                bundle = load_domain_bundle(domain)
+                if bundle is None:
+                    return None
+                pipeline = bundle.get('pipeline')
+                if pipeline is not None and 'model' in pipeline.named_steps:
+                    model_step = pipeline.named_steps['model']
+                    # Initialize the TreeExplainer once
+                    _EXPLAINER_CACHE[domain] = shap.TreeExplainer(model_step)
+                else:
+                    return None
+    return _EXPLAINER_CACHE[domain]
 
 
 @lru_cache(maxsize=8)
@@ -65,6 +88,19 @@ def _score_label(probability):
     return 'Needs work', '0-39'
 
 
+def get_model_status() -> dict[str, bool]:
+    """Return a dict of domain -> is_loaded for the health endpoint."""
+    domains = ["career", "finance", "startup", "policy"]
+    status = {}
+    for domain in domains:
+        try:
+            bundle = load_domain_bundle(domain)
+            status[domain] = bundle is not None and "pipeline" in (bundle or {})
+        except Exception:
+            status[domain] = False
+    return status
+
+
 def predict_with_model(domain, frame):
     bundle = load_domain_bundle(domain)
     if bundle is None:
@@ -91,8 +127,9 @@ def predict_with_model(domain, frame):
         # Pass profiles and labels for human-readable SHAP
         profiles = bundle.get('profiles', {})
         feature_labels = bundle.get('feature_labels', {})
+        explainer = get_shap_explainer(domain)
         shap_result = compute_shap_explanation(
-            pipeline.named_steps['model'], 
+            explainer, 
             transformed_row, 
             feature_names, 
             raw_row=frame.iloc[0].to_dict(),

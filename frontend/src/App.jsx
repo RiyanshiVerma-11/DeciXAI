@@ -1,69 +1,89 @@
-import { useEffect, useState } from 'react'
-import { Routes, Route, Link } from 'react-router-dom'
+import { Routes, Route, Link, Navigate } from 'react-router-dom'
 import Home from './pages/Home'
 import DomainPage from './pages/DomainPage'
+import AuditTrail from './pages/AuditTrail'
+import LandingPage from './pages/LandingPage'
+import AuthPage from './pages/AuthPage'
 import Chatbot from './components/Chatbot'
+import ErrorBoundary from './components/ErrorBoundary'
+import ProtectedRoute from './components/ProtectedRoute'
+import ProfileMenu from './components/ProfileMenu'
+import { useAuth } from './components/AuthContext'
 
-export default function App() {
-  const [showSplash, setShowSplash] = useState(true)
+function DashboardLayout() {
+  return (
+    <ProtectedRoute>
+      <DashboardShell />
+    </ProtectedRoute>
+  )
+}
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setShowSplash(false)
-    }, 3000)
-
-    return () => window.clearTimeout(timer)
-  }, [])
-
-  if (showSplash) {
-    return (
-      <div className="relative flex min-h-screen items-end justify-center overflow-hidden bg-slate-950 px-4 py-8">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_30%),linear-gradient(180deg,_rgba(2,6,23,0.94),_rgba(2,6,23,1))]" />
-        <img
-          src="/logo.jpeg"
-          alt="deciXAI logo"
-          className="relative z-10 max-h-[78vh] w-full max-w-5xl object-contain"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/10 via-slate-950/20 to-slate-950/80" />
-        <div className="relative z-10 w-full px-6 pb-14 text-center text-white md:pb-20">
-          <p className="mx-auto max-w-3xl text-xl font-medium leading-8 md:text-3xl md:leading-10">
-            Your AI partner for better decisions
-          </p>
-        </div>
-      </div>
-    )
-  }
+function DashboardShell() {
+  const { user } = useAuth()
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_28%),radial-gradient(circle_at_right,_rgba(34,197,94,0.12),_transparent_22%),linear-gradient(180deg,_#f8fbff_0%,_#eef6ff_100%)]">
       <header className="border-b border-slate-200 bg-white px-5 py-4 shadow-sm">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to="/dashboard" className="flex items-center gap-3">
             <img
               src="/logo.jpeg"
-              alt="deciXAI logo"
+              alt="DeciXAI logo"
               className="h-12 w-12 rounded-2xl border border-sky-100 object-cover shadow-sm"
             />
             <div>
-              <div className="text-2xl font-bold tracking-tight text-slate-900">deciXAI</div>
+              <div className="text-2xl font-bold tracking-tight text-slate-900">DeciXAI</div>
               <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Your AI partner for better decisions</div>
             </div>
           </Link>
-          <nav className="flex flex-wrap gap-4 text-sm font-medium text-slate-600">
-            <Link to="/career" className="transition hover:text-cyan-700">Career</Link>
-            <Link to="/finance" className="transition hover:text-emerald-700">Finance</Link>
-            <Link to="/startup" className="transition hover:text-fuchsia-700">Startup</Link>
-            <Link to="/policy" className="transition hover:text-orange-700">Policy</Link>
+          <nav className="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-600">
+            <Link to="/dashboard/career" className="transition hover:text-cyan-700">Career</Link>
+            <Link to="/dashboard/finance" className="transition hover:text-emerald-700">Finance</Link>
+            <Link to="/dashboard/startup" className="transition hover:text-fuchsia-700">Startup</Link>
+            <Link to="/dashboard/policy" className="transition hover:text-orange-700">Policy</Link>
+            <Link to="/dashboard/audit" className="ml-4 flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 transition hover:bg-slate-100 hover:text-slate-900">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+              Audit
+            </Link>
+            <div className="ml-2">
+              <ProfileMenu />
+            </div>
           </nav>
         </div>
       </header>
 
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/:domain" element={<DomainPage />} />
+        <Route index element={<Home />} />
+        <Route path="audit" element={<AuditTrail />} />
+        <Route path=":domain" element={<DomainPage />} />
       </Routes>
 
       <Chatbot />
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/auth" element={<AuthPage />} />
+
+        {/* Protected dashboard routes */}
+        <Route path="/dashboard/*" element={<DashboardLayout />} />
+
+        {/* Legacy routes redirect to dashboard */}
+        <Route path="/career" element={<Navigate to="/dashboard/career" replace />} />
+        <Route path="/finance" element={<Navigate to="/dashboard/finance" replace />} />
+        <Route path="/startup" element={<Navigate to="/dashboard/startup" replace />} />
+        <Route path="/policy" element={<Navigate to="/dashboard/policy" replace />} />
+        <Route path="/audit" element={<Navigate to="/dashboard/audit" replace />} />
+
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ErrorBoundary>
   )
 }

@@ -436,7 +436,7 @@ def get_policy_decision(data):
         insights=insights[:6],
     )
     if llm_plan:
-        action_plan_steps = _unique_lines(llm_plan[:3])
+        action_plan_steps = _unique_lines(llm_plan.get("action_plan", [])[:3])
 
     priority_label = _policy_priority_label(
         band_label=band_label,

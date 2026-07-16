@@ -3,25 +3,25 @@ import { useNavigate } from 'react-router-dom'
 const domains = [
   {
     label: 'Career',
-    path: '/career',
+    path: 'career',
     color: 'from-cyan-500 via-sky-500 to-blue-600',
     blurb: 'Match skills, projects, and intent with clearer career guidance.',
   },
   {
     label: 'Finance',
-    path: '/finance',
+    path: 'finance',
     color: 'from-emerald-500 via-lime-500 to-teal-600',
     blurb: 'Turn income, debt, and credit signals into smarter money decisions.',
   },
   {
     label: 'Startup',
-    path: '/startup',
+    path: 'startup',
     color: 'from-fuchsia-500 via-violet-500 to-indigo-600',
     blurb: 'Measure investor readiness, team strength, and market momentum fast.',
   },
   {
     label: 'Government Policy',
-    path: '/policy',
+    path: 'policy',
     color: 'from-orange-500 via-amber-500 to-rose-500',
     blurb: 'Assess policy feasibility with explainable, public-impact focused reasoning.',
   },
@@ -40,7 +40,7 @@ export default function Home() {
                 Explainable Decision Intelligence
               </div>
               <h1 className="mt-6 max-w-3xl text-4xl font-bold leading-tight md:text-5xl">
-                deciXAI helps teams choose with clarity, confidence, and evidence.
+                DeciXAI helps teams choose with clarity, confidence, and evidence.
               </h1>
               <p className="mt-4 max-w-2xl text-lg leading-8 text-cyan-50/90">
                 Your AI partner for better decisions across careers, finance, startups, and public policy.
@@ -51,11 +51,11 @@ export default function Home() {
               <div className="flex items-center gap-4">
                 <img
                   src="/logo.jpeg"
-                  alt="deciXAI logo"
+                  alt="DeciXAI logo"
                   className="h-20 w-20 rounded-3xl border border-white/20 object-cover shadow-lg"
                 />
                 <div>
-                  <div className="text-3xl font-semibold">deciXAI</div>
+                  <div className="text-3xl font-semibold">DeciXAI</div>
                   <div className="text-sm uppercase tracking-[0.26em] text-cyan-100">Decision support that explains itself</div>
                 </div>
               </div>

@@ -42,6 +42,10 @@ body {
   background: linear-gradient(180deg, #38bdf8, #14b8a6);
 }
 
+/* =========================================================================
+   Domain Report Animations (existing)
+   ========================================================================= */
+
 @keyframes report-float {
   0%,
   100% {
@@ -71,3 +75,189 @@ body {
   transform-origin: left center;
   animation: report-rise 0.7s ease-out both;
 }
+
+/* =========================================================================
+   Landing Page Animations
+   ========================================================================= */
+
+@keyframes landingFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes landingSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landingFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes landingGlow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes landingCardReveal {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.landing-fade-in {
+  animation: landingFadeIn 0.8s ease-out both;
+}
+
+.landing-fade-in-delay-3 {
+  animation: landingFadeIn 0.8s ease-out 1.2s both;
+}
+
+.landing-slide-up {
+  animation: landingSlideUp 0.8s ease-out 0.2s both;
+}
+
+.landing-slide-up-delay {
+  animation: landingSlideUp 0.8s ease-out 0.5s both;
+}
+
+.landing-slide-up-delay-2 {
+  animation: landingSlideUp 0.8s ease-out 0.8s both;
+}
+
+.landing-float {
+  animation: landingFloat 8s ease-in-out infinite;
+}
+
+.landing-float-delayed {
+  animation: landingFloat 10s ease-in-out 2s infinite;
+}
+
+.landing-float-slow {
+  animation: landingFloat 12s ease-in-out 4s infinite;
+}
+
+.landing-card {
+  animation: landingCardReveal 0.6s ease-out both;
+}
+
+/* =========================================================================
+   Auth Page Animations
+   ========================================================================= */
+
+@keyframes authShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-4px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes authFieldEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes profileDropIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.auth-shake {
+  animation: authShake 0.5s ease-out;
+}
+
+.auth-field-enter {
+  animation: authFieldEnter 0.3s ease-out both;
+}
+
+/* =========================================================================
+   Google Light Ambient Floating Blobs Animations
+   ========================================================================= */
+@keyframes blob-float-1 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+    filter: blur(120px);
+  }
+  33% {
+    transform: translate(50px, -60px) scale(1.15);
+    filter: blur(140px);
+  }
+  66% {
+    transform: translate(-30px, 40px) scale(0.9);
+    filter: blur(110px);
+  }
+}
+
+@keyframes blob-float-2 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1.1);
+    filter: blur(130px);
+  }
+  50% {
+    transform: translate(-60px, 50px) scale(0.95);
+    filter: blur(110px);
+  }
+}
+
+@keyframes blob-float-3 {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(0.9);
+    filter: blur(110px);
+  }
+  50% {
+    transform: translate(40px, 30px) scale(1.15);
+    filter: blur(130px);
+  }
+}
+
+.animate-blob-1 {
+  animation: blob-float-1 14s ease-in-out infinite;
+}
+.animate-blob-2 {
+  animation: blob-float-2 18s ease-in-out infinite;
+}
+.animate-blob-3 {
+  animation: blob-float-3 22s ease-in-out infinite;
+}
+

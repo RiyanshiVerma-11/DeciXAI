@@ -89,9 +89,9 @@ def get_finance_decision(data):
             'meta': {'missing_fields': missing},
         }
 
-    income = max(safe_float(data.get('income'), 0.0), 1.0)
-    loan = max(safe_float(data.get('loan'), 0.0), 0.0)
-    credit_score = min(max(safe_float(data.get('credit_score'), 0.0), 300.0), 850.0)
+    income = safe_float(data.get('income'), 1.0)
+    loan = safe_float(data.get('loan'), 0.0)
+    credit_score = safe_float(data.get('credit_score'), 650.0)
     loan_to_income = min(loan / max(income, 1.0), 5.0)
 
     feature_values = {
@@ -178,8 +178,9 @@ def get_finance_decision(data):
             insights=[result.get("summary") or ""],
         )
         if llm_plan:
-            result["suggestions"] = llm_plan[:3]
-            result["next_step"] = llm_plan[0]
+            action_steps = llm_plan.get("action_plan", [])
+            result["suggestions"] = action_steps[:3]
+            result["next_step"] = action_steps[0] if action_steps else ""
             result["meta"] = dict(result.get("meta") or {})
             result["meta"]["action_plan_source"] = "ollama"
         return result

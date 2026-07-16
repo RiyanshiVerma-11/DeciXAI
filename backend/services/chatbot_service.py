@@ -24,6 +24,7 @@ OLLAMA_URL = (
     else urljoin(raw_ollama_url.rstrip('/') + '/', 'v1/chat/completions')
 )
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.1:8b')
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 MAX_HISTORY = 10
 TIMEOUT_SECONDS = int(os.getenv('OLLAMA_TIMEOUT_SECONDS', '60'))
 RETRY_ATTEMPTS = 2
@@ -32,7 +33,7 @@ PROJECT_DOMAINS = ('career', 'finance', 'startup', 'policy')
 
 def _build_system_prompt(language_instruction: str = 'Reply in concise English.') -> str:
     return (
-        'You are deciXAI, an AI Decision Intelligence assistant. '
+        'You are DeciXAI, an AI Decision Intelligence assistant. '
         'You help users explore career, finance, startup, and policy decisions through natural conversation. '
         'When a user asks for guidance, answer directly first, then ask at most one clarifying question only if it is truly needed. '
         'Avoid generic motivational filler. Give practical next steps, stay concise, and do not use tables. '
@@ -283,9 +284,49 @@ def _format_grounded_reply(domain: str, result: dict[str, Any]) -> str:
     return summary or explanation or decision or "Here's a grounded answer from the app."
 
 
+def _has_grounding_parameters(domain: str, message: str) -> bool:
+    import math
+    lowered = str(message or '').lower()
+    if domain == 'career':
+        return _looks_like_career_profile(message)
+
+    if domain == 'startup':
+        from services.startup_service import parse_startup_input
+        parsed = parse_startup_input(message)
+        # Verify that we actually extracted at least one valid, non-NaN numerical feature
+        return (
+            (parsed.get('funding') == parsed.get('funding') and not math.isnan(parsed.get('funding', float('nan')))) or
+            (parsed.get('team_size') == parsed.get('team_size') and not math.isnan(parsed.get('team_size', float('nan')))) or
+            (parsed.get('experience') == parsed.get('experience') and not math.isnan(parsed.get('experience', float('nan'))))
+        )
+
+    if domain == 'finance':
+        from utils.parse_prompt import parse_prompt
+        parsed = parse_prompt('finance', message).get('features', {})
+        return (
+            parsed.get('income') is not None or
+            parsed.get('loan') is not None or
+            parsed.get('credit_score') is not None
+        )
+
+    if domain == 'policy':
+        from utils.parse_prompt import parse_prompt
+        parsed = parse_prompt('policy', message)
+        features = parsed.get('features', {})
+        options = parsed.get('options', [])
+        has_numeric = features.get('budget') is not None or features.get('population') is not None
+        has_options = len(options) >= 2 or any(token in lowered for token in ('compare', 'between', 'vs', 'versus', 'alternative'))
+        return has_numeric or has_options
+
+    return False
+
+
 def _grounded_domain_reply(message: str) -> str | None:
     domain = _infer_domain(message)
     if not domain:
+        return None
+
+    if not _has_grounding_parameters(domain, message):
         return None
 
     lowered = str(message or '').strip().lower()
@@ -345,6 +386,7 @@ def _extract_chat_content(payload: dict[str, Any]) -> str:
 
     return ''
 
+
 def _looks_like_career_profile(text: str) -> bool:
     lowered = str(text or "").lower()
     # Treat as a profile only when we see multiple strong signals, not just a generic word like "projects".
@@ -362,9 +404,9 @@ def _looks_like_career_followup(text: str) -> bool:
     lowered = str(text or "").lower()
     # Follow-ups typically ask for examples/roadmap without repeating the profile.
     return any(token in lowered for token in (
-        "give example", "examples", "project ideas", "projects i should make", "what projects", "roadmap",
+        "give example", "examples", "project ideas", "projects ideas", "projects i should make", "what projects", "roadmap",
         "how can i", "what should i do", "improve", "top companies", "google", "microsoft", "amazon",
-        "faang", "resume", "portfolio",
+        "faang", "resume", "portfolio", "project", "projects",
     ))
 
 
@@ -445,15 +487,23 @@ def _build_ollama_request(messages: list[dict[str, str]], stream: bool = False) 
         'model': OLLAMA_MODEL,
         'messages': messages,
         'temperature': 0.7,
-        'num_predict': 512,
     }
     if stream:
         payload['stream'] = True
 
+    if GROQ_API_KEY:
+        payload['max_tokens'] = 512
+    else:
+        payload['num_predict'] = 512
+
+    headers = {'Content-Type': 'application/json'}
+    if GROQ_API_KEY:
+        headers['Authorization'] = f'Bearer {GROQ_API_KEY}'
+
     return Request(
         OLLAMA_URL,
         data=json.dumps(payload).encode('utf-8'),
-        headers={'Content-Type': 'application/json'},
+        headers=headers,
     )
 
 

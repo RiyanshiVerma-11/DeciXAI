@@ -405,6 +405,8 @@ def _build_startup_response(score: float, funding: float, team_size: int, market
         'what_if': f'Adding stronger traction evidence or extending runway can improve the score from {int(round(score))} to {what_if_score}.',
         'blocking_factors': blocking_factors,
         'probability': round(score / 100.0, 4),
+
+
         'score_label': score_label,
         'score_band': score_label,
         'next_step': action_plan[0] if action_plan else '',
@@ -419,6 +421,35 @@ def get_startup_decision(data: dict | None):
     team_size = startup['team_size']
     market = startup['market']
     experience = startup['experience']
+
+    missing = []
+    if math.isnan(funding):
+        missing.append('funding')
+    if math.isnan(team_size):
+        missing.append('team_size')
+    if math.isnan(experience):
+        missing.append('experience')
+    if missing:
+        return {
+            'decision': 'Need more details to assess startup potential',
+            'probability': 0.5,
+            'score_label': 'Unknown',
+            'score_band': 'Unknown',
+            'summary': 'The startup model needs your funding amount, team size, and founder experience to produce a reliable result.',
+            'next_step': 'Share funding, team size, and founder experience.',
+            'target_score': 75.0,
+            'key_factors': ['missing_inputs'],
+            'explanation': f'Missing required inputs: {", ".join(missing)}.',
+            'suggestions': [
+                'Provide: funding, team size, and founder experience.',
+                'If unsure, provide approximate ranges.',
+            ],
+            'risks': ['Inputs were missing, so any score would be unreliable.'],
+            'meta': {'missing_fields': missing},
+            'intent': 'startup',
+            'mode': 'single',
+            'parsed_input': _sanitize_startup_payload(startup),
+        }
 
     market_type = startup.get('market_type', '')
     market_segment = startup.get('market_segment', market)
@@ -561,11 +592,16 @@ def get_startup_decision(data: dict | None):
         insights=[str(item) for item in (merged.get("insights") or [])],
     )
     if llm_plan:
-        merged["action_plan"] = llm_plan
-        merged["suggestions"] = llm_plan[:3]
-        merged["next_step"] = llm_plan[0]
+        action_steps = llm_plan.get("action_plan", [])
+        merged["action_plan"] = action_steps
+        merged["suggestions"] = action_steps[:3]
+        merged["next_step"] = action_steps[0] if action_steps else ""
         merged["meta"] = dict((merged.get("meta") or {}))
         merged["meta"]["action_plan_source"] = "ollama"
+        # Store additional LLM outputs in details
+        merged["details"] = dict((merged.get("details") or {}))
+        merged["details"]["reality_check"] = llm_plan.get("reality_check", "")
+        merged["details"]["project_ideas"] = llm_plan.get("project_ideas", [])
 
     return merged
 

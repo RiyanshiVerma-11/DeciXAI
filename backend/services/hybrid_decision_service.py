@@ -232,11 +232,10 @@ def _experience_bonus(normalized: dict[str, Any], path_class: str = "") -> float
     return _clamp((internship_bonus + real_world_bonus) * multiplier, 0.0, 0.18)
 
 
-def _skill_strength_label(skill_count: int) -> str:
-    """Bucket skill count into a human-readable strength band."""
-    if skill_count <= 2:
+def _skill_strength_label(count: int) -> str:
+    if count < 3:
         return "weak"
-    if 3 <= skill_count <= 5:
+    if count < 6:
         return "moderate"
     return "strong"
 
@@ -448,9 +447,17 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
     interest_aligned = bool(path_class in explicit_interest_paths) if explicit_interest_paths else bool(aligned_interest and interest_domain == aligned_interest)
     explicit_interest_hit = path_class in explicit_interest_paths
 
-    skills_aligned = len(skill_hits) >= 2 or (len(skill_hits) >= 1 and len(user_skills) <= 5)
-    projects_aligned = (project_count == 0 and False) or len(project_hits) >= 1
-    certs_aligned = (cert_count == 0 and False) or len(cert_hits) >= 1
+    skills_aligned = len(skill_hits) >= 2 or (len(skill_hits) >= 1 and len(user_skills) <= 4)
+    projects_aligned = len(project_hits) >= 1
+    
+    # Certification relevance: Direct match vs Partial match (e.g., AWS for SDE)
+    certs_aligned = len(cert_hits) >= 1
+    certs_partial = False
+    if not certs_aligned and cert_count > 0:
+        # Check if cert matches related technical/management domains
+        related_hints = INTEREST_HINTS.get(PATH_INTEREST_ALIGNMENT.get(path_class, ""), [])
+        if _path_text_hits(cert_text, related_hints):
+            certs_partial = True
 
     # Treat missing projects/certs as "missing evidence" rather than mismatch.
     projects_missing = project_count == 0
@@ -462,6 +469,7 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
         "skills_aligned": skills_aligned,
         "projects_aligned": projects_aligned,
         "certs_aligned": certs_aligned,
+        "certs_partial": certs_partial,
         "interest_aligned": interest_aligned,
         "explicit_interest_hit": explicit_interest_hit,
         "projects_missing": projects_missing,
@@ -472,48 +480,60 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
     }
 
 
-def _suggest_projects_for_path(path_class: str) -> list[str]:
-    # Keep it short but concrete: 4 project directions per path.
+def _suggest_projects_for_path(path_class: str) -> list[dict[str, str]]:
+    # High-quality, resume-worthy project templates
     if path_class in {"data_science", "data_engineering"}:
         return [
-            "Build an end-to-end ML project: data cleaning -> model -> evaluation -> simple dashboard",
-            "Create a portfolio notebook + report: EDA + insights + business-style recommendations",
-            "Deploy a small API for predictions (FastAPI) and log metrics",
-            "Rebuild one public dataset project with proper validation, feature engineering, and model comparison",
+            {
+                "title": "Real-Time Fraud Detection Pipeline",
+                "problem": "E-commerce platforms lose millions to bot transactions.",
+                "stack": "Python, XGBoost, FastAPI, Docker",
+                "impact": "End-to-end MLE deployment proof."
+            },
+            {
+                "title": "Financial News Sentiment Engine",
+                "problem": "Summarizing market sentiment from thousands of articles.",
+                "stack": "Transformers, PostgreSQL, Streamlit",
+                "impact": "NLP and automated data ingestion maturity."
+            }
         ]
     if path_class == "software_development":
         return [
-            "Build a backend REST API with auth + database + deployment",
-            "Create a React frontend that consumes an API (state, routing, forms)",
-            "Ship one full-stack app and write a clear README + demo",
-            "Add testing + CI: unit tests, basic integration tests, and GitHub Actions pipeline",
+            {
+                "title": "Full-Stack Inventory Dashboard",
+                "problem": "Small businesses struggle to track stock in real-time.",
+                "stack": "React, Node.js or Flask, PostgreSQL",
+                "impact": "Core CRUD and state management proof."
+            },
+            {
+                "title": "Real-time Collaborative Chat",
+                "problem": "Handling instant state updates across users.",
+                "stack": "WebSockets, Express, Redis",
+                "impact": "Concurrency and event-driven logic proof."
+            },
+            {
+                "title": "Portfolio Automation Suite",
+                "problem": "Manual deployment and testing for side projects.",
+                "stack": "GitHub Actions, Docker, Shell Scripting",
+                "impact": "DevOps mindset and systems awareness."
+            }
         ]
     if path_class == "cloud_devops":
         return [
-            "Containerize an app with Docker and set up CI pipeline",
-            "Deploy to cloud with monitoring + basic IaC (Terraform)",
-            "Add logging/alerts and a rollback plan for releases",
-            "Build a small SRE runbook: SLOs, dashboards, alerts, incident checklist",
-        ]
-    if path_class == "cybersecurity":
-        return [
-            "Create a small security lab report: recon -> vuln -> mitigation",
-            "Set up a SIEM-style log pipeline and detect simple attacks",
-            "Write a threat model and hardening checklist for a sample app",
-            "Do a secure-code review on a demo app and fix the top vulnerabilities",
-        ]
-    if path_class == "product_management":
-        return [
-            "Write a PRD with metrics, user stories, and a rollout plan",
-            "Do a competitor analysis + positioning + pricing draft",
-            "Run a user interview summary and convert it into a roadmap",
-            "Create a metrics dashboard spec: north star + funnels + experiment plan",
+            {
+                "title": "Self-Healing K8s Cluster",
+                "problem": "Managing downtime in distributed systems.",
+                "stack": "Kubernetes, Terraform, Prometheus",
+                "impact": "Infrastructure as Code and SRE maturity."
+            }
         ]
     return [
-        "Build 2 domain-relevant projects with clear outcomes and demos",
-        "Write a short case study explaining problem -> approach -> result",
-        "Publish a portfolio README that links demos and explains decisions",
-        "Add one real-world proof point: internship, freelance, or open-source contribution",
+        {
+            "title": "Domain-Specific Evidence Project",
+            "problem": "Lack of practical proof for target roles.",
+            "stack": "Industry-standard tools",
+            "impact": "Immediate resume signal improvement."
+        }
     ]
 
 
@@ -533,9 +553,11 @@ def _suggest_certifications_for_path(path_class: str) -> list[str]:
     return ["One role-aligned certification", "One portfolio-backed certificate (project-based)"]
 
 
-def _alignment_badge(aligned: bool, missing: bool = False) -> str:
+def _alignment_badge(aligned: bool, missing: bool = False, partial: bool = False) -> str:
     if missing:
         return "missing"
+    if partial:
+        return "partial"
     return "match" if aligned else "mismatch"
 
 
@@ -557,7 +579,7 @@ def _career_track_roadmap(normalized: dict[str, Any], option: dict[str, Any], *,
     alignment = {
         "skills": _alignment_badge(snapshot["skills_aligned"]),
         "projects": _alignment_badge(snapshot["projects_aligned"], missing=projects_missing),
-        "certifications": _alignment_badge(snapshot["certs_aligned"], missing=certs_missing),
+        "certifications": _alignment_badge(snapshot["certs_aligned"], missing=certs_missing, partial=snapshot.get("certs_partial")),
         "interest": _alignment_badge(snapshot["interest_aligned"]),
     }
 
@@ -570,8 +592,10 @@ def _career_track_roadmap(normalized: dict[str, Any], option: dict[str, Any], *,
         gaps.append("Projects are not clearly aligned to the target path yet.")
     if certs_missing:
         gaps.append("No certifications listed (optional, but helps credibility).")
+    elif snapshot.get("certs_partial"):
+        gaps.append("Certification is valuable but only partially relevant to this specific track.")
     elif not snapshot["certs_aligned"]:
-        gaps.append("Certifications are not clearly aligned to the target path yet.")
+        gaps.append("Certifications do not yet provide strong proof for this path.")
     if not snapshot["interest_aligned"]:
         gaps.append("Interest does not match this path (choose: commit or pivot).")
 
@@ -658,6 +682,32 @@ def _career_followup_questions(normalized: dict[str, Any]) -> list[str]:
 
 def _calibrate_final_score(normalized: dict[str, Any], probability: float) -> float:
     """
+    Calibrated score: honest, slightly critical, and aligned with hiring manager expectations.
+    """
+    cgpa = float(normalized.get("cgpa", 0.0) or 0.0)
+    project_count = int(normalized.get("project_count", 0) or 0)
+    skill_count = int(normalized.get("skill_count", 0) or 0)
+
+    # Base score from model
+    score = float(probability) * 100.0
+
+    # Calibration rules
+    if cgpa >= 8.0:
+        score += 5.0
+    elif cgpa < 6.0:
+        score -= 10.0
+    elif cgpa < 7.0:
+        score -= 5.0
+
+    if project_count < 2:
+        score -= 4.0
+    if skill_count < 3:
+        score -= 5.0
+
+    return round(_clamp(score, 0.0, 100.0), 1)
+
+def _OLD_calibrate_final_score(normalized: dict[str, Any], probability: float) -> float:
+    """
     Convert model probability into a presentation score and adjust it using
     profile-strength heuristics so the user-facing score better matches hiring reality.
     """
@@ -729,8 +779,15 @@ def normalize_career_input(data: dict[str, Any]) -> dict[str, Any]:
     raw_interest = _clean_text(data.get("interest"))
     course_value = _clean_text(data.get("course") or data.get("degree") or data.get("education_level"))
     specialization_value = _clean_text(data.get("specialization") or course_value)
-    project_count = max(len(projects), int(_safe_float(data.get("project_count", data.get("projects_count", len(projects))), len(projects))))
-    skill_count = max(len(skills), int(_safe_float(data.get("skill_count", data.get("skills_count", len(skills))), len(skills))))
+    project_count = int(_safe_float(data.get("project_count", data.get("projects_count", len(projects))), len(projects)))
+    
+    # STRICT SKILL COUNTING: Only count unique user-provided skills
+    unique_user_skills = list(set([_clean_token(s) for s in skills if s]))
+    skill_count = len(unique_user_skills)
+    
+    # If the user explicitly provided a count, we respect it only if it's higher (e.g. "I have 10 skills: A, B, C")
+    explicit_skill_count = int(_safe_float(data.get("skill_count", data.get("skills_count", 0)), 0))
+    skill_count = max(skill_count, explicit_skill_count)
     certification_count = max(len(certifications), int(_safe_float(data.get("certification_count", data.get("certifications_count", len(certifications))), len(certifications))))
     project_quality_score = float(_safe_float(data.get("project_quality_score", 0), 0))
     project_signal = float(_safe_float(data.get("project_signal", 0), 0))
@@ -1079,16 +1136,22 @@ def _career_narrative_summary(normalized: dict[str, Any], option_scores: list[di
 
 
 def _career_confidence(normalized: dict[str, Any], option_scores: list[dict[str, Any]], score: float) -> float:
+    """Calibrate confidence: do NOT exceed 80% unless profile is industry-ready."""
     skill_count = int(normalized.get("skill_count", 0) or 0)
     project_count = int(normalized.get("project_count", 0) or 0)
-    cert_count = int(normalized.get("certification_count", 0) or 0)
     internship_count = len(normalized.get("internships") or [])
-    top_probability = float(option_scores[0].get("probability", 0.0)) if option_scores else 0.0
-    second_probability = float(option_scores[1].get("probability", 0.0)) if len(option_scores) > 1 else 0.0
-    margin = max(top_probability - second_probability, 0.0)
-    evidence = min(skill_count / 6.0, 1.0) * 16 + min(project_count / 3.0, 1.0) * 14 + min(cert_count / 2.0, 1.0) * 6 + min(internship_count, 1) * 8
-    confidence = 48 + score * 0.28 + margin * 45 + evidence
-    return round(_clamp(confidence, 58.0, 96.0), 1)
+
+    # Baseline confidence
+    confidence = 45 + score * 0.25
+
+    # Industry-readiness bonus
+    if project_count >= 2 and skill_count >= 5 and internship_count >= 1:
+        confidence += 15.0
+
+    # Hard cap for junior profiles without production proof
+    max_cap = 92.0 if (project_count >= 3 and internship_count >= 1) else 80.0
+
+    return round(_clamp(confidence, 55.0, max_cap), 1)
 
 
 def _profile_aliases(profile_key: str, profile: dict[str, Any]) -> list[str]:
@@ -1126,7 +1189,9 @@ def _dynamic_option_scores(normalized: dict[str, Any], readiness: float | None =
     readiness = float(readiness or 0.0)
 
     def _blend_probability(path_probability: float) -> float:
-        calibrated = path_probability * 0.72 + readiness * 0.28
+        # Give slightly more weight to path-specific evidence (0.65 vs 0.35)
+        # to prevent underestimating paths like Data Science for Python/SQL users.
+        calibrated = path_probability * 0.65 + readiness * 0.35
         return float(_clamp(calibrated, 0.02, 0.98))
     if requested_options:
         for option in requested_options:
@@ -1155,22 +1220,21 @@ def _dynamic_option_scores(normalized: dict[str, Any], readiness: float | None =
                 0.02,
                 0.98,
             )
-            rank_probability = _clamp(
-                calibrated_probability + _path_affinity_adjustment(normalized, mapped_class, path_profiles.get(mapped_class, {})),
+            calibrated_probability = _clamp(
+                calibrated_probability,
                 0.02,
                 0.98,
             )
+            # Use the same calibration logic for the item score
+            calibrated_score = _calibrate_final_score(normalized, calibrated_probability)
+            
             scored.append({
                 "name": option,
-                "score": round(rank_probability * 100, 2),
+                "score": calibrated_score,
                 "probability": round(calibrated_probability, 4),
                 "raw_probability": round(probability, 4),
-                "rank_probability": round(rank_probability, 4),
-                "evidence_probability": round(evidence_probabilities.get(mapped_class, 0.0), 4),
-                "evidence_score": round(evidence_raw_scores.get(mapped_class, 0.0), 4),
                 "mapped_class": mapped_class,
                 "mapped_label": path_profiles.get(mapped_class, {}).get("display_name", mapped_class.replace("_", " ").title()),
-                "match_strength": round(match_strength, 4),
                 "path_profile": path_profiles.get(mapped_class, {})
             })
     else:
@@ -1192,45 +1256,46 @@ def _dynamic_option_scores(normalized: dict[str, Any], readiness: float | None =
                 0.02,
                 0.98,
             )
-            rank_probability = _clamp(
-                calibrated_probability + _path_affinity_adjustment(normalized, class_name, path_profiles.get(class_name, {})),
+            calibrated_probability = _clamp(
+                calibrated_probability,
                 0.02,
                 0.98,
             )
+            # Use the same calibration logic for the item score
+            calibrated_score = _calibrate_final_score(normalized, calibrated_probability)
+            
             scored.append({
                 "name": path_profiles.get(class_name, {}).get("display_name", class_name.replace("_", " ").title()),
-                "score": round(rank_probability * 100, 2),
+                "score": calibrated_score,
                 "probability": round(calibrated_probability, 4),
                 "raw_probability": round(raw_probability, 4),
-                "rank_probability": round(rank_probability, 4),
-                "evidence_probability": round(evidence_probabilities.get(class_name, 0.0), 4),
-                "evidence_score": round(evidence_raw_scores.get(class_name, 0.0), 4),
                 "mapped_class": class_name,
                 "mapped_label": path_profiles.get(class_name, {}).get("display_name", class_name.replace("_", " ").title()),
-                "match_strength": 1.0,
                 "path_profile": path_profiles.get(class_name, {})
             })
 
     if scored:
-        model_leader = max(scored, key=lambda item: item["rank_probability"])
-        evidence_leader = max(scored, key=lambda item: item["evidence_score"])
+        model_leader = max(scored, key=lambda item: item.get("rank_probability", item.get("probability", 0)))
+        evidence_leader = max(scored, key=lambda item: item.get("evidence_score", 0))
         strong_evidence_conflict = (
             evidence_leader["mapped_class"] != model_leader["mapped_class"]
-            and evidence_leader["evidence_score"] >= 3.0
-            and evidence_leader["evidence_score"] >= model_leader["evidence_score"] + 2.0
+            and evidence_leader.get("evidence_score", 0) >= 3.0
+            and evidence_leader.get("evidence_score", 0) >= model_leader.get("evidence_score", 0) + 2.0
         )
         rank_weight = 0.35 if strong_evidence_conflict else 0.7
         evidence_weight = 1.0 - rank_weight
         for item in scored:
             final_probability = _clamp(
-                item["rank_probability"] * rank_weight + item["evidence_probability"] * evidence_weight,
+                item.get("rank_probability", item["probability"]) * rank_weight + item.get("evidence_probability", 0) * evidence_weight,
                 0.02,
                 0.98,
             )
             item["probability"] = round(final_probability, 4)
-            item["score"] = round(final_probability * 100, 2)
+            # Ensure even the blended score is calibrated
+            item["score"] = _calibrate_final_score(normalized, final_probability)
 
-    scored.sort(key=lambda x: (x["score"], x["rank_probability"]), reverse=True)
+
+    scored.sort(key=lambda x: (x["score"]), reverse=True)
     return scored[:4], {
         "comparison_supported": True,
         "path_profiles": path_profiles,
@@ -1363,52 +1428,6 @@ def _dynamic_action_plan(normalized: dict[str, Any], model_result: dict[str, Any
 
 
 def _pure_model_what_if(normalized: dict[str, Any], model_result: dict[str, Any]) -> tuple[str, float]:
-    """Model-driven what-if using profile targets."""
-    profiles = model_result.get("profiles", {}) or {}
-    numeric_profiles = profiles.get("numeric", {}) or {}
-    
-    # Simulate hitting positive medians in top 2 gaps
-    updated = dict(normalized)
-    changes_made = []
-    
-    priority_features = ["skills_count", "projects_count", "certifications_count", "cgpa"]
-    for feature in priority_features:
-        profile = numeric_profiles.get(feature)
-        if not profile:
-            continue
-        target = profile.get("positive_median")
-        if target:
-            current = updated.get(
-                "skill_count" if feature == "skills_count" else 
-                "project_count" if feature == "projects_count" else 
-                "certification_count" if feature == "certifications_count" else 
-                feature
-            )
-            if current < target:
-                updated[
-                    "skill_count" if feature == "skills_count" else 
-                    "project_count" if feature == "projects_count" else 
-                    "certification_count" if feature == "certifications_count" else 
-                    feature
-                ] = target
-                changes_made.append(feature.replace('_', ' '))
-                if len(changes_made) >= 2:
-                    break
-    
-    # Re-run prediction
-    rerun_frame = _career_model_frame(updated)
-    rerun_result = predict_with_model("career", rerun_frame)
-    
-    if rerun_result:
-        original_pct = round(model_result['probability'] * 100, 1)
-        new_pct = round(rerun_result['probability'] * 100, 1)
-        changes = ', '.join(changes_made)
-        return f"Improve {changes}: readiness jumps from {original_pct}% → {new_pct}%", new_pct
-    return "", model_result["probability"] * 100
-
-
-def _pure_model_what_if(normalized: dict[str, Any], model_result: dict[str, Any]) -> tuple[str, float]:
-    """Model-driven what-if using actual input mutations and a full rerun."""
     profiles = model_result.get("profiles", {}) or {}
     numeric_profiles = profiles.get("numeric", {}) or {}
     updated = dict(normalized)
@@ -1502,8 +1521,13 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
     action_plan = _dynamic_action_plan(normalized, model_result, option_scores)
     what_if_text, rerun_score = _pure_model_what_if(normalized, model_result)
     
-    top_probability = option_scores[0]["probability"] if option_scores else readiness
+    top_probability = option_scores[0]["score"] / 100.0 if option_scores else readiness
     score = _calibrate_final_score(normalized, top_probability)
+    
+    # ENSURE ALIGNMENT: Profile Score must equal Top Path Match %
+    if option_scores:
+        score = option_scores[0]["score"]
+    
     confidence = _career_confidence(normalized, option_scores, score)
     skill_strength = _skill_strength_label(int(normalized.get("skill_count", 0) or 0))
 
@@ -1583,9 +1607,12 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
             ][:4]
             ideas = _suggest_projects_for_path(snapshot["path_class"])[:2]
             if ideas:
+                # Ensure we handle both string and dict formats from _suggest_projects_for_path
+                p1 = ideas[0] if isinstance(ideas[0], str) else ideas[0].get("title", "")
+                p2 = ideas[1] if isinstance(ideas[1], str) else ideas[1].get("title", "")
                 result["action_plan"] = [
-                    f"Replace/upgrade projects for {snapshot['path_label']}: {ideas[0]}.",
-                    f"Add one more: {ideas[1]}.",
+                    f"Replace/upgrade projects for {snapshot['path_label']}: {p1}.",
+                    f"Add one more: {p2}.",
                     *[step for step in (result.get("action_plan") or []) if step],
                 ][:5]
 
@@ -1652,9 +1679,17 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
         insights=[str(item) for item in (result.get("insights") or [])],
     )
     if llm_plan:
-        result["action_plan"] = llm_plan
-        result["next_step"] = llm_plan[0]
+        result["action_plan"] = llm_plan.get("action_plan", [])
+        result["reality_check"] = llm_plan.get("reality_check", "")
+        result["project_ideas"] = llm_plan.get("project_ideas", [])
+        result["next_step"] = result["action_plan"][0] if result["action_plan"] else ""
         result["details"] = dict(result.get("details") or {})
         result["details"]["action_plan_source"] = "ollama"
 
+    # FORCED ALIGNMENT: Overall Score MUST match Top Path Match %
+    if option_scores:
+        result["score"] = option_scores[0]["score"]
+        result["probability"] = option_scores[0]["probability"]
+
     return result
+

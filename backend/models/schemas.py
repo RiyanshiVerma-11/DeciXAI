@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class CareerInput(BaseModel):
-    cgpa: float
+    cgpa: float = Field(..., ge=0.0, le=10.0, description="Cumulative Grade Point Average, bounded between 0.0 and 10.0")
     skills: list[str] = Field(default_factory=list)
     projects: list[str] = Field(default_factory=list)
     interest: str
@@ -15,21 +15,21 @@ class CareerInput(BaseModel):
     course: str | None = None
     specialization: str | None = None
     education_level: str | None = None
-    year_of_study: float | None = None
-    experience_years: float | None = None
+    year_of_study: float | None = Field(None, ge=1.0, le=5.0, description="Year of study, usually between 1.0 and 5.0")
+    experience_years: float | None = Field(None, ge=0.0, le=50.0, description="Years of professional experience")
 
 
 class FinanceInput(BaseModel):
-    income: float
-    loan: float
-    credit_score: float
+    income: float = Field(..., ge=1.0, description="Annual income must be positive")
+    loan: float = Field(..., ge=0.0, description="Loan amount cannot be negative")
+    credit_score: float = Field(..., ge=300.0, le=850.0, description="Credit score must be between 300 and 850")
 
 
 class StartupInput(BaseModel):
-    funding: float
-    team_size: int
+    funding: float = Field(..., ge=0.0, description="Funding amount cannot be negative")
+    team_size: int = Field(..., ge=1, description="Team size must be at least 1")
     market: str
-    experience: float
+    experience: float = Field(..., ge=0.0, le=60.0, description="Founder years of experience, bounded up to 60")
 
 
 class StartupPromptInput(BaseModel):
@@ -42,8 +42,8 @@ class CareerPromptInput(BaseModel):
 
 class PolicyInput(BaseModel):
     sector: str
-    budget: float
-    population: float
+    budget: float = Field(..., ge=0.0, description="Policy budget cannot be negative")
+    population: float = Field(..., ge=0.0, description="Target population size cannot be negative")
     political_support: str | None = None
     infrastructure_readiness: str | None = None
     risk_level: str | None = None
@@ -126,3 +126,33 @@ class ChatbotResponse(BaseModel):
     mode: str = "chat"
     detection: DomainDetectionResponse | None = None
     meta: dict[str, Any] | None = None
+
+
+# ---------------------------------------------------------------------------
+# Authentication schemas
+# ---------------------------------------------------------------------------
+
+
+class RegisterInput(BaseModel):
+    email: str = Field(..., description="User email address")
+    name: str = Field(..., min_length=2, max_length=100, description="User display name")
+    password: str = Field(..., min_length=6, max_length=128, description="Account password (min 6 chars)")
+
+
+class LoginInput(BaseModel):
+    email: str = Field(..., description="User email address")
+    password: str = Field(..., description="Account password")
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    name: str
+    created_at: str | None = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+

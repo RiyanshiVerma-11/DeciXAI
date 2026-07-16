@@ -672,11 +672,18 @@ def parse_natural_language_input(text: str) -> dict:
     project_quality_score = max(project_quality_score, extract_project_keywords(cleaned_text))
     project_signal = 0.5 * project_quality_score + 0.3 * project_count
 
+    # Section-aware skill extraction to prevent inflation
+    skills_text = cleaned_text
+    skills_match = re.search(r"skills?\s*[:\-]?\s*(.*?)(?=\b(?:cgpa|course|specialization|interest|projects?|certifications?|options?|compare|vs)\b|$)", cleaned_text, flags=re.IGNORECASE)
+    if skills_match:
+        skills_text = skills_match.group(1)
+
+
     return {
         "degree": _extract_degree(cleaned_text),
         "specialization": _extract_specialization(cleaned_text),
         "cgpa": _extract_cgpa(cleaned_text),
-        "skills": _extract_skills(cleaned_text),
+        "skills": _extract_skills(skills_text),
         "projects": project_count,
         "project_descriptions": project_descriptions,
         "project_quality_score": project_quality_score,

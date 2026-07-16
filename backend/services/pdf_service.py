@@ -1,0 +1,123 @@
+import io
+
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+
+
+def generate_decision_report(domain: str, decision_data: dict) -> io.BytesIO:
+    """
+    Generates a PDF report from the decision JSON data.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, 
+        pagesize=letter, 
+        rightMargin=72, 
+        leftMargin=72, 
+        topMargin=72, 
+        bottomMargin=72
+    )
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle(
+        'TitleStyle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor("#0f172a"),
+        alignment=TA_CENTER,
+        spaceAfter=30
+    )
+    heading_style = ParagraphStyle(
+        'HeadingStyle',
+        parent=styles['Heading2'],
+        fontSize=16,
+        textColor=colors.HexColor("#0284c7"),
+        spaceBefore=20,
+        spaceAfter=10
+    )
+    normal_style = styles['Normal']
+    normal_style.fontSize = 11
+    normal_style.leading = 16
+    
+    elements = []
+    
+    # Title
+    domain_title = domain.capitalize()
+    elements.append(Paragraph(f"DeciXAI {domain_title} Report", title_style))
+    
+    # Executive Summary Section
+    elements.append(Paragraph("Executive Summary", heading_style))
+    
+    score = decision_data.get('score', 'N/A')
+    if isinstance(score, float):
+        score = round(score, 1)
+        
+    decision = decision_data.get('decision', 'N/A')
+    summary = decision_data.get('summary', 'No summary available.')
+    
+    summary_data = [
+        ["Decision / Band", str(decision)],
+        ["Score", f"{score} / 100"],
+    ]
+    
+    t = Table(summary_data, colWidths=[120, 340])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor("#f8fafc")),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor("#334155")),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor("#e2e8f0")),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 15))
+    elements.append(Paragraph(summary, normal_style))
+    
+    # Recommended Action Plan
+    actions = decision_data.get('action_plan', [])
+    if actions:
+        elements.append(Paragraph("Recommended Action Plan", heading_style))
+        for i, action in enumerate(actions, 1):
+            elements.append(Paragraph(f"<b>{i}.</b> {action}", normal_style))
+            elements.append(Spacer(1, 6))
+            
+    # Key Factors / Drivers
+    factors = decision_data.get('key_factors', [])
+    if factors:
+        elements.append(Paragraph("Key Driving Factors", heading_style))
+        for factor in factors:
+            if isinstance(factor, dict) and 'factor' in factor:
+                # Handle structured factor impacts
+                text = f"• <b>{factor['factor']}:</b> {factor.get('impact', '')}"
+            else:
+                text = f"• {factor}"
+            elements.append(Paragraph(text, normal_style))
+            elements.append(Spacer(1, 6))
+            
+    # Risks / Watchouts
+    risks = decision_data.get('risks', [])
+    blocking = decision_data.get('blocking_factors', [])
+    all_risks = risks + blocking
+    if all_risks:
+        # Deduplicate
+        unique_risks = list(dict.fromkeys(all_risks))
+        elements.append(Paragraph("Risks & Watchouts", heading_style))
+        for risk in unique_risks:
+            elements.append(Paragraph(f"• {risk}", normal_style))
+            elements.append(Spacer(1, 6))
+
+    # Details/Explanation
+    explanation = decision_data.get('explanation')
+    if explanation:
+        elements.append(Paragraph("Detailed Context", heading_style))
+        elements.append(Paragraph(explanation, normal_style))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer

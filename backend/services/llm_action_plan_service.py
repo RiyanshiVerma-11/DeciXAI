@@ -15,6 +15,7 @@ OLLAMA_URL = (
     else urljoin(RAW_OLLAMA_URL.rstrip("/") + "/", "v1/chat/completions")
 )
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
 def _ollama_request(messages: list[dict[str, str]], *, temperature: float = 0.4, num_predict: int = 220) -> Request:
@@ -22,12 +23,20 @@ def _ollama_request(messages: list[dict[str, str]], *, temperature: float = 0.4,
         "model": OLLAMA_MODEL,
         "messages": messages,
         "temperature": temperature,
-        "num_predict": num_predict,
     }
+    if GROQ_API_KEY:
+        payload["max_tokens"] = num_predict
+    else:
+        payload["num_predict"] = num_predict
+
+    headers = {"Content-Type": "application/json"}
+    if GROQ_API_KEY:
+        headers["Authorization"] = f"Bearer {GROQ_API_KEY}"
+
     return Request(
         OLLAMA_URL,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
     )
 
 
@@ -51,28 +60,46 @@ def generate_action_plan(
     score: float | None = None,
     risks: list[str] | None = None,
     insights: list[str] | None = None,
-    timeout_seconds: int = 6,
-) -> list[str] | None:
+    timeout_seconds: int = 15,
+) -> dict[str, Any] | None:
     """
-    Returns a short list of 3-5 actionable steps grounded in the given input and outputs.
+    Returns a structured audit report from a hiring manager's perspective.
     Returns None if the LLM is unavailable or fails.
     """
     domain = str(domain or "").strip().lower()
     if domain not in {"career", "finance", "startup", "policy"}:
         return None
 
-    # Keep prompts compact and deterministic.
+    # persona: Senior Hiring Manager & Auditor
     system = (
-        "You are a senior domain advisor. Generate a short action plan only. "
-        "Do not mention being an AI. Do not ask questions. Do not include disclaimers. "
-        "Output ONLY JSON with shape: {\"action_plan\": [\"...\"]}. "
-        "Each step must be a single sentence, concrete and measurable."
+        "You are a Senior Hiring Manager and Career Auditor. Audit the user's career profile bluntly.\n\n"
+        "Constraints:\n"
+        "1. Confidence Calibration: Do not exceed 80% unless they have production/internship proof.\n"
+        "2. Score Consistency: Ensure your reasoning matches the provided scores.\n"
+        "3. Action Plan: Be specific and realistic. If Python is a core skill, prioritize suggesting Flask/Django for backend pivots. Avoid suggesting Node.js unless it fits their existing JS expertise.\n"
+        "4. 🔥 REALISTIC PROJECT IDEAS (ACHIEVABLE):\n"
+        "   Suggest 3-4 resume-worthy projects. Avoid overkill like 'Microservices' for beginners. Focus on robust CRUD, data pipelines, or automated tools.\n"
+        "   Each MUST include:\n"
+        "   - Title: Professional project name\n"
+        "   - Problem: Real-world scenario\n"
+        "   - Stack: Realistic tools (e.g. Flask/React, not Kafka/K8s for starters)\n"
+        "   - Features: 2-3 core tasks\n"
+        "   - Impact: Recruiter signal\n"
+        "   - Deployment: Hosting strategy\n\n"
+        "Return ONLY JSON in this exact format:\n"
+        "{\n"
+        "  \"reality_check\": \"Blunt 1-sentence assessment\",\n"
+        "  \"project_ideas\": [\n"
+        "    {\"title\": \"...\", \"problem\": \"...\", \"stack\": \"...\", \"features\": \"...\", \"impact\": \"...\", \"deployment\": \"...\"}\n"
+        "  ],\n"
+        "  \"action_plan\": [\"Step 1\", \"Step 2\"]\n"
+        "}"
     )
     user = {
         "domain": domain,
         "input": user_input,
         "decision": decision,
-        "score": score,
+        "score": f"{score}/100",
         "risks": risks or [],
         "insights": insights or [],
     }
@@ -81,7 +108,7 @@ def generate_action_plan(
         {"role": "user", "content": json.dumps(user, ensure_ascii=True)},
     ]
 
-    request = _ollama_request(messages)
+    request = _ollama_request(messages, num_predict=1200)  # more tokens for detailed projects
     try:
         with urlopen(request, timeout=timeout_seconds) as response:
             raw = response.read().decode("utf-8")
@@ -97,7 +124,6 @@ def generate_action_plan(
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
-        # Some models wrap JSON in text. Try to recover a JSON object substring.
         start = content.find("{")
         end = content.rfind("}")
         if start < 0 or end < 0 or end <= start:
@@ -107,24 +133,12 @@ def generate_action_plan(
         except Exception:
             return None
 
-    plan = parsed.get("action_plan")
-    if not isinstance(plan, list):
+    if not isinstance(parsed, dict):
         return None
 
-    cleaned: list[str] = []
-    seen = set()
-    for item in plan:
-        if not isinstance(item, str):
-            continue
-        step = " ".join(item.strip().split()).strip(" -\t")
-        if not step:
-            continue
-        key = step.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        cleaned.append(step)
-        if len(cleaned) >= 5:
-            break
-    return cleaned if cleaned else None
+    return {
+        "action_plan": parsed.get("action_plan", [])[:5],
+        "reality_check": parsed.get("reality_check", "Profile is promising but needs more production-ready evidence."),
+        "project_ideas": parsed.get("project_ideas", [])[:3]
+    }
 

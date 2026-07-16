@@ -7,6 +7,7 @@ import {
   submitStartup,
   submitStartupPrompt,
   submitPolicy,
+  downloadPdf,
 } from '../api'
 import DecisionReport from '../components/DecisionReport'
 import InsightPanel from '../components/InsightPanel'
@@ -407,146 +408,208 @@ export default function DomainPage() {
   const resultInput = interactiveInput || (mode === 'free' ? (result?.parsed_input || input) : input)
 
   return (
-    <div className="px-4 py-5 sm:px-6 md:p-8">
-      <div className="mx-auto max-w-6xl">
-        <button className="mb-5 text-sm font-medium text-sky-700 transition hover:text-sky-900" onClick={() => navigate('/')}>
-          ← Back
+    <div className="px-4 py-4 sm:px-6 md:p-8 bg-slate-50/50 min-h-screen">
+      <div className="mx-auto max-w-7xl">
+        <button 
+          className="mb-4 text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition" 
+          onClick={() => navigate('/')}
+        >
+          &larr; Back
         </button>
 
-        <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white p-4 shadow-xl sm:p-6 md:p-8">
-          <div className="grid gap-6 lg:grid-cols-[0.92fr,1.08fr]">
-            <div>
-              <div className="inline-flex rounded-full bg-slate-100 px-4 py-2 text-xs uppercase tracking-[0.28em] text-slate-500">
-                {config.title} workspace
-              </div>
-              <h1 className="mt-5 text-3xl font-bold text-slate-900 sm:text-4xl">{config.title} Decision Studio</h1>
-              <p className="mt-3 max-w-xl text-base leading-7 text-slate-600">{config.subtitle}</p>
-
-              <div className="mt-6 flex flex-wrap gap-2">
-                <button onClick={() => setMode('structured')} className={`rounded-full px-4 py-2 text-sm font-medium ${mode === 'structured' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                  Structured Input
-                </button>
-                <button onClick={() => setMode('free')} className={`rounded-full px-4 py-2 text-sm font-medium ${mode === 'free' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                  Free-text Prompt
-                </button>
-              </div>
+        {/* Compact Workspace Header */}
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+          <div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] uppercase font-bold tracking-[0.2em] text-slate-500">
+              {config.title} workspace
             </div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 mt-1">{config.title} Decision Studio</h1>
+            <p className="text-xs text-slate-500 mt-0.5">{config.subtitle}</p>
+          </div>
+          <div className="flex items-center gap-3 bg-white border border-slate-200/80 rounded-xl p-2 pr-4 shadow-sm">
+            <img src="/logo.jpeg" alt="DeciXAI logo" className="h-10 w-10 rounded-xl object-cover border border-slate-100" />
+            <div>
+              <div className="text-xs font-bold text-slate-900 leading-none">DeciXAI Engine</div>
+              <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold mt-0.5">English + Hindi friendly</div>
+            </div>
+          </div>
+        </div>
 
-            <div className="rounded-[28px] bg-[linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(30,41,59,0.95)_45%,_rgba(14,165,233,0.82)_100%)] p-5 text-white shadow-lg sm:p-6">
-              <div className="flex items-center gap-4">
-                <img src="/logo.jpeg" alt="deciXAI logo" className="h-16 w-16 rounded-3xl border border-white/20 object-cover" />
-                <div>
-                  <div className="text-2xl font-semibold">deciXAI</div>
-                  <div className="text-xs uppercase tracking-[0.26em] text-slate-300">English + Hindi friendly</div>
+        {/* Two-Column Responsive Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+          {/* Left Panel: Control Center (col-span-4) */}
+          <div className="md:col-span-4 space-y-4">
+            <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm space-y-4">
+              <div className="border-b border-slate-100 pb-3">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Control Center</h2>
+              </div>
+
+              {/* Segmented slider tab for Input Mode Selection */}
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Input Mode</span>
+                <div className="relative flex rounded-lg bg-slate-100 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setMode('structured')}
+                    className={`flex-1 rounded-md py-1 text-[11px] font-bold transition-all ${mode === 'structured' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    Structured Input
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('free')}
+                    className={`flex-1 rounded-md py-1 text-[11px] font-bold transition-all ${mode === 'free' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+                  >
+                    Free-text Prompt
+                  </button>
                 </div>
               </div>
-              <p className="mt-6 text-base leading-7 text-slate-100 sm:text-lg sm:leading-8">
-                Fill in a few inputs and we&apos;ll turn them into a recommendation you can understand, defend, and improve with live what-if controls.
-              </p>
-            </div>
-          </div>
 
-          <div className="mt-6">
-            <div className="text-xs uppercase tracking-[0.24em] text-slate-400">Example prompts</div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              {config.examples.map((example) => (
-                <button
-                  key={example}
-                  type="button"
-                  onClick={() => handleExampleClick(example)}
-                  className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-left text-sm leading-6 text-slate-700 transition hover:border-sky-300 hover:bg-sky-50"
-                >
-                  {example}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <form onSubmit={submit} className="mt-8 space-y-5">
-            {mode === 'structured' ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {config.fields.map((field) => (
-                  <div key={field.name} className="rounded-3xl bg-slate-50 p-4">
-                    <label className="block text-sm font-medium text-slate-700">{field.label}</label>
-                    <input
-                      type={field.type}
-                      min={field.min}
-                      max={field.max}
-                      value={Array.isArray(input[field.name]) ? input[field.name].join(', ') : (input[field.name] ?? '')}
-                      onChange={(e) => onFieldChange(field.name, e.target.value)}
-                      className={`mt-2 w-full rounded-2xl border bg-white px-4 py-3 outline-none transition focus:border-sky-400 ${fieldErrors[field.name] ? 'border-rose-300' : 'border-slate-200'}`}
-                    />
-                    {fieldErrors[field.name] && <p className="mt-2 text-sm text-rose-600">{fieldErrors[field.name]}</p>}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-3xl bg-slate-50 p-4">
-                <label className="block text-sm font-medium text-slate-700">Prompt</label>
-                <textarea
-                  rows={5}
-                  value={textPrompt}
-                  onChange={(e) => setTextPrompt(e.target.value)}
-                  placeholder={config.freeTextExample}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white p-4 outline-none transition focus:border-sky-400"
-                />
-                <p className="mt-2 text-sm text-slate-500">{config.freeTextExample}</p>
-              </div>
-            )}
-
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                type="submit"
-                className="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-60"
-                disabled={loading}
-              >
-                {loading ? 'Analyzing...' : 'Analyze Decision'}
-              </button>
-              <div className="text-sm text-slate-500">
-                {liveUpdating ? 'Refreshing what-if output...' : 'Results appear as explainable cards, comparisons, and live sliders.'}
-              </div>
-            </div>
-          </form>
-
-          {error && <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>}
-
-          {result && (
-            <div ref={resultRef} className="mt-8 scroll-mt-24">
-              {hasComparisonResult ? (
-                <DecisionReport
-                  payload={result}
-                  interactiveFields={numericSliderFields.map((field) => ({
-                    ...field,
-                    range: getRangeForField(domain, field.name, resultInput?.[field.name]),
-                    value: resultInput?.[field.name],
-                  }))}
-                  onInteractiveChange={handleInteractiveChange}
-                  isLiveUpdating={liveUpdating}
-                  onRefresh={recalc}
-                />
-              ) : (
-                <InsightPanel
-                  result={result}
-                  domain={domain}
-                  title={`${config.title} decision`}
-                  subtitle={config.subtitle}
-                  input={resultInput}
-                  interactiveFields={numericSliderFields.map((field) => ({
-                    ...field,
-                    range: getRangeForField(domain, field.name, resultInput?.[field.name]),
-                    value: resultInput?.[field.name],
-                  }))}
-                  onInteractiveChange={handleInteractiveChange}
-                  isLiveUpdating={liveUpdating}
-                  footerAction={(
-                    <button onClick={recalc} className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20">
-                      Refresh What-if
+              {/* Compact Example Prompts Badges */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Example Prompts</span>
+                <div className="flex flex-col gap-1.5">
+                  {config.examples.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => handleExampleClick(example)}
+                      className="text-left text-[11px] leading-normal text-slate-600 bg-slate-50 border border-slate-200/60 rounded-lg px-2.5 py-2 transition hover:border-sky-300 hover:bg-sky-50/50"
+                    >
+                      {example}
                     </button>
-                  )}
-                />
+                  ))}
+                </div>
+              </div>
+
+              {/* Form Input fields */}
+              <form onSubmit={submit} className="space-y-4 pt-1">
+                {mode === 'structured' ? (
+                  <div className="space-y-3">
+                    {config.fields.map((field) => (
+                      <div key={field.name} className="flex flex-col">
+                        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                          {field.label} {field.required && <span className="text-red-500">*</span>}
+                        </label>
+                        <input
+                          type={field.type}
+                          min={field.min}
+                          max={field.max}
+                          value={Array.isArray(input[field.name]) ? input[field.name].join(', ') : (input[field.name] ?? '')}
+                          onChange={(e) => onFieldChange(field.name, e.target.value)}
+                          className={`w-full rounded-lg border bg-slate-50/50 px-3 py-1.5 text-xs outline-none transition focus:border-sky-400 focus:bg-white ${fieldErrors[field.name] ? 'border-rose-300' : 'border-slate-200'}`}
+                        />
+                        {fieldErrors[field.name] && <span className="text-[10px] text-rose-600 mt-1">{fieldErrors[field.name]}</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Prompt</label>
+                    <textarea
+                      rows={4}
+                      value={textPrompt}
+                      onChange={(e) => setTextPrompt(e.target.value)}
+                      placeholder={config.freeTextExample}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 text-xs outline-none transition focus:border-sky-400 focus:bg-white resize-none"
+                    />
+                  </div>
+                )}
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg bg-slate-900 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 flex items-center justify-center gap-2 shadow"
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Analyzing...
+                      </>
+                    ) : 'Analyze Decision'}
+                  </button>
+                  <div className="text-[10px] text-slate-400 text-center mt-2 leading-relaxed">
+                    {liveUpdating ? 'Refreshing what-if output...' : 'Results refresh dynamically via live sliders.'}
+                  </div>
+                </div>
+              </form>
+
+              {error && (
+                <div className="rounded-lg bg-rose-50 border border-rose-100 p-2.5 text-xs text-rose-700 mt-2">
+                  {error}
+                </div>
               )}
             </div>
-          )}
+          </div>
+
+          {/* Right Panel: Main Analysis & Output Board (col-span-8) */}
+          <div className="md:col-span-8">
+            {result ? (
+              <div ref={resultRef} className="scroll-mt-6">
+                {hasComparisonResult ? (
+                  <DecisionReport
+                    payload={result}
+                    interactiveFields={numericSliderFields.map((field) => ({
+                      ...field,
+                      range: getRangeForField(domain, field.name, resultInput?.[field.name]),
+                      value: resultInput?.[field.name],
+                    }))}
+                    onInteractiveChange={handleInteractiveChange}
+                    isLiveUpdating={liveUpdating}
+                    onRefresh={recalc}
+                    onDownload={() => downloadPdf(domain, result)}
+                  />
+                ) : (
+                  <InsightPanel
+                    result={result}
+                    domain={domain}
+                    title={`${config.title} decision`}
+                    subtitle={config.subtitle}
+                    input={resultInput}
+                    interactiveFields={numericSliderFields.map((field) => ({
+                      ...field,
+                      range: getRangeForField(domain, field.name, resultInput?.[field.name]),
+                      value: resultInput?.[field.name],
+                    }))}
+                    onInteractiveChange={handleInteractiveChange}
+                    isLiveUpdating={liveUpdating}
+                    footerAction={(
+                      <div className="flex items-center gap-1.5">
+                        <button 
+                          onClick={() => downloadPdf(domain, result)} 
+                          className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white transition hover:bg-white/30"
+                        >
+                          PDF
+                        </button>
+                        <button 
+                          onClick={recalc} 
+                          className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white transition hover:bg-white/30"
+                        >
+                          Refresh
+                        </button>
+                      </div>
+                    )}
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="h-full min-h-[450px] flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-50 text-sky-500 mb-4 border border-sky-100 shadow-sm">
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+                  </svg>
+                </div>
+                <h3 className="text-sm font-bold text-slate-800">Awaiting Decision Input</h3>
+                <p className="mt-2 text-xs text-slate-400 max-w-sm leading-relaxed">
+                  Configure the inputs in the control center on the left, select an example, or write a free-text prompt, then run analysis to inspect your decision signals and custom roadmap.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

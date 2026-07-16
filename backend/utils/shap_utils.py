@@ -126,7 +126,7 @@ def _humanize_impact(
 
 
 def compute_shap_explanation(
-    model,
+    explainer,
     row: np.ndarray,
     feature_names: List[str],
     raw_row: Dict[str, Any] | None = None,
@@ -135,8 +135,8 @@ def compute_shap_explanation(
     positive_class_index: int = 1,
 ) -> Dict[str, Any]:
     try:
-        import shap
-        explainer = shap.TreeExplainer(model)
+        if explainer is None:
+            raise ValueError("Cached SHAP explainer is unavailable.")
         shap_values = explainer.shap_values(row)
         if isinstance(shap_values, list):
             shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
