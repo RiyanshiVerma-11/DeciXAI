@@ -5,7 +5,7 @@ const normalizeOptions = (payload) => {
   if (Array.isArray(details.option_scores)) {
     return details.option_scores.map((item) => ({
       name: item.mapped_label || item.name,
-      percent: typeof item.probability === 'number' ? clampPercent(item.probability) : Math.round(item.score || 0),
+      percent: typeof item.score === 'number' ? Math.round(item.score) : (typeof item.probability === 'number' ? clampPercent(item.probability) : 0),
       reason: item.reason || '',
     }))
   }
@@ -19,7 +19,7 @@ const normalizeOptions = (payload) => {
   if (Array.isArray(payload.options)) {
     return payload.options.map((item) => ({
       name: item.mapped_label || item.name,
-      percent: typeof item.probability === 'number' ? clampPercent(item.probability) : Math.round(item.score || 0),
+      percent: typeof item.score === 'number' ? Math.round(item.score) : (typeof item.probability === 'number' ? clampPercent(item.probability) : 0),
       reason: item.reason || '',
     }))
   }
@@ -89,18 +89,109 @@ function RadarGlyph({ positive }) {
   )
 }
 
-function AlignmentChip({ value }) {
-  const normalized = String(value || '').toLowerCase()
-  const styles = {
-    match: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    mismatch: 'bg-rose-50 text-rose-700 border-rose-100',
-    missing: 'bg-amber-50 text-amber-700 border-amber-100',
+const getSentimentVisuals = (text) => {
+  const lower = String(text || '').toLowerCase();
+  let val = 0; // -100 to +100
+  let label = "Neutral";
+  let color = "bg-slate-400";
+  let textClass = "text-slate-650";
+  let gradient = "from-slate-400 to-slate-500";
+
+  if (lower.includes("strongly boosts")) {
+    val = 90;
+    label = "Strong Boost";
+    color = "bg-emerald-500";
+    textClass = "text-emerald-700";
+    gradient = "from-emerald-400 to-teal-500";
+  } else if (lower.includes("slightly boosts")) {
+    val = 45;
+    label = "Slight Boost";
+    color = "bg-emerald-400";
+    textClass = "text-emerald-600";
+    gradient = "from-teal-300 to-emerald-400";
+  } else if (lower.includes("boosts")) {
+    val = 65;
+    label = "Boosts";
+    color = "bg-emerald-400";
+    textClass = "text-emerald-600";
+    gradient = "from-emerald-400 to-teal-400";
+  } else if (lower.includes("strongly holds back")) {
+    val = -90;
+    label = "Strong Holdback";
+    color = "bg-rose-500";
+    textClass = "text-rose-750 font-bold";
+    gradient = "from-rose-500 to-red-650";
+  } else if (lower.includes("slightly holds back")) {
+    val = -45;
+    label = "Slight Holdback";
+    color = "bg-amber-500";
+    textClass = "text-amber-600";
+    gradient = "from-amber-400 to-orange-505";
+  } else if (lower.includes("holds back")) {
+    val = -65;
+    label = "Holds Back";
+    color = "bg-rose-450";
+    textClass = "text-rose-600";
+    gradient = "from-orange-450 to-rose-500";
   }
-  const style = styles[normalized] || styles.missing
+
+  return { val, label, color, textClass, gradient };
+}
+
+function SentimentMeter({ text }) {
+  const { val } = getSentimentVisuals(text)
+  if (val === 0) return null
+
+  const isPositive = val > 0
+  const absVal = Math.abs(val)
+  const pillBg = isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+
   return (
-    <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${style}`}>
-      {normalized || 'missing'}
+    <span className={`inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[12px] font-extrabold ${pillBg}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      {isPositive ? `+${absVal}%` : `−${absVal}%`}
     </span>
+  )
+}
+
+function VisualAlignmentBar({ label, value }) {
+  const normalized = String(value || '').toLowerCase()
+  let percent = 10
+  let color = 'from-amber-400 to-orange-500'
+  let labelText = 'Missing'
+  let textColor = 'text-amber-600'
+  let iconClass = 'text-amber-500'
+  let icon = '⚠'
+  
+  if (normalized === 'match') {
+    percent = 100
+    color = 'from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.15)]'
+    labelText = 'Match'
+    textColor = 'text-emerald-700'
+    iconClass = 'text-emerald-500 font-bold'
+    icon = '✓'
+  } else if (normalized === 'mismatch') {
+    percent = 40
+    color = 'from-orange-400 to-rose-500'
+    labelText = 'Mismatch'
+    textColor = 'text-rose-700'
+    iconClass = 'text-rose-500 font-bold'
+    icon = '×'
+  }
+
+  return (
+    <div className="flex flex-col p-2.5 rounded-xl border border-slate-100 bg-slate-50/30">
+      <div className="flex items-center justify-between text-[12px] font-bold text-slate-500 mb-1">
+        <span>{label}</span>
+        <span className={`font-black uppercase tracking-wider text-[14px] ${textColor} flex items-center gap-0.5`}>
+          <span className={iconClass}>{icon}</span>
+          <span>{labelText}</span>
+        </span>
+      </div>
+      <div className="h-1 w-full bg-slate-200/60 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full bg-gradient-to-r ${color} transition-all duration-500`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
   )
 }
 
@@ -113,73 +204,61 @@ function RoadmapCard({ eyebrow, title, alignment, roadmap, tone = 'slate' }) {
 
   return (
     <div className={`rounded-xl border p-4 shadow-sm bg-white ${tones[tone] || tones.slate}`}>
-      <div className="text-[9px] uppercase tracking-[0.22em] text-slate-400 font-bold">{eyebrow}</div>
-      <div className="mt-0.5 text-xs font-bold text-slate-950">{title}</div>
+      <div className="text-[12px] uppercase tracking-[0.22em] text-slate-400 font-bold">{eyebrow}</div>
+      <div className="mt-0.5 text-base font-bold text-slate-950">{title}</div>
 
-      {/* Grid Alignment: compact row */}
-      <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-50 border border-slate-100 rounded-lg p-1.5">
-        <div className="flex items-center justify-between px-1.5">
-          <span className="text-[10px] font-medium text-slate-500">Skills</span>
-          <AlignmentChip value={alignment?.skills} />
-        </div>
-        <div className="flex items-center justify-between px-1.5 border-l border-slate-200/60">
-          <span className="text-[10px] font-medium text-slate-500">Projects</span>
-          <AlignmentChip value={alignment?.projects} />
-        </div>
-        <div className="flex items-center justify-between px-1.5 border-l border-slate-200/60">
-          <span className="text-[10px] font-medium text-slate-500">Certs</span>
-          <AlignmentChip value={alignment?.certifications} />
-        </div>
-        <div className="flex items-center justify-between px-1.5 border-l border-slate-200/60">
-          <span className="text-[10px] font-medium text-slate-500">Interest</span>
-          <AlignmentChip value={alignment?.interest} />
-        </div>
+      {/* Visual Alignment matching bars */}
+      <div className="mt-3.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <VisualAlignmentBar label="Skills" value={alignment?.skills} />
+        <VisualAlignmentBar label="Projects" value={alignment?.projects} />
+        <VisualAlignmentBar label="Certs" value={alignment?.certifications} />
+        <VisualAlignmentBar label="Interest" value={alignment?.interest} />
       </div>
 
       <div className="mt-3 grid gap-3">
         <div className="grid grid-cols-2 gap-2.5">
           {/* Skills to Add */}
           <div className="rounded-lg border border-slate-100 bg-slate-50/30 p-2">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Skills to add</span>
+            <span className="text-[12px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Skills to add</span>
             <div className="flex flex-wrap gap-1">
               {(roadmap?.skills_to_add || []).slice(0, 4).map((item) => (
-                <span key={item} className="rounded bg-white border border-slate-100 px-1 py-0.5 text-[9px] font-semibold text-slate-600">
+                <span key={item} className="rounded bg-white border border-slate-100 px-1 py-0.5 text-[12px] font-bold text-slate-600">
                   {item}
                 </span>
               ))}
-              {!(roadmap?.skills_to_add || []).length && <span className="text-[9px] text-slate-400">None</span>}
+              {!(roadmap?.skills_to_add || []).length && <span className="text-[12px] text-slate-400">None</span>}
             </div>
           </div>
 
           {/* Certifications */}
           <div className="rounded-lg border border-slate-100 bg-slate-50/30 p-2">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Certifications</span>
+            <span className="text-[12px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Certifications</span>
             <div className="space-y-1">
               {(roadmap?.certifications || []).slice(0, 2).map((item, index) => (
-                <div key={index} className="text-[9px] font-semibold text-slate-700 truncate" title={item}>
+                <div key={index} className="text-[12px] font-bold text-slate-700" title={item}>
                   &bull; {item}
                 </div>
               ))}
-              {!(roadmap?.certifications || []).length && <span className="text-[9px] text-slate-400">None</span>}
+              {!(roadmap?.certifications || []).length && <span className="text-[12px] text-slate-400">None</span>}
             </div>
           </div>
         </div>
 
         {/* Project Ideas */}
         <div className="rounded-lg border border-slate-100 bg-slate-50/30 p-2.5">
-          <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Project Ideas</span>
+          <span className="text-[12px] font-bold uppercase tracking-wider text-slate-400 block mb-2">Project Ideas</span>
           <div className="grid gap-2 sm:grid-cols-2">
             {(roadmap?.project_ideas || []).slice(0, 2).map((item, index) => {
               const isObj = typeof item === 'object' && item !== null;
               return (
                 <div key={index} className="rounded-lg border border-slate-100 bg-white p-2 shadow-sm">
-                  <div className="text-[10px] font-bold text-slate-800 truncate">{isObj ? item.title : item}</div>
+                  <div className="text-[13px] font-bold text-slate-800">{isObj ? item.title : item}</div>
                   {isObj && (
-                    <div className="mt-1 text-[9px] text-slate-500 leading-normal">
-                      <span className="font-semibold text-slate-600">Problem:</span> {item.problem}
+                    <div className="mt-1 text-[12px] text-slate-500 leading-normal">
+                      <span className="font-bold text-slate-600">Problem:</span> {item.problem}
                       <div className="mt-1 flex flex-wrap gap-1">
-                        <span className="bg-cyan-50 text-cyan-700 px-1 rounded text-[8px] font-mono font-bold">{item.stack}</span>
-                        <span className="bg-emerald-50 text-emerald-700 px-1 rounded text-[8px] font-bold">{item.impact}</span>
+                        <span className="bg-cyan-50 text-cyan-700 px-1 rounded text-[14px] font-mono font-bold">{item.stack}</span>
+                        <span className="bg-emerald-50 text-emerald-700 px-1 rounded text-[14px] font-bold">{item.impact}</span>
                       </div>
                     </div>
                   )}
@@ -194,14 +273,15 @@ function RoadmapCard({ eyebrow, title, alignment, roadmap, tone = 'slate' }) {
 }
 
 function ScoreDial({ percent }) {
-  const radius = 24
+  const radius = 23
   const circumference = 2 * Math.PI * radius
-  const dashOffset = circumference - (percent / 100) * circumference
+  const val = Number(percent) || 0
+  const dashOffset = circumference - (val / 100) * circumference
 
   return (
-    <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/10 shadow-lg backdrop-blur">
-      <svg className="absolute inset-1.5 -rotate-90" viewBox="0 0 60 60" width="52" height="52">
-        <circle cx="30" cy="30" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4.5" />
+    <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.2)] backdrop-blur-md">
+      <svg className="absolute inset-0 -rotate-90" viewBox="0 0 60 60" width="80" height="80">
+        <circle cx="30" cy="30" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4.5" />
         <circle
           cx="30"
           cy="30"
@@ -212,19 +292,26 @@ function ScoreDial({ percent }) {
           strokeDashoffset={dashOffset}
           strokeLinecap="round"
           strokeWidth="4.5"
+          filter="url(#score-dial-glow)"
         />
         <defs>
+          <filter id="score-dial-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
           <linearGradient id="comparison-score-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#38bdf8" />
-            <stop offset="40%" stopColor="#2dd4bf" />
-            <stop offset="78%" stopColor="#a3e635" />
+            <stop offset="50%" stopColor="#34d399" />
             <stop offset="100%" stopColor="#facc15" />
           </linearGradient>
         </defs>
       </svg>
       <div className="relative z-10 text-center text-white">
-        <div className="text-sm font-black leading-none">{percent}</div>
-        <div className="text-[6.5px] uppercase tracking-wider text-cyan-200 mt-0.5 font-bold">Score</div>
+        <div className="text-base font-black leading-none tracking-tight">{percent}</div>
+        <div className="text-[13px] uppercase tracking-wider text-cyan-200 mt-1 font-bold">Score</div>
       </div>
     </div>
   )
@@ -241,11 +328,11 @@ function PanelTitle({ eyebrow, title, count, tone = 'slate' }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-2 mb-3">
       <div>
-        <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">{eyebrow}</div>
-        <h3 className="text-xs font-bold text-slate-900 mt-0.5">{title}</h3>
+        <div className="text-[12px] uppercase tracking-[0.15em] text-slate-400 font-extrabold">{eyebrow}</div>
+        <h3 className="text-base font-extrabold text-slate-900 mt-0.5 tracking-tight">{title}</h3>
       </div>
       {count !== undefined && (
-        <div className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tones[tone] || tones.slate}`}>
+        <div className={`rounded-full px-2 py-0.5 text-[13px] font-bold ${tones[tone] || tones.slate}`}>
           {count}
         </div>
       )}
@@ -255,37 +342,37 @@ function PanelTitle({ eyebrow, title, count, tone = 'slate' }) {
 
 function ComparisonBars({ options }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {options.map((option, index) => {
         const rank = index + 1
         const accent = index === 0
-          ? 'from-cyan-500 via-sky-500 to-emerald-400'
+          ? 'from-sky-500 to-indigo-500 shadow-[0_0_12px_rgba(56,189,248,0.25)]'
           : index === 1
-            ? 'from-sky-400 via-teal-400 to-lime-400'
-            : 'from-slate-400 via-slate-500 to-slate-600'
+            ? 'from-teal-400 to-emerald-500 shadow-[0_0_12px_rgba(45,212,191,0.2)]'
+            : 'from-slate-400 to-slate-600 shadow-sm'
 
         return (
-          <div key={`${option.name}-${index}`} className="rounded-lg border border-slate-100 bg-slate-50/30 p-2.5 shadow-sm">
+          <div key={`${option.name}-${index}`} className="glass-panel p-3.5 rounded-2xl transition-all duration-300 hover:shadow-md hover:bg-white/90 hover:scale-[1.01] border-slate-200/60">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-extrabold ${index === 0 ? 'bg-cyan-50 text-cyan-700 border border-cyan-100' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
+                  <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-base font-extrabold ${index === 0 ? 'bg-sky-50 text-sky-700 border border-sky-100/60' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>
                     {rank}
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-900 leading-tight">{option.name}</div>
-                    <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold mt-0.5">Path fit signal</div>
+                    <div className="text-base font-bold text-slate-900 leading-tight tracking-tight">{option.name}</div>
+                    <div className="text-[12px] uppercase tracking-wider text-slate-400 font-bold mt-0.5">Path fit signal</div>
                   </div>
                 </div>
-                {option.reason && <div className="mt-2 text-[11px] leading-relaxed text-slate-600">{option.reason}</div>}
+                {option.reason && <div className="mt-2.5 text-[14px] leading-relaxed text-slate-600 font-bold">{option.reason}</div>}
               </div>
               <div className="shrink-0 text-right">
-                <div className="text-sm font-black text-slate-950">{option.percent}%</div>
-                <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Match</div>
+                <div className="text-base font-black text-slate-950">{option.percent}%</div>
+                <div className="text-[12px] uppercase tracking-wider text-slate-400 font-bold">Match</div>
               </div>
             </div>
-            <div className="mt-2">
-              <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+            <div className="mt-2.5">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200/60">
                 <div className={`report-rise h-full rounded-full bg-gradient-to-r ${accent}`} style={{ width: `${option.percent}%` }} />
               </div>
             </div>
@@ -299,46 +386,100 @@ function ComparisonBars({ options }) {
 function StoryCard({ title, items, emptyText, tone }) {
   const styles = {
     insight: {
-      dot: 'bg-cyan-500',
-      badge: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+      dot: 'bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]',
+      numBg: 'bg-cyan-500',
       tag: 'Momentum',
+      border: 'border-l-cyan-400',
     },
     risk: {
-      dot: 'bg-rose-500',
-      badge: 'bg-rose-50 text-rose-600 border-rose-100',
+      dot: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]',
+      numBg: 'bg-rose-500',
       tag: 'Watch-out',
+      border: 'border-l-rose-400',
     },
     action: {
-      dot: 'bg-emerald-500',
-      badge: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      dot: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]',
+      numBg: 'bg-emerald-500',
       tag: 'Execution',
+      border: 'border-l-emerald-400',
     },
   }
 
   const current = styles[tone] || styles.insight
 
   return (
-    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-          <span className={`h-2 w-2 rounded-full ${current.dot}`}></span>
+    <div className="glass-panel p-5 rounded-2xl transition-all duration-300 hover:shadow-md border border-slate-200/60 lg:col-span-3 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2 tracking-tight">
+          <span className={`h-3 w-3 rounded-full ${current.dot}`}></span>
           {title}
         </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{current.tag}</span>
+        <span className="text-[12px] text-slate-400 font-extrabold uppercase tracking-wider">{current.tag}</span>
       </div>
-      <div className="space-y-2">
-        {items.length ? (
-          items.map((item, index) => (
-            <div key={index} className="flex items-start gap-2 text-xs">
-              <span className={`shrink-0 ${current.badge} px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border`}>
-                {tone === 'action' ? (index === 0 ? 'First' : `Step ${index + 1}`) : `${current.tag}`}
-              </span>
-              <p className="text-slate-600 leading-normal text-[11px] mt-0.5">{item.text || item}</p>
+      {items.length ? (
+        <div className="divide-y divide-slate-100">
+          {items.map((item, index) => {
+            const text = item.text || item
+            return (
+              <div key={index} className="flex items-start gap-2.5 py-2.5">
+                <span className="shrink-0 text-[14px] font-extrabold text-slate-400 mt-px w-5 text-right">{index + 1}.</span>
+                <p className="flex-1 text-slate-700 leading-relaxed text-[14px] font-bold">
+                  {text} <SentimentMeter text={text} />
+                </p>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="text-[14px] text-slate-400 italic py-4 text-center">{emptyText}</p>
+      )}
+    </div>
+  )
+}
+
+function ActionJourney({ actions }) {
+  if (!actions.length) {
+    return (
+      <div className="glass-panel p-5 rounded-2xl border border-slate-200/60 bg-white lg:col-span-3 text-center py-6">
+        <p className="text-[14px] text-slate-400 italic font-bold">No action plan available.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="glass-panel p-5 rounded-2xl border border-slate-200/60 bg-white lg:col-span-3">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span>
+          Execution Pipeline
+        </h3>
+        <span className="text-[12px] text-slate-400 font-extrabold uppercase tracking-wider">Milestones</span>
+      </div>
+      
+      <div className="relative flex flex-col md:flex-row items-stretch justify-between gap-6 md:gap-4">
+        {/* Connecting line for desktop */}
+        <div className="absolute top-8 left-8 right-8 h-[2px] bg-slate-100/90 hidden md:block z-0 animate-pulse" />
+        
+        {actions.map((action, index) => {
+          const isFirst = index === 0
+          const stepNum = index + 1
+          
+          return (
+            <div key={index} className="relative z-10 flex-1 flex flex-col md:items-center text-left md:text-center p-4 rounded-xl border border-slate-150 bg-slate-50/20 shadow-sm hover:shadow-md hover:bg-white hover:border-slate-250 transition-all duration-300">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 text-white text-[14px] font-black shadow-md md:mb-3 border border-white/20">
+                {stepNum}
+              </div>
+              <div className="mt-2 md:mt-0">
+                <span className="text-[12px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                  {isFirst ? 'Priority Action' : `Step ${stepNum}`}
+                </span>
+                <p className="text-slate-700 leading-relaxed text-[14px] font-bold mx-auto">
+                  {action}
+                </p>
+              </div>
             </div>
-          ))
-        ) : (
-          <p className="text-[11px] text-slate-400 italic text-center py-2">{emptyText}</p>
-        )}
+          )
+        })}
       </div>
     </div>
   )
@@ -366,44 +507,48 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
   return (
     <div className="space-y-4">
       {/* Sleek, Compact Decision Signal Board Header */}
-      <div className="relative overflow-hidden rounded-xl bg-[linear-gradient(135deg,_#7c3aed_0%,_#ec4899_45%,_#f97316_100%)] p-4 sm:p-5 text-white shadow-md">
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
+      <div className="relative overflow-hidden rounded-2xl bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-indigo-950 p-5 text-white shadow-xl border border-slate-800">
+        {/* Visual mesh glow helpers */}
+        <div className="absolute top-0 right-0 -mt-8 -mr-8 h-40 w-40 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-1/3 -mb-10 h-32 w-32 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none"></div>
+
+        <div className="relative z-10 flex items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-wider text-cyan-200 font-bold">
+              <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[12px] uppercase tracking-[0.15em] text-cyan-300 font-extrabold shadow-sm">
                 Decision Signal Board
               </span>
               {typeof onDownload === 'function' && (
                 <button
                   onClick={onDownload}
-                  className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white transition hover:bg-white/30"
+                  className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[12px] font-bold uppercase tracking-wider text-white transition hover:bg-white/20 hover:scale-[1.02] shadow-sm"
                 >
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                   PDF
                 </button>
               )}
             </div>
-            <h2 className="mt-1.5 text-lg font-bold tracking-tight leading-snug">{payload.decision}</h2>
-            <p className="mt-0.5 text-xs text-cyan-50/90 line-clamp-1 max-w-xl">{payload.summary}</p>
+            <h2 className="mt-2 text-xl font-extrabold tracking-tight leading-snug">{payload.decision}</h2>
+            <p className="mt-1 text-base text-slate-300 font-bold">{payload.summary}</p>
           </div>
           <ScoreDial percent={bestPercent} />
         </div>
 
         {/* Secondary Metrics Horizontal Grid Row */}
-        <div className="grid grid-cols-3 gap-4 pt-3 text-white/95">
+        <div className="relative z-10 grid grid-cols-3 gap-4 pt-4 text-white/90">
           <div className="flex flex-col">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-cyan-200/90">Confidence</span>
-            <span className="text-sm font-extrabold mt-0.5">{confidence}%</span>
+            <span className="text-[12px] font-extrabold uppercase tracking-[0.15em] text-cyan-300">Confidence</span>
+            <span className="text-base font-extrabold mt-1 tracking-tight text-white">{confidence}%</span>
           </div>
           <div className="flex flex-col border-l border-white/10 pl-4">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-lime-200/90">Top Path</span>
-            <span className="text-sm font-extrabold mt-0.5 truncate max-w-[150px]">{options[0]?.name || payload.decision}</span>
+            <span className="text-[12px] font-extrabold uppercase tracking-[0.15em] text-emerald-300">Top Path</span>
+            <span className="text-base font-extrabold mt-1 tracking-tight text-white">{options[0]?.name || payload.decision}</span>
           </div>
           <div className="flex flex-col border-l border-white/10 pl-4">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-amber-200/90">Next Move</span>
-            <span className="text-sm font-extrabold mt-0.5 truncate max-w-[220px]">
+            <span className="text-[12px] font-extrabold uppercase tracking-[0.15em] text-amber-300">Next Move</span>
+            <span className="text-base font-extrabold mt-1 tracking-tight text-white">
               {(() => {
                 const next = String(payload.next_step || '').trim()
                 const first = String(actions[0] || '').trim()
@@ -418,24 +563,24 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
       {/* Bento Grid layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
         {/* Option Comparison Card */}
-        <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm md:col-span-2">
+        <div className="glass-panel p-5 rounded-2xl md:col-span-2 shadow-md">
           <PanelTitle eyebrow="Path ranking" title="Option comparison" count={`${options.length} options`} tone="cyan" />
           <ComparisonBars options={options} />
         </div>
 
         {/* Live Slider controls */}
         {showSliders && (
-          <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
+          <div className="glass-panel p-5 rounded-2xl shadow-md">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3.5">
               <div>
-                <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">What-if</span>
-                <h3 className="text-xs font-bold text-slate-900 mt-0.5">Live Sliders</h3>
+                <span className="text-[12px] uppercase tracking-[0.15em] text-slate-400 font-extrabold">What-if</span>
+                <h3 className="text-base font-extrabold text-slate-900 mt-0.5 tracking-tight">Live Sliders</h3>
               </div>
               {typeof onRefresh === 'function' && (
                 <button
                   type="button"
                   onClick={onRefresh}
-                  className="text-[10px] font-bold text-sky-600 hover:text-sky-800 transition"
+                  className="text-[13px] font-bold text-sky-600 hover:text-sky-850 transition duration-200"
                 >
                   {isLiveUpdating ? 'Updating...' : 'Refresh'}
                 </button>
@@ -443,10 +588,10 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
             </div>
             <div className="space-y-3 pr-1">
               {sliders.map((field) => (
-                <div key={field.name} className="rounded-lg border border-slate-100 bg-slate-50/40 p-2">
+                <div key={field.name} className="rounded-xl border border-slate-100 bg-white/50 p-3 shadow-sm hover:shadow-md transition-all duration-300">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-bold text-slate-700">{field.label}</span>
-                    <span className="text-[11px] font-extrabold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded">{field.value ?? field.range?.min ?? 0}</span>
+                    <span className="text-[14px] font-bold text-slate-700">{field.label}</span>
+                    <span className="text-[14px] font-extrabold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded">{field.value ?? field.range?.min ?? 0}</span>
                   </div>
                   <input
                     type="range"
@@ -455,9 +600,9 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
                     step={field.range?.step || 1}
                     value={field.value ?? field.range?.min ?? 0}
                     onChange={(event) => onInteractiveChange(field.name, Number(event.target.value))}
-                    className="mt-2 w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
+                    className="mt-2 w-full h-1 bg-slate-200/80 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-600 transition-all"
                   />
-                  <div className="mt-1 flex justify-between text-[9px] text-slate-400">
+                  <div className="mt-1 flex justify-between text-[12px] text-slate-400 font-bold">
                     <span>{field.range?.min}</span>
                     <span>{field.range?.max}</span>
                   </div>
@@ -484,17 +629,12 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
         />
 
         {/* Action checklist */}
-        <StoryCard
-          title="Action Plan"
-          items={actions.map((item) => ({ text: item }))}
-          emptyText="No action plan available."
-          tone="action"
-        />
+        <ActionJourney actions={actions} />
 
         {/* Factor Impact Signals map */}
-        <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm md:col-span-2">
+        <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:col-span-3">
           <PanelTitle eyebrow="Model trace" title="Factor impact" count="Signal map" tone="slate" />
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {impacts.length ? impacts.slice(0, 4).map((item, index) => {
               const rawValue = Number(item.value)
               const strength = Number.isFinite(rawValue) ? Math.max(Math.min(Math.abs(rawValue) * 100, 100), 8) : 20
@@ -504,12 +644,12 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
                 <div key={index} className="rounded-lg border border-slate-100 bg-slate-50/30 p-2.5 flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-bold text-slate-800 truncate" title={item.factor}>{item.factor}</span>
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded ${positive ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                      <span className="text-[14px] font-bold text-slate-800" title={item.factor}>{item.factor}</span>
+                      <span className={`text-[12px] font-bold px-1.5 py-0.5 rounded ${positive ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
                         {positive ? 'Positive' : 'Negative'}
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1 leading-normal line-clamp-2" title={item.impact}>{item.impact}</p>
+                    <p className="text-[13px] text-slate-500 mt-1 leading-normal" title={item.impact}>{item.impact}</p>
                   </div>
                   <div className="mt-3">
                     <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
@@ -522,7 +662,7 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
                 </div>
               )
             }) : (
-              <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-400 italic text-center sm:col-span-2">No factor impact data available.</div>
+              <div className="rounded-lg bg-slate-50 p-3 text-base text-slate-400 italic text-center sm:col-span-2 lg:col-span-4">No factor impact data available.</div>
             )}
           </div>
         </div>
@@ -537,8 +677,8 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
                 </svg>
               </div>
               <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-rose-500">Auditor Perspective / Reality Check</span>
-                <p className="text-xs italic leading-relaxed text-slate-700 mt-0.5">"{realityCheck}"</p>
+                <span className="text-[12px] font-bold uppercase tracking-wider text-rose-500">Auditor Perspective / Reality Check</span>
+                <p className="text-base italic leading-relaxed text-slate-700 mt-0.5">"{realityCheck}"</p>
               </div>
             </div>
           </div>
@@ -548,12 +688,12 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
         {whatIf && (
           <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-3.5 shadow-sm lg:col-span-3">
             <div className="flex items-start gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 font-extrabold text-xs">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 font-extrabold text-base">
                 W
               </div>
               <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-600">Scenario Lab / What-if Scenario</span>
-                <p className="text-xs text-amber-950/90 mt-0.5 leading-relaxed">{whatIf}</p>
+                <span className="text-[12px] font-bold uppercase tracking-wider text-amber-600">Scenario Lab / What-if Scenario</span>
+                <p className="text-base text-amber-950/90 mt-0.5 leading-relaxed">{whatIf}</p>
               </div>
             </div>
           </div>
@@ -567,15 +707,15 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
               {projectIdeas.slice(0, 3).map((idea, idx) => (
                 <div key={idx} className="flex flex-col justify-between rounded-lg border border-slate-100 bg-slate-50/40 p-3 shadow-sm">
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900">{idea.title}</h4>
+                    <h4 className="text-base font-bold text-slate-900">{idea.title}</h4>
                     <div className="mt-2 space-y-1">
-                      <span className="text-[8px] font-bold uppercase text-slate-400">Problem</span>
-                      <p className="text-[10px] text-slate-500 leading-normal line-clamp-3">{idea.problem}</p>
+                      <span className="text-[14px] font-bold uppercase text-slate-400">Problem</span>
+                      <p className="text-[13px] text-slate-500 leading-normal">{idea.problem}</p>
                     </div>
                   </div>
                   <div className="mt-3 pt-2 border-t border-slate-100">
-                    <span className="text-[8px] font-mono text-cyan-600 bg-cyan-50/50 px-1 py-0.5 rounded font-semibold block truncate mb-1">{idea.stack}</span>
-                    <span className="inline-flex rounded bg-emerald-50 text-emerald-700 px-1 py-0.5 text-[9px] font-bold">
+                    <span className="text-[14px] font-mono text-cyan-600 bg-cyan-50/50 px-1 py-0.5 rounded font-bold block mb-1">{idea.stack}</span>
+                    <span className="inline-flex rounded bg-emerald-50 text-emerald-700 px-1 py-0.5 text-[12px] font-bold">
                       Impact: {idea.impact}
                     </span>
                   </div>
@@ -595,7 +735,7 @@ export default function DecisionReport({ payload, interactiveFields, onInteracti
               tone="slate"
             />
             {Array.isArray(careerIntel.difference) && careerIntel.difference.length > 0 && (
-              <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 text-xs text-slate-600 leading-normal">
+              <div className="mt-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 text-base text-slate-600 leading-normal">
                 {careerIntel.difference.slice(0, 2).map((line, index) => (
                   <div key={index}>{line}</div>
                 ))}

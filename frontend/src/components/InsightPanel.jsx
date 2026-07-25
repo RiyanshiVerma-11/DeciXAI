@@ -247,8 +247,8 @@ function ScoreRing({ score, accentClass, ringId }) {
           </defs>
         </svg>
         <div className="relative z-10 text-center text-white">
-          <div className="text-sm font-black leading-none">{score}</div>
-          <div className="text-[6.5px] uppercase tracking-wider text-slate-300 mt-0.5 font-bold">Score</div>
+          <div className="text-base font-black leading-none">{score}</div>
+          <div className="text-[13px] uppercase tracking-wider text-slate-300 mt-0.5 font-bold">Score</div>
         </div>
       </div>
     </div>
@@ -269,27 +269,27 @@ function StoryCards({ result, domain }) {
   const chipStyle = DOMAIN_STYLES[domain]?.chip || DOMAIN_STYLES.default.chip
 
   return (
-    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:col-span-3">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3.5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-cyan-500" />
           Decision Story
         </h3>
-        <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold border uppercase tracking-wider ${chipStyle}`}>
+        <span className={`rounded px-1.5 py-0.5 text-[12px] font-bold border uppercase tracking-wider ${chipStyle}`}>
           {domain}
         </span>
       </div>
-      <div className="space-y-2">
-        <div className="rounded-lg bg-slate-50 p-2.5 border border-slate-100">
-          <div className="text-[9px] uppercase tracking-wider text-slate-400 font-bold">Summary</div>
-          <p className="mt-0.5 text-[11px] font-bold text-slate-800 leading-normal">{result.summary}</p>
-        </div>
+      <div className="rounded-xl bg-slate-50/40 p-4 border border-slate-100 mb-4">
+        <div className="text-[12px] uppercase tracking-wider text-slate-400 font-bold mb-1">Summary</div>
+        <p className="text-[14px] font-bold text-slate-800 leading-relaxed">{result.summary}</p>
+      </div>
+      <div className="divide-y divide-slate-100">
         {points.map((point, index) => (
-          <div key={index} className="flex items-start gap-2 text-xs">
-            <span className="shrink-0 bg-cyan-50 text-cyan-700 border border-cyan-100 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
-              Insight {index + 1}
-            </span>
-            <p className="text-slate-600 leading-normal text-[11px] mt-0.5">{withSentencePunctuation(point)}</p>
+          <div key={index} className="flex items-start gap-2.5 py-2.5">
+            <span className="shrink-0 text-[14px] font-extrabold text-slate-400 mt-px w-5 text-right">{index + 1}.</span>
+            <p className="flex-1 text-slate-700 leading-relaxed text-[14px] font-bold">
+              {withSentencePunctuation(point)} <SentimentMeter text={point} />
+            </p>
           </div>
         ))}
       </div>
@@ -315,11 +315,11 @@ function ImpactMix({ factors, domain }) {
   return (
     <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm md:col-span-2">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-indigo-500" />
           Impact Mix
         </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Factor weights</span>
+        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">Factor weights</span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-[110px,1fr] items-center">
@@ -330,7 +330,7 @@ function ImpactMix({ factors, domain }) {
               style={{ background: `conic-gradient(${gradientParts})` }}
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-center shadow">
-                <span className="text-xs font-bold text-slate-800">{factors.length}</span>
+                <span className="text-base font-bold text-slate-800">{factors.length}</span>
               </div>
             </div>
           </div>
@@ -342,9 +342,9 @@ function ImpactMix({ factors, domain }) {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1 min-w-0">
                   <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: factor.color }} />
-                  <span className="text-[10px] font-bold text-slate-700 truncate">{factor.label}</span>
+                  <span className="text-[13px] font-bold text-slate-700">{factor.label}</span>
                 </div>
-                <span className="text-[9px] font-semibold text-slate-400">{segmentPercent(factor.magnitude, total)}</span>
+                <span className="text-[12px] font-bold text-slate-400">{segmentPercent(factor.magnitude, total)}</span>
               </div>
               <div className="mt-1 h-1 w-full bg-slate-200 rounded-full overflow-hidden">
                 <div
@@ -361,28 +361,48 @@ function ImpactMix({ factors, domain }) {
 }
 
 function ActionCards({ actions }) {
-  return (
-    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          Action Plan
-        </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Execution</span>
+  if (!actions.length) {
+    return (
+      <div className="rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm lg:col-span-3 text-center py-6">
+        <p className="text-[14px] text-slate-400 italic font-bold">No actions suggested.</p>
       </div>
-      <div className="space-y-2">
-        {actions.length ? (
-          actions.map((action, index) => (
-            <div key={index} className="flex items-start gap-2 text-xs">
-              <span className="shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
-                {index === 0 ? 'First' : `Step ${index + 1}`}
-              </span>
-              <p className="text-slate-600 leading-normal text-[11px] mt-0.5 font-medium">{action}</p>
+    )
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm lg:col-span-3">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 tracking-tight">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+          Execution Pipeline
+        </h3>
+        <span className="text-[12px] text-slate-400 font-extrabold uppercase tracking-wider">Milestones</span>
+      </div>
+
+      <div className="relative flex flex-col md:flex-row items-stretch justify-between gap-6 md:gap-4">
+        {/* Connecting line for desktop */}
+        <div className="absolute top-8 left-8 right-8 h-[2px] bg-slate-100/90 hidden md:block z-0" />
+
+        {actions.map((action, index) => {
+          const isFirst = index === 0
+          const stepNum = index + 1
+
+          return (
+            <div key={index} className="relative z-10 flex-1 flex flex-col md:items-center text-left md:text-center p-4 rounded-xl border border-slate-150 bg-slate-50/20 shadow-sm hover:shadow-md hover:bg-white hover:border-slate-250 transition-all duration-300">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 text-white text-[14px] font-black shadow-md md:mb-3 border border-white/20">
+                {stepNum}
+              </div>
+              <div className="mt-2 md:mt-0">
+                <span className="text-[12px] font-black uppercase tracking-widest text-slate-400 block mb-1">
+                  {isFirst ? 'Priority Action' : `Step ${stepNum}`}
+                </span>
+                <p className="text-slate-700 leading-relaxed text-[14px] font-bold mx-auto">
+                  {action}
+                </p>
+              </div>
             </div>
-          ))
-        ) : (
-          <p className="text-[11px] text-slate-400 italic text-center py-2">No actions suggested.</p>
-        )}
+          )
+        })}
       </div>
     </div>
   )
@@ -392,21 +412,21 @@ function BlockingFactorsCard({ items }) {
   if (!items.length) return null
 
   return (
-    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm lg:col-span-3">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3.5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-rose-500" />
           Blocking Factors
         </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Watchout</span>
+        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">Watchout</span>
       </div>
-      <div className="space-y-2">
+      <div className="divide-y divide-slate-100">
         {items.map((item, index) => (
-          <div key={index} className="flex items-start gap-2 text-xs">
-            <span className="shrink-0 bg-rose-50 text-rose-600 border border-rose-100 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
-              Risk {index + 1}
-            </span>
-            <p className="text-slate-600 leading-normal text-[11px] mt-0.5">{item}</p>
+          <div key={index} className="flex items-start gap-2.5 py-2.5">
+            <span className="shrink-0 text-[14px] font-extrabold text-slate-400 mt-px w-5 text-right">{index + 1}.</span>
+            <p className="flex-1 text-slate-700 leading-relaxed text-[14px] font-bold">
+              {item} <SentimentMeter text={item} />
+            </p>
           </div>
         ))}
       </div>
@@ -420,19 +440,19 @@ function QuestionsCard({ questions }) {
   return (
     <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-indigo-500" />
           Quick Questions
         </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Clarify</span>
+        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">Clarify</span>
       </div>
       <div className="space-y-2">
         {questions.slice(0, 3).map((item, index) => (
-          <div key={index} className="flex items-start gap-2 text-xs">
-            <span className="shrink-0 bg-indigo-50 text-indigo-700 border border-indigo-100 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">
+          <div key={index} className="flex items-start gap-2 text-base">
+            <span className="shrink-0 bg-indigo-50 text-indigo-700 border border-indigo-100 px-1.5 py-0.5 rounded text-[12px] font-bold uppercase">
               Q {index + 1}
             </span>
-            <p className="text-slate-600 leading-normal text-[11px] mt-0.5">{item}</p>
+            <p className="text-slate-600 leading-normal text-[14px] mt-0.5">{item}</p>
           </div>
         ))}
       </div>
@@ -440,21 +460,108 @@ function QuestionsCard({ questions }) {
   )
 }
 
-function AlignmentPill({ label, value }) {
-  const styles = {
-    match: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    mismatch: 'bg-rose-50 text-rose-700 border-rose-100',
-    missing: 'bg-amber-50 text-amber-700 border-amber-100',
+const getSentimentVisuals = (text) => {
+  const lower = String(text || '').toLowerCase();
+  let val = 0; // -100 to +100
+  let label = "Neutral";
+  let color = "bg-slate-400";
+  let textClass = "text-slate-650";
+  let gradient = "from-slate-400 to-slate-500";
+
+  if (lower.includes("strongly boosts")) {
+    val = 90;
+    label = "Strong Boost";
+    color = "bg-emerald-500";
+    textClass = "text-emerald-700";
+    gradient = "from-emerald-400 to-teal-500";
+  } else if (lower.includes("slightly boosts")) {
+    val = 45;
+    label = "Slight Boost";
+    color = "bg-emerald-400";
+    textClass = "text-emerald-600";
+    gradient = "from-teal-300 to-emerald-400";
+  } else if (lower.includes("boosts")) {
+    val = 65;
+    label = "Boosts";
+    color = "bg-emerald-400";
+    textClass = "text-emerald-600";
+    gradient = "from-emerald-400 to-teal-400";
+  } else if (lower.includes("strongly holds back")) {
+    val = -90;
+    label = "Strong Holdback";
+    color = "bg-rose-500";
+    textClass = "text-rose-750 font-bold";
+    gradient = "from-rose-500 to-red-650";
+  } else if (lower.includes("slightly holds back")) {
+    val = -45;
+    label = "Slight Holdback";
+    color = "bg-amber-500";
+    textClass = "text-amber-600";
+    gradient = "from-amber-400 to-orange-505";
+  } else if (lower.includes("holds back")) {
+    val = -65;
+    label = "Holds Back";
+    color = "bg-rose-450";
+    textClass = "text-rose-600";
+    gradient = "from-orange-450 to-rose-500";
   }
-  const normalized = String(value || '').toLowerCase()
-  const style = styles[normalized] || styles.missing
+
+  return { val, label, color, textClass, gradient };
+}
+
+function SentimentMeter({ text }) {
+  const { val } = getSentimentVisuals(text)
+  if (val === 0) return null
+
+  const isPositive = val > 0
+  const absVal = Math.abs(val)
+  const pillBg = isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-2 py-1 shadow-sm">
-      <span className="text-[10px] font-medium text-slate-500">{label}</span>
-      <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider border ${style}`}>
-        {normalized || 'missing'}
-      </span>
+    <span className={`inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[12px] font-extrabold ${pillBg}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+      {isPositive ? `+${absVal}%` : `−${absVal}%`}
+    </span>
+  )
+}
+
+function VisualAlignmentBar({ label, value }) {
+  const normalized = String(value || '').toLowerCase()
+  let percent = 10
+  let color = 'from-amber-400 to-orange-500'
+  let labelText = 'Missing'
+  let textColor = 'text-amber-600'
+  let iconClass = 'text-amber-500'
+  let icon = '⚠'
+  
+  if (normalized === 'match') {
+    percent = 100
+    color = 'from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.15)]'
+    labelText = 'Match'
+    textColor = 'text-emerald-700'
+    iconClass = 'text-emerald-500 font-bold'
+    icon = '✓'
+  } else if (normalized === 'mismatch') {
+    percent = 40
+    color = 'from-orange-400 to-rose-500'
+    labelText = 'Mismatch'
+    textColor = 'text-rose-700'
+    iconClass = 'text-rose-500 font-bold'
+    icon = '×'
+  }
+
+  return (
+    <div className="flex flex-col p-2.5 rounded-xl border border-slate-100 bg-white">
+      <div className="flex items-center justify-between text-[12px] font-bold text-slate-500 mb-1">
+        <span>{label}</span>
+        <span className={`font-black uppercase tracking-wider text-[14px] ${textColor} flex items-center gap-0.5`}>
+          <span className={iconClass}>{icon}</span>
+          <span>{labelText}</span>
+        </span>
+      </div>
+      <div className="h-1 w-full bg-slate-200/60 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full bg-gradient-to-r ${color} transition-all duration-500`} style={{ width: `${percent}%` }} />
+      </div>
     </div>
   )
 }
@@ -470,14 +577,14 @@ function RoadmapBlock({ title, items, tone = 'slate' }) {
 
   return (
     <div className={`rounded-xl border p-3 ${tones[tone] || tones.slate}`}>
-      <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1.5">{title}</span>
+      <span className="text-[12px] uppercase tracking-wider text-slate-400 font-bold block mb-1.5">{title}</span>
       <div className="space-y-1">
         {(items || []).slice(0, 3).map((item, index) => (
-          <div key={index} className="rounded-lg bg-white border border-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-700 truncate shadow-sm" title={item}>
+          <div key={index} className="rounded-lg bg-white border border-slate-100 px-2 py-1 text-[13px] font-bold text-slate-700 shadow-sm" title={item}>
             {item}
           </div>
         ))}
-        {!(items || []).length && <span className="text-[9px] text-slate-400 font-medium">None detected</span>}
+        {!(items || []).length && <span className="text-[12px] text-slate-400 font-bold">None detected</span>}
       </div>
     </div>
   )
@@ -492,17 +599,17 @@ function DualRoadmapCard({ intel }) {
   return (
     <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm col-span-1 lg:col-span-3">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-cyan-500" />
           Roadmap (Best Fit vs Interest)
         </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">
           {intel.recommended_view === 'dual_track' ? 'Dual track' : 'Single track'}
         </span>
       </div>
 
       {Array.isArray(intel.difference) && intel.difference.length > 0 && (
-        <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 text-[11px] text-slate-600 leading-normal">
+        <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 text-[14px] text-slate-600 leading-normal">
           {intel.difference.slice(0, 2).map((line, index) => (
             <div key={index}>{line}</div>
           ))}
@@ -512,13 +619,13 @@ function DualRoadmapCard({ intel }) {
       <div className="grid gap-4 sm:grid-cols-2">
         {/* Best Fit Track */}
         <div className="rounded-xl border border-cyan-100 bg-cyan-50/20 p-3">
-          <span className="text-[9px] font-bold uppercase tracking-wider text-cyan-600">Best Fit (Current)</span>
-          <h4 className="text-xs font-bold text-slate-800 mt-0.5 truncate">{best.path_label}</h4>
+          <span className="text-[12px] font-bold uppercase tracking-wider text-cyan-600">Best Fit (Current)</span>
+          <h4 className="text-base font-bold text-slate-800 mt-0.5">{best.path_label}</h4>
           <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <AlignmentPill label="Skills" value={best.alignment?.skills} />
-            <AlignmentPill label="Projects" value={best.alignment?.projects} />
-            <AlignmentPill label="Certs" value={best.alignment?.certifications} />
-            <AlignmentPill label="Interest" value={best.alignment?.interest} />
+            <VisualAlignmentBar label="Skills" value={best.alignment?.skills} />
+            <VisualAlignmentBar label="Projects" value={best.alignment?.projects} />
+            <VisualAlignmentBar label="Certs" value={best.alignment?.certifications} />
+            <VisualAlignmentBar label="Interest" value={best.alignment?.interest} />
           </div>
           <div className="mt-3 grid gap-2">
             <RoadmapBlock title="Skills to add" items={best.roadmap?.skills_to_add || []} tone="cyan" />
@@ -528,13 +635,13 @@ function DualRoadmapCard({ intel }) {
 
         {/* Interest Track */}
         <div className="rounded-xl border border-rose-100 bg-rose-50/20 p-3">
-          <span className="text-[9px] font-bold uppercase tracking-wider text-rose-600">Interest Track (Target)</span>
-          <h4 className="text-xs font-bold text-slate-800 mt-0.5 truncate">{interest.path_label}</h4>
+          <span className="text-[12px] font-bold uppercase tracking-wider text-rose-600">Interest Track (Target)</span>
+          <h4 className="text-base font-bold text-slate-800 mt-0.5">{interest.path_label}</h4>
           <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <AlignmentPill label="Skills" value={interest.alignment?.skills} />
-            <AlignmentPill label="Projects" value={interest.alignment?.projects} />
-            <AlignmentPill label="Certs" value={interest.alignment?.certifications} />
-            <AlignmentPill label="Interest" value={interest.alignment?.interest} />
+            <VisualAlignmentBar label="Skills" value={interest.alignment?.skills} />
+            <VisualAlignmentBar label="Projects" value={interest.alignment?.projects} />
+            <VisualAlignmentBar label="Certs" value={interest.alignment?.certifications} />
+            <VisualAlignmentBar label="Interest" value={interest.alignment?.interest} />
           </div>
           <div className="mt-3 grid gap-2">
             <RoadmapBlock title="Skills to add" items={interest.roadmap?.skills_to_add || []} tone="amber" />
@@ -552,30 +659,30 @@ function EvidenceCard({ sources }) {
   return (
     <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm col-span-1 lg:col-span-2">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-violet-500" />
           O*NET Evidence Signals
         </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Reference</span>
+        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">Reference</span>
       </div>
       <div className="space-y-3">
         {sources.slice(0, 2).map((item, index) => (
           <div key={index} className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h4 className="text-[11px] font-bold text-slate-800">{item.title}</h4>
-                <span className="text-[8px] font-semibold uppercase text-slate-400 mt-0.5 block">{item.code}</span>
+                <h4 className="text-[14px] font-bold text-slate-800">{item.title}</h4>
+                <span className="text-[14px] font-bold uppercase text-slate-400 mt-0.5 block">{item.code}</span>
               </div>
               {typeof item.score === 'number' && (
-                <span className="rounded bg-sky-50 border border-sky-100 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 shrink-0">
+                <span className="rounded bg-sky-50 border border-sky-100 px-1.5 py-0.5 text-[12px] font-bold text-sky-700 shrink-0">
                   {Math.round(item.score * 100)}% Match
                 </span>
               )}
             </div>
-            {item.snippet && <p className="text-[10px] text-slate-600 mt-1 leading-normal">{item.snippet}</p>}
+            {item.snippet && <p className="text-[13px] text-slate-600 mt-1 leading-normal">{item.snippet}</p>}
             <div className="mt-2 flex flex-wrap gap-1">
               {(item.top_skills || []).slice(0, 3).map((skill, idx) => (
-                <span key={idx} className="bg-white border border-slate-100 text-[8px] font-semibold text-slate-500 rounded px-1.5 py-0.5">
+                <span key={idx} className="bg-white border border-slate-100 text-[14px] font-bold text-slate-500 rounded px-1.5 py-0.5">
                   {skill}
                 </span>
               ))}
@@ -596,17 +703,17 @@ function InputSnapshot({ input }) {
   return (
     <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm col-span-1">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-slate-500" />
           Detected Inputs
         </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Metadata</span>
+        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">Metadata</span>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {entries.map(([key, value]) => (
           <div key={key} className="bg-slate-50 border border-slate-100 rounded-lg p-2">
-            <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400 block">{prettifyKey(key)}</span>
-            <span className="text-[11px] font-semibold text-slate-700 truncate block mt-0.5">
+            <span className="text-[14px] font-bold uppercase tracking-wider text-slate-400 block">{prettifyKey(key)}</span>
+            <span className="text-[14px] font-bold text-slate-700 block mt-0.5">
               {Array.isArray(value) ? value.join(', ') : formatNumericValue(value)}
             </span>
           </div>
@@ -622,11 +729,11 @@ function LiveControls({ fields, onChange, isLiveUpdating }) {
   return (
     <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-sky-500" />
           What-if Sliders
         </h3>
-        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">
           {isLiveUpdating ? 'Updating' : 'Live'}
         </span>
       </div>
@@ -634,8 +741,8 @@ function LiveControls({ fields, onChange, isLiveUpdating }) {
         {fields.map((field) => (
           <div key={field.name} className="rounded-lg border border-slate-100 bg-slate-50/40 p-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold text-slate-700">{field.label}</span>
-              <span className="text-[11px] font-extrabold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded">{field.value ?? field.range?.min ?? 0}</span>
+              <span className="text-[14px] font-bold text-slate-700">{field.label}</span>
+              <span className="text-[14px] font-extrabold text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded">{field.value ?? field.range?.min ?? 0}</span>
             </div>
             <input
               type="range"
@@ -646,7 +753,7 @@ function LiveControls({ fields, onChange, isLiveUpdating }) {
               onChange={(event) => onChange(field.name, Number(event.target.value))}
               className="mt-2 w-full h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-sky-500"
             />
-            <div className="mt-1 flex justify-between text-[9px] text-slate-400">
+            <div className="mt-1 flex justify-between text-[12px] text-slate-400">
               <span>{field.range?.min}</span>
               <span>{field.range?.max}</span>
             </div>
@@ -690,13 +797,13 @@ export default function InsightPanel({
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[9px] uppercase tracking-wider text-white/90 font-bold">
+              <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[12px] uppercase tracking-wider text-white/90 font-bold">
                 {title}
               </span>
               {footerAction}
             </div>
             <h2 className="mt-1.5 text-lg font-bold tracking-tight leading-snug">{result.decision}</h2>
-            <p className="mt-0.5 text-xs text-white/80 line-clamp-1 max-w-xl">{result.summary || subtitle}</p>
+            <p className="mt-0.5 text-base text-white/80">{result.summary || subtitle}</p>
           </div>
           <ScoreRing score={score} ringId={ringId} accentClass={styles.accent} />
         </div>
@@ -704,20 +811,20 @@ export default function InsightPanel({
         {/* Secondary Metrics Row */}
         <div className="grid grid-cols-4 gap-4 pt-3 text-white/95">
           <div className="flex flex-col">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/70">Confidence</span>
-            <span className="text-sm font-extrabold mt-0.5">{confidence}%</span>
+            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">Confidence</span>
+            <span className="text-base font-extrabold mt-0.5">{confidence}%</span>
           </div>
           <div className="flex flex-col border-l border-white/10 pl-4">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/70">Priority</span>
-            <span className="text-sm font-extrabold mt-0.5 truncate max-w-[120px]" title={result.next_step}>{result.next_step || 'Proceed'}</span>
+            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">Priority</span>
+            <span className="text-base font-extrabold mt-0.5" title={result.next_step}>{result.next_step || 'Proceed'}</span>
           </div>
           <div className="flex flex-col border-l border-white/10 pl-4 col-span-2">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-white/70">Focus / Band</span>
+            <span className="text-[12px] font-bold uppercase tracking-wider text-white/70">Focus / Band</span>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className={`inline-flex rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase border ${bandClass}`}>
+              <span className={`inline-flex rounded px-1.5 py-0.5 text-[12px] font-extrabold uppercase border ${bandClass}`}>
                 {result.score_label || result.score_band || result.band || 'Evaluated'}
               </span>
-              <span className="text-xs text-white/90 font-medium truncate max-w-[150px]" title={result.focus}>
+              <span className="text-base text-white/90 font-bold" title={result.focus}>
                 {result.focus || actions[1]}
               </span>
             </div>

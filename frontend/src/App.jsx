@@ -1,4 +1,4 @@
-import { Routes, Route, Link, Navigate } from 'react-router-dom'
+import { Routes, Route, Link, NavLink, Navigate } from 'react-router-dom'
 import Home from './pages/Home'
 import DomainPage from './pages/DomainPage'
 import AuditTrail from './pages/AuditTrail'
@@ -21,31 +21,42 @@ function DashboardLayout() {
 function DashboardShell() {
   const { user } = useAuth()
 
+  const getLinkClass = ({ isActive }) => 
+    `transition-all duration-200 font-bold text-xs tracking-wider uppercase px-3 py-1.5 rounded-lg ${
+      isActive 
+        ? 'bg-slate-900 text-white shadow-[0_4px_12px_rgba(15,23,42,0.15)] scale-[1.02]' 
+        : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100/70'
+    }`
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(14,165,233,0.16),_transparent_28%),radial-gradient(circle_at_right,_rgba(34,197,94,0.12),_transparent_22%),linear-gradient(180deg,_#f8fbff_0%,_#eef6ff_100%)]">
-      <header className="border-b border-slate-200 bg-white px-5 py-4 shadow-sm">
+      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/75 backdrop-blur-md px-5 py-3 shadow-[0_1px_3px_rgba(15,23,42,0.02)] transition-all">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <Link to="/dashboard" className="flex items-center gap-3">
+          <Link to="/dashboard" className="flex items-center gap-3 transition hover:opacity-90">
             <img
               src="/logo.jpeg"
               alt="DeciXAI logo"
-              className="h-12 w-12 rounded-2xl border border-sky-100 object-cover shadow-sm"
+              className="h-10 w-10 rounded-xl border border-sky-100 object-cover shadow-sm"
             />
             <div>
-              <div className="text-2xl font-bold tracking-tight text-slate-900">DeciXAI</div>
-              <div className="text-xs uppercase tracking-[0.28em] text-slate-500">Your AI partner for better decisions</div>
+              <div className="text-xl font-black tracking-tight text-slate-950">DeciXAI</div>
+              <div className="text-[9px] font-bold uppercase tracking-[0.24em] text-slate-400">Your AI partner for better decisions</div>
             </div>
           </Link>
-          <nav className="flex flex-wrap items-center gap-4 text-sm font-medium text-slate-600">
-            <Link to="/dashboard/career" className="transition hover:text-cyan-700">Career</Link>
-            <Link to="/dashboard/finance" className="transition hover:text-emerald-700">Finance</Link>
-            <Link to="/dashboard/startup" className="transition hover:text-fuchsia-700">Startup</Link>
-            <Link to="/dashboard/policy" className="transition hover:text-orange-700">Policy</Link>
-            <Link to="/dashboard/audit" className="ml-4 flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 transition hover:bg-slate-100 hover:text-slate-900">
+          <nav className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-600">
+            <NavLink to="/dashboard/career" className={getLinkClass}>Career</NavLink>
+            <NavLink to="/dashboard/finance" className={getLinkClass}>Finance</NavLink>
+            <NavLink to="/dashboard/startup" className={getLinkClass}>Startup</NavLink>
+            <NavLink to="/dashboard/policy" className={getLinkClass}>Policy</NavLink>
+            <NavLink to="/dashboard/audit" className={({ isActive }) => 
+              `ml-3 flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/50 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider transition hover:bg-slate-100 hover:text-slate-900 ${
+                isActive ? 'border-sky-300 bg-sky-50/50 text-sky-700 active-indicator-pulse' : 'text-slate-500'
+              }`
+            }>
               <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
               Audit
-            </Link>
-            <div className="ml-2">
+            </NavLink>
+            <div className="ml-2 border-l border-slate-200 pl-3">
               <ProfileMenu />
             </div>
           </nav>

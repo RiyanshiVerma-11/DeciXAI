@@ -88,11 +88,19 @@ const domainConfig = {
 
 const sectionBreaks = '(?=\\b(?:cgpa|gpa|skills?|expertise|projects?|interest|certifications?|course|degree|specialization|education level|year of study|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people)\\b|$)'
 
-const splitItems = (value) =>
-  String(value)
+const splitItems = (value) => {
+  const str = String(value)
+  if (!/[,;]|\band\b|\bor\b|\/|\n/i.test(str) && /\s+/.test(str.trim())) {
+    return str
+      .split(/\s+/)
+      .map((item) => item.trim().replace(/^[:\-\s]+|[:\-\s]+$/g, ''))
+      .filter(Boolean)
+  }
+  return str
     .split(/,|;|\band\b|\bor\b|\/|\n/gi)
     .map((item) => item.trim().replace(/^[:\-\s]+|[:\-\s]+$/g, ''))
     .filter(Boolean)
+}
 
 const pickNumber = (...values) => {
   for (const value of values) {
@@ -117,16 +125,14 @@ const extractNumber = (text, keys) => {
     const match = lower.match(new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\D*([0-9]+(?:\\.[0-9]+)?)`, 'i'))
     if (match) return Number(match[1])
   }
-
-  const fallback = lower.match(/([0-9]+(?:\.[0-9]+)?)/)
-  return fallback ? Number(fallback[1]) : null
+  return null
 }
 
 const extractSection = (text, keys) => {
   for (const key of keys) {
     const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const match = text.match(new RegExp(`\\b${escaped}\\b[:\\s-]*(.*?)${sectionBreaks}`, 'is'))
-    if (match?.[1]) return match[1].trim().replace(/[.:-]+$/g, '')
+    if (match?.[1]) return match[1].trim().replace(/[.:,;\-\s]+$/g, '')
   }
   return ''
 }
@@ -235,6 +241,7 @@ export default function DomainPage() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [loading, setLoading] = useState(false)
   const [liveUpdating, setLiveUpdating] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   const numericSliderFields = useMemo(
     () => (config?.fields || []).filter((field) => field.type === 'number'),
@@ -318,6 +325,9 @@ export default function DomainPage() {
       setResult(res)
       setInput(payload)
       syncInteractiveInput(payload)
+      if (!live) {
+        setIsSidebarCollapsed(true)
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -336,6 +346,7 @@ export default function DomainPage() {
       setResult(res)
       setInput(nextInput)
       syncInteractiveInput(nextInput)
+      setIsSidebarCollapsed(true)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -409,9 +420,9 @@ export default function DomainPage() {
 
   return (
     <div className="px-4 py-4 sm:px-6 md:p-8 bg-slate-50/50 min-h-screen">
-      <div className="mx-auto max-w-7xl">
+      <div className={`mx-auto transition-all duration-300 ${isSidebarCollapsed ? 'max-w-full' : 'max-w-7xl'}`}>
         <button 
-          className="mb-4 text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition" 
+          className="mb-4 text-base font-bold text-slate-500 hover:text-slate-800 flex items-center gap-1.5 transition" 
           onClick={() => navigate('/')}
         >
           &larr; Back
@@ -420,136 +431,169 @@ export default function DomainPage() {
         {/* Compact Workspace Header */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] uppercase font-bold tracking-[0.2em] text-slate-500">
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-[13px] uppercase font-bold tracking-[0.2em] text-slate-500">
               {config.title} workspace
             </div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 mt-1">{config.title} Decision Studio</h1>
-            <p className="text-xs text-slate-500 mt-0.5">{config.subtitle}</p>
+            <p className="text-base text-slate-500 mt-0.5">{config.subtitle}</p>
           </div>
-          <div className="flex items-center gap-3 bg-white border border-slate-200/80 rounded-xl p-2 pr-4 shadow-sm">
-            <img src="/logo.jpeg" alt="DeciXAI logo" className="h-10 w-10 rounded-xl object-cover border border-slate-100" />
-            <div>
-              <div className="text-xs font-bold text-slate-900 leading-none">DeciXAI Engine</div>
-              <div className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold mt-0.5">English + Hindi friendly</div>
+          <div className="flex items-center gap-3">
+            {result && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className={`px-4 py-2 rounded-xl text-base font-bold transition-all duration-300 flex items-center gap-2 border shadow-sm ${
+                  isSidebarCollapsed
+                    ? 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100 hover:scale-[1.02]'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:scale-[1.02]'
+                }`}
+              >
+                {isSidebarCollapsed ? (
+                  <>
+                    <svg className="h-4 w-4 text-sky-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Modify Inputs
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Minimize Inputs
+                  </>
+                )}
+              </button>
+            )}
+            <div className="flex items-center gap-3 bg-white border border-slate-200/80 rounded-xl p-2 pr-4 shadow-sm">
+              <img src="/logo.jpeg" alt="DeciXAI logo" className="h-10 w-10 rounded-xl object-cover border border-slate-100" />
+              <div>
+                <div className="text-base font-bold text-slate-900 leading-none">DeciXAI Engine</div>
+                <div className="text-[12px] uppercase tracking-wider text-slate-400 font-bold mt-0.5">English + Hindi friendly</div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Two-Column Responsive Layout */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-          {/* Left Panel: Control Center (col-span-4) */}
-          <div className="md:col-span-4 space-y-4">
-            <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm space-y-4">
-              <div className="border-b border-slate-100 pb-3">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">Control Center</h2>
-              </div>
-
-              {/* Segmented slider tab for Input Mode Selection */}
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Input Mode</span>
-                <div className="relative flex rounded-lg bg-slate-100 p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setMode('structured')}
-                    className={`flex-1 rounded-md py-1 text-[11px] font-bold transition-all ${mode === 'structured' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
-                  >
-                    Structured Input
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode('free')}
-                    className={`flex-1 rounded-md py-1 text-[11px] font-bold transition-all ${mode === 'free' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
-                  >
-                    Free-text Prompt
-                  </button>
+          {/* Left Panel: Control Center (col-span-3 when open, hidden when collapsed) */}
+          {!isSidebarCollapsed && (
+            <div className="md:col-span-3 space-y-4 animate-fade-in">
+              <div className="glass-panel p-5 rounded-2xl space-y-5">
+                <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                  <h2 className="text-base font-bold uppercase tracking-wider text-slate-400">Control Center</h2>
+                  <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></span>
                 </div>
-              </div>
 
-              {/* Compact Example Prompts Badges */}
-              <div className="space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Example Prompts</span>
-                <div className="flex flex-col gap-1.5">
-                  {config.examples.map((example) => (
+                {/* Segmented slider tab for Input Mode Selection */}
+                <div>
+                  <span className="text-[13px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Input Mode</span>
+                  <div className="relative flex rounded-xl bg-slate-100 p-1">
                     <button
-                      key={example}
                       type="button"
-                      onClick={() => handleExampleClick(example)}
-                      className="text-left text-[11px] leading-normal text-slate-600 bg-slate-50 border border-slate-200/60 rounded-lg px-2.5 py-2 transition hover:border-sky-300 hover:bg-sky-50/50"
+                      onClick={() => setMode('structured')}
+                      className={`flex-1 rounded-lg py-1.5 text-base font-bold transition-all duration-300 ${mode === 'structured' ? 'bg-white text-slate-950 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-900'}`}
                     >
-                      {example}
+                      Structured Input
                     </button>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={() => setMode('free')}
+                      className={`flex-1 rounded-lg py-1.5 text-base font-bold transition-all duration-300 ${mode === 'free' ? 'bg-white text-slate-950 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-900'}`}
+                    >
+                      Free-text Prompt
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              {/* Form Input fields */}
-              <form onSubmit={submit} className="space-y-4 pt-1">
-                {mode === 'structured' ? (
-                  <div className="space-y-3">
-                    {config.fields.map((field) => (
-                      <div key={field.name} className="flex flex-col">
-                        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-                          {field.label} {field.required && <span className="text-red-500">*</span>}
-                        </label>
-                        <input
-                          type={field.type}
-                          min={field.min}
-                          max={field.max}
-                          value={Array.isArray(input[field.name]) ? input[field.name].join(', ') : (input[field.name] ?? '')}
-                          onChange={(e) => onFieldChange(field.name, e.target.value)}
-                          className={`w-full rounded-lg border bg-slate-50/50 px-3 py-1.5 text-xs outline-none transition focus:border-sky-400 focus:bg-white ${fieldErrors[field.name] ? 'border-rose-300' : 'border-slate-200'}`}
-                        />
-                        {fieldErrors[field.name] && <span className="text-[10px] text-rose-600 mt-1">{fieldErrors[field.name]}</span>}
-                      </div>
+                {/* Compact Example Prompts Badges */}
+                <div className="space-y-2">
+                  <span className="text-[13px] font-bold uppercase tracking-wider text-slate-400 block">Example Prompts</span>
+                  <div className="flex flex-col gap-2">
+                    {config.examples.map((example) => (
+                      <button
+                        key={example}
+                        type="button"
+                        onClick={() => handleExampleClick(example)}
+                        className="text-left text-[14px] leading-relaxed text-slate-600 bg-white/60 hover:bg-white border border-slate-200/60 hover:border-sky-400 rounded-xl px-3 py-2.5 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                      >
+                        {example}
+                      </button>
                     ))}
                   </div>
-                ) : (
-                  <div className="flex flex-col">
-                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Prompt</label>
-                    <textarea
-                      rows={4}
-                      value={textPrompt}
-                      onChange={(e) => setTextPrompt(e.target.value)}
-                      placeholder={config.freeTextExample}
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50/50 p-2.5 text-xs outline-none transition focus:border-sky-400 focus:bg-white resize-none"
-                    />
+                </div>
+
+                {/* Form Input fields */}
+                <form onSubmit={submit} className="space-y-4 pt-1">
+                  {mode === 'structured' ? (
+                    <div className="space-y-3">
+                      {config.fields.map((field) => (
+                        <div key={field.name} className="flex flex-col">
+                          <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            {field.label} {field.required && <span className="text-red-500">*</span>}
+                          </label>
+                          <input
+                            type={field.type}
+                            min={field.min}
+                            max={field.max}
+                            step={field.type === 'number' ? 'any' : undefined}
+                            value={Array.isArray(input[field.name]) ? input[field.name].join(', ') : (input[field.name] ?? '')}
+                            onChange={(e) => onFieldChange(field.name, e.target.value)}
+                            className={`w-full rounded-xl border bg-white/80 px-3.5 py-2 text-base outline-none transition-all duration-300 focus:border-sky-500 focus:bg-white focus:shadow-[0_0_0_3px_rgba(14,165,233,0.12)] ${fieldErrors[field.name] ? 'border-rose-300 focus:border-rose-500 focus:shadow-[0_0_0_3px_rgba(244,63,94,0.12)]' : 'border-slate-200'}`}
+                          />
+                          {fieldErrors[field.name] && <span className="text-[13px] text-rose-600 mt-1">{fieldErrors[field.name]}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col">
+                      <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider mb-1">Prompt</label>
+                      <textarea
+                        rows={4}
+                        value={textPrompt}
+                        onChange={(e) => setTextPrompt(e.target.value)}
+                        placeholder={config.freeTextExample}
+                        className="w-full rounded-xl border border-slate-200 bg-white/80 p-3 text-base outline-none transition-all duration-300 focus:border-sky-500 focus:bg-white focus:shadow-[0_0_0_3px_rgba(14,165,233,0.12)] resize-none"
+                      />
+                    </div>
+                  )}
+
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-slate-955 py-2.5 text-base font-bold uppercase tracking-wider text-white transition-all duration-300 hover:bg-slate-900 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_4px_12px_rgba(15,23,42,0.15)] hover:shadow-[0_6px_18px_rgba(15,23,42,0.22)] bg-slate-950"
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Analyzing...
+                        </>
+                      ) : 'Analyze Decision'}
+                    </button>
+                    <div className="text-[13px] text-slate-400 text-center mt-2.5 leading-relaxed font-bold">
+                      {liveUpdating ? 'Refreshing what-if output...' : 'Results refresh dynamically via live sliders.'}
+                    </div>
+                  </div>
+                </form>
+
+                {error && (
+                  <div className="rounded-xl bg-rose-50 border border-rose-100 p-3 text-base text-rose-700 mt-2">
+                    {error}
                   </div>
                 )}
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    className="w-full rounded-lg bg-slate-900 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 flex items-center justify-center gap-2 shadow"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Analyzing...
-                      </>
-                    ) : 'Analyze Decision'}
-                  </button>
-                  <div className="text-[10px] text-slate-400 text-center mt-2 leading-relaxed">
-                    {liveUpdating ? 'Refreshing what-if output...' : 'Results refresh dynamically via live sliders.'}
-                  </div>
-                </div>
-              </form>
-
-              {error && (
-                <div className="rounded-lg bg-rose-50 border border-rose-100 p-2.5 text-xs text-rose-700 mt-2">
-                  {error}
-                </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Right Panel: Main Analysis & Output Board (col-span-8) */}
-          <div className="md:col-span-8">
+          {/* Right Panel: Main Analysis & Output Board */}
+          <div className={isSidebarCollapsed ? 'md:col-span-12 w-full transition-all duration-300' : 'md:col-span-9 w-full transition-all duration-300'}>
             {result ? (
-              <div ref={resultRef} className="scroll-mt-6">
+              <div ref={resultRef} className="scroll-mt-6 animate-fade-in">
                 {hasComparisonResult ? (
                   <DecisionReport
                     payload={result}
@@ -581,13 +625,13 @@ export default function DomainPage() {
                       <div className="flex items-center gap-1.5">
                         <button 
                           onClick={() => downloadPdf(domain, result)} 
-                          className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white transition hover:bg-white/30"
+                          className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white transition hover:bg-white/30"
                         >
                           PDF
                         </button>
                         <button 
                           onClick={recalc} 
-                          className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white transition hover:bg-white/30"
+                          className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white transition hover:bg-white/30"
                         >
                           Refresh
                         </button>
@@ -597,14 +641,14 @@ export default function DomainPage() {
                 )}
               </div>
             ) : (
-              <div className="h-full min-h-[450px] flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 text-center shadow-sm">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-50 text-sky-500 mb-4 border border-sky-100 shadow-sm">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <div className="h-full min-h-[480px] flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-350 bg-white/50 backdrop-blur-sm p-8 text-center shadow-sm glass-panel-hover border-slate-300">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-500 mb-5 border border-sky-100/60 shadow-[0_4px_12px_rgba(14,165,233,0.1)]">
+                  <svg className="h-6 w-6 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
                   </svg>
                 </div>
-                <h3 className="text-sm font-bold text-slate-800">Awaiting Decision Input</h3>
-                <p className="mt-2 text-xs text-slate-400 max-w-sm leading-relaxed">
+                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">Awaiting Decision Input</h3>
+                <p className="mt-2 text-base text-slate-500 max-w-md leading-relaxed">
                   Configure the inputs in the control center on the left, select an example, or write a free-text prompt, then run analysis to inspect your decision signals and custom roadmap.
                 </p>
               </div>

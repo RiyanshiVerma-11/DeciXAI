@@ -71,10 +71,10 @@ export const fetchCurrentUser = (token) => getJson('/api/v1/auth/me', token)
 // ---------------------------------------------------------------------------
 
 export const submitCareer = (payload) => postJson('/api/v1/career/', payload)
-export const submitCareerPrompt = (payload) => postJson('/api/v1/career/parse/', payload)
+export const submitCareerPrompt = (payload) => postJson('/api/v1/career/parse', payload)
 export const submitFinance = (payload) => postJson('/api/v1/finance/', payload)
 export const submitStartup = (payload) => postJson('/api/v1/startup/', payload)
-export const submitStartupPrompt = (payload) => postJson('/api/v1/startup/parse/', payload)
+export const submitStartupPrompt = (payload) => postJson('/api/v1/startup/parse', payload)
 export const submitPolicy = (payload) => postJson('/api/v1/policy/', payload)
 export const submitChatbot = (payload) => postJson('/api/v1/chatbot/', payload)
 
