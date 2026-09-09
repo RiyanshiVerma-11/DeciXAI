@@ -1,4 +1,4 @@
-const defaultApiBase = `${window.location.protocol}//${window.location.hostname}:8000`
+const defaultApiBase = `${window.location.protocol}//${window.location.hostname}:8002`
 const API_BASE = import.meta.env.VITE_API_BASE_URL || defaultApiBase
 
 const postJson = async (path, body, token) => {
@@ -15,7 +15,6 @@ const postJson = async (path, body, token) => {
   const rawText = await res.text()
 
   if (!res.ok) {
-    // Try to parse error detail from FastAPI
     try {
       const errJson = JSON.parse(rawText)
       throw new Error(errJson.detail || `API error ${res.status}`)
@@ -56,6 +55,28 @@ const getJson = async (path, token) => {
   }
 
   return JSON.parse(rawText)
+}
+
+const deleteJson = async (path, token) => {
+  const headers = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    headers,
+  })
+  const rawText = await res.text()
+  if (!res.ok) {
+    try {
+      const errJson = JSON.parse(rawText)
+      throw new Error(errJson.detail || `API error ${res.status}`)
+    } catch (e) {
+      if (e.message && !e.message.startsWith('API error')) throw e
+      throw new Error(`API error ${res.status}: ${rawText || res.statusText || 'Request failed'}`)
+    }
+  }
+  return rawText ? JSON.parse(rawText) : { status: 'success' }
 }
 
 // ---------------------------------------------------------------------------
@@ -100,3 +121,34 @@ export const downloadPdf = async (domain, resultData) => {
   document.body.removeChild(a)
   window.URL.revokeObjectURL(url)
 }
+
+// ---------------------------------------------------------------------------
+// Workspace & Decisions API
+// ---------------------------------------------------------------------------
+
+export const saveDecision = (payload, token) => postJson('/api/v1/decisions', payload, token)
+export const fetchSavedDecisions = (domain = '', search = '', token) => {
+  const params = new URLSearchParams()
+  if (domain) params.set('domain', domain)
+  if (search) params.set('search', search)
+  const qs = params.toString() ? `?${params.toString()}` : ''
+  return getJson(`/api/v1/decisions${qs}`, token)
+}
+export const fetchDecisionById = (id, token) => getJson(`/api/v1/decisions/${id}`, token)
+export const deleteDecision = (id, token) => deleteJson(`/api/v1/decisions/${id}`, token)
+export const toggleDecisionShare = (id, isPublic, token) => postJson(`/api/v1/decisions/${id}/share`, { is_public: isPublic }, token)
+export const fetchPublicReport = (shareToken) => getJson(`/api/v1/decisions/public/${shareToken}`)
+
+// ---------------------------------------------------------------------------
+// Developer Hub & API Keys
+// ---------------------------------------------------------------------------
+
+export const fetchApiKeys = (token) => getJson('/api/v1/keys', token)
+export const createApiKey = (name, token) => postJson('/api/v1/keys', { name }, token)
+export const deleteApiKey = (id, token) => deleteJson(`/api/v1/keys/${id}`, token)
+
+// ---------------------------------------------------------------------------
+// Subscription Tier Upgrade
+// ---------------------------------------------------------------------------
+
+export const updateUserTier = (tier, token) => postJson('/api/v1/auth/tier', { tier }, token)

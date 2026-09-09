@@ -2,6 +2,10 @@ from functools import lru_cache
 from pathlib import Path
 import threading
 
+import sklearn.compose._column_transformer as _ct
+if not hasattr(_ct, '_RemainderColsList'):
+    _ct._RemainderColsList = type('_RemainderColsList', (list,), {})
+
 import joblib
 import pandas as pd
 import shap
@@ -33,12 +37,48 @@ def get_shap_explainer(domain: str):
     return _EXPLAINER_CACHE[domain]
 
 
+import scipy.sparse as sp
+
+
+def _patch_loaded_bundle(bundle):
+    if not isinstance(bundle, dict):
+        return bundle
+
+    def _fix_obj(obj):
+        if obj is None:
+            return
+        for attr in ('transformers_', 'transformers'):
+            if hasattr(obj, attr):
+                for item in getattr(obj, attr, []):
+                    if len(item) >= 2:
+                        _fix_obj(item[1])
+        if hasattr(obj, 'named_steps'):
+            for _, step in obj.named_steps.items():
+                _fix_obj(step)
+        elif hasattr(obj, 'steps'):
+            for _, step in obj.steps:
+                _fix_obj(step)
+        if hasattr(obj, '_tfidf'):
+            _fix_obj(obj._tfidf)
+        if hasattr(obj, '__dict__') and 'idf_' in obj.__dict__ and not hasattr(obj, '_idf_diag'):
+            idf = obj.__dict__['idf_']
+            if idf is not None:
+                obj._idf_diag = sp.diags(idf, offsets=0, shape=(len(idf), len(idf)), format='csr', dtype=float)
+
+    _fix_obj(bundle.get('pipeline'))
+    if 'comparison' in bundle and isinstance(bundle['comparison'], dict):
+        _fix_obj(bundle['comparison'].get('pipeline'))
+
+    return bundle
+
+
 @lru_cache(maxsize=8)
 def load_domain_bundle(domain):
     model_path = MODELS_DIR / f'{domain}_model.joblib'
     if not model_path.exists():
         return None
-    return joblib.load(model_path)
+    bundle = joblib.load(model_path)
+    return _patch_loaded_bundle(bundle)
 
 
 def get_domain_profiles(domain):

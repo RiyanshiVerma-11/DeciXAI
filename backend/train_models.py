@@ -156,7 +156,11 @@ def normalize_text(value) -> str:
 def split_items(text):
     if pd.isna(text):
         return []
-    parts = re.split(r'[;,/|]|\band\b', str(text), flags=re.IGNORECASE)
+    parts = re.split(
+        r'[;,|]|\band\b|(?<!\bci)(?<!\bui)(?<!\bpl)(?<!\btcp)(?<!\ba)\/(?!cd\b)(?!ux\b)(?!sql\b)(?!ip\b)(?!b\b)',
+        str(text),
+        flags=re.IGNORECASE,
+    )
     return [part.strip().lower() for part in parts if part and part.strip()]
 
 
@@ -245,20 +249,23 @@ def classify_career_path(text):
     lowered = normalize_text(text)
     best_path = None
     best_score = 0.0
+    best_specificity = 0.0
 
     for path_name, patterns in CAREER_PATHS.items():
         score = 0.0
+        matched_chars = 0
+        match_count = 0
         for pattern in patterns:
             escaped = re.escape(pattern).replace(r'\ ', r'[\s/-]+')
             if re.search(rf'(?<!\w){escaped}(?!\w)', lowered):
                 score += 1.0 + min(len(pattern.split()) * 0.15, 0.45)
-        if score > best_score or (
-            score == best_score
-            and best_path is not None
-            and CAREER_PATH_PRIORITY[path_name] < CAREER_PATH_PRIORITY[best_path]
-        ):
+                matched_chars += len(pattern)
+                match_count += 1
+        specificity = matched_chars + (match_count * 0.5)
+        if score > best_score or (score == best_score and specificity > best_specificity):
             best_path = path_name
             best_score = score
+            best_specificity = specificity
 
     return best_path if best_score >= 1.0 else None
 

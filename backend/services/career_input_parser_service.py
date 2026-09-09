@@ -166,6 +166,11 @@ SKILL_ALIASES = {
     "llamaindex": ("llamaindex",),
     "vector db": ("vector db", "qdrant", "milvus", "chroma", "pgvector"),
     "vllm": ("vllm", "ollama"),
+    "ci/cd": ("ci/cd", "cicd", "ci cd", "continuous integration"),
+    "ui/ux": ("ui/ux", "ui ux", "ui", "ux", "user experience", "user interface"),
+    "pl/sql": ("pl/sql", "plsql", "pl sql"),
+    "c#": ("c#", "csharp", "c sharp"),
+    "figma": ("figma",),
 }
 
 CAREER_OPTION_ALIASES = {
@@ -365,7 +370,7 @@ TOKEN_VOCABULARY = _build_token_vocabulary()
 def _normalize_text(text: str) -> str:
     """Lowercase and normalize punctuation before extraction."""
     normalized = str(text or "").lower()
-    normalized = normalized.replace("&", " and ")
+    normalized = normalized.replace("&", " and ").replace("%", " percent ")
     normalized = re.sub(r"[^a-z0-9+.\s/-]", " ", normalized)
     return _collapse_spaces(normalized)
 
@@ -476,18 +481,36 @@ def _extract_number_near_keywords(text: str, keywords: tuple[str, ...]) -> int |
 
 
 def _extract_cgpa(text: str) -> float:
-    """Extract CGPA from either 'cgpa 8.5' or '8.5 cgpa' style inputs."""
+    """Extract CGPA/GPA/Percentage and auto-convert to 10-point scale."""
+    # 1. Check for explicit 4-point scale (e.g. "3.8/4", "3.8 out of 4", "gpa 3.6 / 4")
+    match_4 = re.search(r"(\d+(?:\.\d+)?)\s*(?:/|out of)\s*4(?:\.0)?\b", text, flags=re.IGNORECASE)
+    if match_4:
+        val = float(match_4.group(1))
+        return max(0.0, min((val / 4.0) * 10.0, 10.0))
+
+    # 2. Check for percentage (e.g. "82%", "82 percent", "percentage 85")
+    match_pct = re.search(r"(?:percentage|percent|%)\s*[:=]?\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*(?:%|percent\b)", text, flags=re.IGNORECASE)
+    if match_pct:
+        val_str = match_pct.group(1) or match_pct.group(2)
+        val = float(val_str)
+        if val > 10.0:
+            val = val / 10.0
+        return max(0.0, min(val, 10.0))
+
+    # 3. Standard CGPA / GPA patterns
     patterns = (
         r"\b(?:cgpa|gpa)\b[^\d]{0,10}(\d+(?:\.\d+)?)",
         r"\b(\d+(?:\.\d+)?)\b[^\n]{0,10}\b(?:cgpa|gpa)\b",
     )
     for pattern in patterns:
-        match = re.search(pattern, text)
+        match = re.search(pattern, text, flags=re.IGNORECASE)
         if not match:
             continue
         value = float(match.group(1))
-        if value > 10:
+        if value > 10.0:
             value = value / 10.0
+        elif 0.0 < value <= 4.0:
+            value = (value / 4.0) * 10.0
         return max(0.0, min(value, 10.0))
     return 0.0
 
@@ -525,7 +548,11 @@ def _extract_specialization(text: str) -> str:
 def _split_section_items(section: str) -> list[str]:
     if not section:
         return []
-    raw_items = re.split(r",|;|/|\band\b|\bor\b|\n", section)
+    raw_items = re.split(
+        r",|;|\band\b|\bor\b|\n|(?<!\bci)(?<!\bui)(?<!\bpl)(?<!\btcp)(?<!\ba)\/(?!cd\b)(?!ux\b)(?!sql\b)(?!ip\b)(?!b\b)",
+        section,
+        flags=re.IGNORECASE,
+    )
     items = []
     for item in raw_items:
         cleaned = _collapse_spaces(item.strip(" .,:;-"))

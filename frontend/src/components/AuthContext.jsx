@@ -44,6 +44,17 @@ export function AuthProvider({ children }) {
     return data
   }, [])
 
+  const refreshUser = useCallback(async () => {
+    if (!token) return
+    try {
+      const userData = await fetchCurrentUser(token)
+      setUser(userData)
+      return userData
+    } catch (e) {
+      console.error('Failed to refresh user profile:', e)
+    }
+  }, [token])
+
   const logout = useCallback(() => {
     localStorage.removeItem('decixai_token')
     setToken(null)
@@ -52,12 +63,14 @@ export function AuthProvider({ children }) {
 
   const value = {
     user,
+    setUser,
     token,
     isAuthenticated: !!user && !!token,
     loading,
     login,
     register,
     logout,
+    refreshUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

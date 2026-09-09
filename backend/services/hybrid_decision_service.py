@@ -15,7 +15,10 @@ from utils.shap_utils import compute_shap_explanation
 
 
 SECTION_BREAKS = r"(?=\b(?:cgpa|gpa|skills?|projects?|interest|experience|certifications?|options?|compare|versus|vs)\b|$)"
-LIST_SPLIT = re.compile(r",|;|\band\b|\bor\b|/|\n", flags=re.IGNORECASE)
+LIST_SPLIT = re.compile(
+    r",|;|\band\b|\bor\b|\n|(?<!\bci)(?<!\bui)(?<!\bpl)(?<!\btcp)(?<!\ba)\/(?!cd\b)(?!ux\b)(?!sql\b)(?!ip\b)(?!b\b)",
+    flags=re.IGNORECASE,
+)
 SKILL_ALIASES = {
     "nodejs": ["node", "backend"],
     "node.js": ["node", "backend"],
@@ -26,12 +29,17 @@ SKILL_ALIASES = {
     "typescript": ["javascript"],
     "express": ["backend", "node"],
     "mongodb": ["backend"],
+    "ci/cd": ["ci/cd", "devops", "cloud"],
+    "ui/ux": ["ui", "ux", "ui/ux", "design"],
+    "pl/sql": ["sql", "database"],
+    "c++": ["cpp", "programming"],
+    "c#": ["csharp", ".net", "backend"],
 }
 INTEREST_HINTS = {
     "ai": ["ai engineering", "ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq"],
     "data": ["data science", "analytics", "machine learning"],
-    "management": ["product management", "business analyst", "management"],
-    "technical": ["software development", "software engineer", "web developer", "frontend", "backend", "cloud", "devops", "aws", "azure", "gcp", "docker", "kubernetes", "sre"],
+    "management": ["product management", "business analyst", "management", "finance", "consulting", "marketing"],
+    "technical": ["software development", "software engineer", "web developer", "frontend", "backend", "cloud", "devops", "aws", "azure", "gcp", "docker", "kubernetes", "sre", "ui/ux", "cybersecurity"],
 }
 INTERNSHIP_HINTS = ("internship", "intern", "apprentice", "trainee", "industry training")
 REAL_WORLD_HINTS = (
@@ -74,11 +82,15 @@ PATH_GROUP_ALIGNMENT = {
 PATH_KEYWORD_HINTS = {
     "ai_engineer": {"ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq", "fastapi", "docker", "python", "vector db", "rag"},
     "data_science": {"data science", "machine learning", "deep learning", "statistics", "pandas", "numpy", "analytics", "python"},
-    "data_engineering": {"data engineering", "etl", "spark", "pipelines", "data pipeline", "sql", "python", "big data"},
-    "software_development": {"software", "development", "developer", "frontend", "backend", "react", "javascript", "java", "testing"},
+    "data_engineering": {"data engineering", "etl", "spark", "pipelines", "data pipeline", "sql", "python", "big data", "hadoop", "airflow", "kafka"},
+    "software_development": {"software", "development", "developer", "frontend", "backend", "react", "javascript", "java", "testing", "full stack", "web developer", "c++", "c#", "node"},
     "cloud_devops": {"cloud", "devops", "sre", "site reliability", "aws", "azure", "gcp", "docker", "kubernetes", "ci/cd", "jenkins", "terraform", "linux"},
-    "product_management": {"product", "management", "leadership", "marketing", "analytics", "communication", "business"},
-    "cybersecurity": {"cybersecurity", "security", "ethical hacking", "networking", "linux", "ceh", "penetration testing"},
+    "product_management": {"product", "management", "leadership", "analytics", "communication", "business", "product manager", "product owner", "scrum", "roadmap"},
+    "cybersecurity": {"cybersecurity", "security", "ethical hacking", "networking", "linux", "ceh", "penetration testing", "soc", "infosec"},
+    "ui_ux_design": {"ui", "ux", "ui/ux", "user interface", "user experience", "figma", "wireframing", "prototyping", "design system", "interaction design", "user research", "product design", "adobe xd", "sketch"},
+    "marketing": {"marketing", "digital marketing", "seo", "sem", "content marketing", "social media", "brand", "growth", "campaigns", "copywriting", "advertising", "email marketing", "analytics"},
+    "finance": {"finance", "financial", "accounting", "investment", "banking", "financial modeling", "excel", "valuation", "portfolio", "equity", "cfa", "corporate finance", "risk analysis"},
+    "consulting": {"consulting", "consultant", "strategy", "management consulting", "business strategy", "advisory", "case study", "market entry", "operations", "stakeholder management", "problem solving"},
 }
 
 
@@ -160,18 +172,41 @@ def _normalize_interest(interest: str, options_text: str) -> str:
     def _classify(value: str) -> str | None:
         if not value:
             return None
-        # Cloud/DevOps is a technical track in this app (not "data").
-        if any(token in value for token in ["cloud", "devops", "sre", "site reliability", "aws", "azure", "gcp", "docker", "kubernetes", "terraform"]):
-            return "technical"
-        if any(token in value for token in ["software", "development", "engineering", "coding", "frontend", "backend", "full stack", "web developer"]):
-            return "technical"
-        if any(token in value for token in ["manage", "business", "leader", "finance", "sales", "market", "product"]):
+        # Check direct career path alignments first
+        for path_name, aligned_int in PATH_INTEREST_ALIGNMENT.items():
+            if path_name in value or path_name.replace("_", " ") in value:
+                return aligned_int
+        # Management / Business / Finance / Consulting / Marketing tracks
+        if any(token in value for token in [
+            "consulting", "consultant", "strategy", "advisory", "management consulting",
+            "finance", "financial", "banking", "investment", "accounting", "equity", "valuation",
+            "market", "marketing", "digital marketing", "seo", "sales", "brand", "advertising",
+            "product management", "product manager", "project management", "business", "manage", "leader", "mba"
+        ]):
             return "management"
-        if any(token in value for token in ["data", "analytic", "analysis", "ai", "machine learning", "ml"]):
+        # Data Science / Analytics / AI tracks
+        if any(token in value for token in ["data", "analytic", "analysis", "statistics", "machine learning", "ml", "ai", "deep learning", "nlp", "llm"]):
             return "data"
+        # Cloud/DevOps
+        if any(token in value for token in ["cloud", "devops", "sre", "site reliability", "aws", "azure", "gcp", "docker", "kubernetes", "terraform", "ci/cd"]):
+            return "technical"
+        # Cybersecurity
+        if any(token in value for token in ["cybersecurity", "security", "ethical hacking", "soc", "infosec", "penetration testing", "network"]):
+            return "technical"
+        # UI/UX design
+        if any(token in value for token in ["ui", "ux", "ui/ux", "user interface", "user experience", "design", "figma"]):
+            return "technical"
+        # Software engineering & technical tracks
+        if any(token in value for token in ["software", "development", "developer", "engineering", "coding", "frontend", "backend", "full stack", "web developer", "programmer", "technical", "tech"]):
+            return "technical"
         return None
 
-    return _classify(explicit_value) or _classify(fallback_value) or "technical"
+    classified = _classify(explicit_value) or _classify(fallback_value)
+    if classified:
+        return classified
+    # If the user's explicit interest was specified but didn't match technical/data/management keywords,
+    # do NOT forcibly default to "technical" which produces false "mismatch" warnings!
+    return "general"
 
 
 def _normalize_course_group(value: Any) -> str:
@@ -187,12 +222,15 @@ def _normalize_course_group(value: Any) -> str:
     return "general"
 
 
-def _normalize_cgpa(value: Any) -> float:
+def _normalize_cgpa(value: Any, score_type: str = "cgpa_10") -> float:
     numeric = _safe_float(value, float("nan"))
     if numeric != numeric:
         return numeric
-    if numeric > 10:
+    st = str(score_type or "cgpa_10").lower().strip()
+    if st in {"percentage", "percent", "%"} or numeric > 10.0:
         numeric = numeric / 10.0
+    elif st in {"gpa_4", "gpa_4.0", "gpa", "4", "4.0"} or (0.0 < numeric <= 4.0 and st not in {"percentage", "percent", "%"}):
+        numeric = (numeric / 4.0) * 10.0
     return _clamp(numeric, 0.0, 10.0)
 
 
@@ -270,16 +308,27 @@ def _cgpa_penalty_factor(normalized: dict[str, Any], path_class: str = "") -> fl
     if cgpa != cgpa:
         return 1.0
 
+    # Industry hiring for experienced professionals (>= 2 years) is driven by work experience, not college CGPA
+    experience_years = float(normalized.get("experience_years", 0.0) or 0.0)
+    if experience_years >= 2.0:
+        return 1.0
+
     technical_paths = {"data_science", "data_engineering", "software_development", "cloud_devops", "cybersecurity", "ui_ux_design"}
     management_paths = {"product_management", "marketing", "consulting", "finance"}
 
+    # For 1-2 years experience, halve the CGPA penalty
+    penalty_multiplier = 0.5 if experience_years >= 1.0 else 1.0
+
     if cgpa < 5.0:
-        return 0.68 if path_class in technical_paths else 0.78 if path_class in management_paths else 0.72
-    if cgpa < 6.0:
-        return 0.8 if path_class in technical_paths else 0.88 if path_class in management_paths else 0.84
-    if cgpa < 7.0:
-        return 0.92 if path_class in technical_paths else 0.96 if path_class in management_paths else 0.94
-    return 1.0
+        base_penalty = 0.68 if path_class in technical_paths else 0.78 if path_class in management_paths else 0.72
+    elif cgpa < 6.0:
+        base_penalty = 0.8 if path_class in technical_paths else 0.88 if path_class in management_paths else 0.84
+    elif cgpa < 7.0:
+        base_penalty = 0.92 if path_class in technical_paths else 0.96 if path_class in management_paths else 0.94
+    else:
+        return 1.0
+
+    return 1.0 - ((1.0 - base_penalty) * penalty_multiplier)
 
 
 def _path_affinity_adjustment(normalized: dict[str, Any], path_class: str, path_profile: dict[str, Any] | None = None) -> float:
@@ -385,12 +434,13 @@ def _path_evidence_probabilities(
         class_name: _path_evidence_score(normalized, class_name, path_profiles.get(class_name, {}))
         for class_name in class_order
     }
-    sharpened_scores = {class_name: raw_scores[class_name] ** 2 for class_name in class_order}
-    total = sum(sharpened_scores.values())
-    if total <= 0:
-        uniform = 1.0 / max(len(class_order), 1)
-        return ({class_name: uniform for class_name in class_order}, raw_scores)
-    return ({class_name: sharpened_scores[class_name] / total for class_name in class_order}, raw_scores)
+    # Path-level evidence fit probability: measures evidence strength directly for each path [0.05 - 0.98]
+    # rather than dividing by the sum of all 10 paths which artificially deflates fit to 0.15-0.25!
+    evidence_probabilities = {
+        class_name: float(_clamp(raw_scores[class_name] / 12.0, 0.05, 0.98))
+        for class_name in class_order
+    }
+    return (evidence_probabilities, raw_scores)
 
 
 def _pick_desired_path_from_interest(
@@ -735,50 +785,32 @@ def _calibrate_final_score(normalized: dict[str, Any], probability: float) -> fl
     cgpa = float(normalized.get("cgpa", 0.0) or 0.0)
     project_count = int(normalized.get("project_count", 0) or 0)
     skill_count = int(normalized.get("skill_count", 0) or 0)
+    experience_years = float(normalized.get("experience_years", 0.0) or 0.0)
 
     # Base score from model
     score = float(probability) * 100.0
 
     # Calibration rules
-    if cgpa >= 8.0:
-        score += 5.0
-    elif cgpa < 6.0:
-        score -= 10.0
-    elif cgpa < 7.0:
-        score -= 5.0
+    # For experienced candidates (>= 2 years), industry work experience takes precedence over college CGPA
+    if experience_years >= 2.0:
+        if experience_years >= 5.0:
+            score += 8.0
+        elif experience_years >= 3.0:
+            score += 5.0
+        else:
+            score += 3.0
+    else:
+        if cgpa >= 8.0:
+            score += 5.0
+        elif cgpa < 6.0:
+            score -= 10.0
+        elif cgpa < 7.0:
+            score -= 5.0
 
-    if project_count < 2:
+    if project_count < 2 and experience_years < 1.0:
         score -= 4.0
     if skill_count < 3:
         score -= 5.0
-
-    return round(_clamp(score, 0.0, 100.0), 1)
-
-def _OLD_calibrate_final_score(normalized: dict[str, Any], probability: float) -> float:
-    """
-    Convert model probability into a presentation score and adjust it using
-    profile-strength heuristics so the user-facing score better matches hiring reality.
-    """
-    cgpa = float(normalized.get("cgpa", 0.0) or 0.0)
-    project_count = int(normalized.get("project_count", 0) or 0)
-    skill_count = int(normalized.get("skill_count", 0) or 0)
-
-    score = float(probability) * 100.0
-
-    if cgpa >= 8.5:
-        score += 5.0
-    elif cgpa < 5.0:
-        score -= 18.0
-    elif cgpa < 6.0:
-        score -= 10.0
-    elif cgpa < 7.0:
-        score -= 4.0
-    if project_count >= 2:
-        score += 5.0
-    if skill_count >= 3:
-        score += 5.0
-    if skill_count < 4:
-        score -= 3.0
 
     return round(_clamp(score, 0.0, 100.0), 1)
 
@@ -790,16 +822,19 @@ def _rule_based_risks(normalized: dict[str, Any], existing_risks: list[str] | No
     skill_count = int(normalized.get("skill_count", 0) or 0)
     certification_count = int(normalized.get("certification_count", 0) or 0)
     internship_count = len(normalized.get("internships") or [])
+    experience_years = float(normalized.get("experience_years", 0.0) or 0.0)
 
-    if cgpa == cgpa and cgpa < 5.0:
-        risks.append("Low CGPA is a major screening risk for many roles")
-    elif cgpa == cgpa and cgpa < 6.0:
-        risks.append("CGPA is below the preferred range for many shortlist filters")
+    # College CGPA risk applies to fresh graduates and entry-level candidates (< 2 years exp)
+    if experience_years < 2.0:
+        if cgpa == cgpa and cgpa < 5.0:
+            risks.append("Low CGPA is a major screening risk for many roles")
+        elif cgpa == cgpa and cgpa < 6.0:
+            risks.append("CGPA is below the preferred range for many shortlist filters")
     if skill_count < 5:
         risks.append("Skill depth is below top-tier profiles")
     if certification_count == 0:
         risks.append("No certifications or external validation")
-    if internship_count == 0:
+    if internship_count == 0 and experience_years < 1.0:
         risks.append("Lack of real-world experience")
     if not risks:
         risks.append("Profile still needs stronger proof against top-tier competition")
@@ -847,8 +882,19 @@ def normalize_career_input(data: dict[str, Any]) -> dict[str, Any]:
     if internships and exp_val == 0.0:
         exp_val = max(0.5 * len(internships), 0.5)
 
+    score_type = str(data.get("score_type") or "cgpa_10").lower().strip()
+    raw_val = data.get("raw_score")
+    if raw_val is None:
+        raw_val = data.get("cgpa")
+    cgpa_raw = _safe_float(data.get("cgpa", float("nan")), float("nan"))
+    if 0.0 < cgpa_raw <= 4.0 and score_type not in {"percentage", "percent", "%"}:
+        score_type = "gpa_4"
+    normalized_cgpa = _normalize_cgpa(cgpa_raw, score_type=score_type)
+
     return {
-        "cgpa": _normalize_cgpa(data.get("cgpa", float("nan"))),
+        "cgpa": normalized_cgpa,
+        "score_type": score_type,
+        "raw_score": _safe_float(raw_val, normalized_cgpa),
         "skills": skills,
         "expanded_skills": expanded_skills,
         "projects": projects,
@@ -961,9 +1007,12 @@ def _comparison_frame(normalized: dict[str, Any], option_text: str = "") -> pd.D
         " ".join(interest_terms),
         normalized["raw_prompt"],
     ]).strip()
+    exp_years = float(normalized.get("experience_years", 0.0) or 0.0)
+    if exp_years <= 0.0:
+        exp_years = float(max(normalized["project_count"] - 1, 0))
     return pd.DataFrame([{
         "text": text,
-        "experience_years": max(normalized["project_count"] - 1, 0),
+        "experience_years": exp_years,
         "skills_count": normalized["skill_count"],
         "certifications": normalized["certification_count"],
         "salary": 0.0,
@@ -1025,10 +1074,7 @@ def _contextualize_factor_impacts(
     option_scores: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     human_shap = [dict(item) for item in model_result.get("human_shap", [])]
-    if not option_scores:
-        return human_shap
-
-    top_option = option_scores[0]
+    top_option = option_scores[0] if option_scores else {"name": "target track", "mapped_class": "general", "mapped_label": "target track"}
     target_path = _path_display_name(top_option)
     target_class = _path_class(top_option)
     aligned_interest = _path_aligned_interest(target_class)
@@ -1108,95 +1154,111 @@ def _contextualize_factor_impacts(
         factor = impact.get("factor")
         shap_value = float(impact.get("shap_value", 0.0))
         strength = "Strongly" if abs(shap_value) > 0.05 else "Slightly"
+        is_positive = shap_value > 0.005
+        is_negative = shap_value < -0.005
 
-        if factor == "Interest area" and aligned_interest:
-            is_positive = normalized.get("interest_domain") == aligned_interest
-            impact["impact"] = f"{strength} {'boosts' if is_positive else 'holds back'}"
+        if factor == "Interest area":
             current_interest = normalized.get("interest_domain", "")
             if is_positive:
+                impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"interest area={current_interest} aligns with {target_path}"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"interest area={current_interest} provides less positive signal for {target_path}"
             else:
-                impact["reason"] = f"interest area={current_interest} is less aligned with {target_path}"
-            impact["shap_value"] = round(abs(shap_value) if is_positive else -abs(shap_value), 4)
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"interest area={current_interest} has a neutral influence on the recommendation"
         elif factor == "Degree group":
             current_group = normalized.get("course_group", "")
-            is_positive = current_group in degree_groups if degree_groups else shap_value > 0
-            impact["impact"] = f"{strength} {'boosts' if is_positive else 'holds back'}"
             if is_positive:
+                impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"degree group={current_group} fits the background commonly associated with {target_path}"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"degree group={current_group} is less aligned with the standard background for {target_path}"
             else:
-                impact["reason"] = f"degree group={current_group} is less aligned with the usual background for {target_path}"
-            impact["shap_value"] = round(abs(shap_value) if is_positive else -abs(shap_value), 4)
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"degree group={current_group} is neutral for this recommendation"
         elif factor == "Specialization group":
-            current_group = normalized.get("specialization_group", "")
-            specialization_is_data = "data science" in raw_specialization and target_class in {"data_science", "data_engineering"}
-            is_positive = specialization_is_data or (current_group in specialization_groups if specialization_groups else shap_value > 0)
-            impact["impact"] = f"{strength} {'boosts' if is_positive else 'holds back'}"
-            current_label = normalized.get("specialization") or current_group
+            current_label = normalized.get("specialization") or normalized.get("specialization_group", "")
             if is_positive:
+                impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"specialization={current_label} supports the {target_path} track"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"specialization={current_label} provides less direct support for the {target_path} track"
             else:
-                impact["reason"] = f"specialization={current_label} is less aligned with the {target_path} track"
-            impact["shap_value"] = round(abs(shap_value) if is_positive else -abs(shap_value), 4)
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"specialization={current_label} has a neutral influence"
         elif factor == "Certification count":
             cert_count = int(normalized.get("certification_count", 0) or 0)
-            if cert_count <= 2:
-                impact["impact"] = "Neutral"
-                impact["reason"] = f"certification count={cert_count} is useful supporting evidence, but it is mostly neutral unless the count becomes much higher"
-                impact["shap_value"] = 0.0
-            elif cert_count >= 4:
+            if is_positive:
                 impact["impact"] = f"{strength} boosts"
-                impact["reason"] = f"certification count={cert_count} adds stronger proof of structured learning for {target_path}"
-                impact["shap_value"] = round(abs(shap_value), 4)
+                impact["reason"] = f"certification count={cert_count} adds verified proof of structured learning for {target_path}"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"certification count={cert_count} offers fewer external credentials for {target_path}"
+            else:
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"certification count={cert_count} has a neutral impact in the current model evaluation"
         elif factor == "CGPA":
             cgpa = float(normalized.get("cgpa", 0.0) or 0.0)
-            is_positive = cgpa >= 7.5
-            impact["impact"] = f"{strength} {'boosts' if is_positive else 'holds back'}"
             if is_positive:
-                impact["reason"] = f"CGPA {cgpa:.1f} is comfortably strong for {target_path} and helps with early screening"
+                impact["impact"] = f"{strength} boosts"
+                impact["reason"] = f"CGPA {cgpa:.1f} contributes positively to your profile evaluation for {target_path}"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"CGPA {cgpa:.1f} holds back the prediction score relative to benchmark candidates"
             else:
-                impact["reason"] = f"CGPA {cgpa:.1f} is still below the stronger shortlist range for {target_path}"
-            impact["shap_value"] = round(abs(shap_value) if is_positive else -abs(shap_value), 4)
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"CGPA {cgpa:.1f} has an approximately neutral contribution to the prediction"
         elif factor == "Skill count":
             skill_count = int(normalized.get("skill_count", 0) or 0)
-            technical_targets = {"software_development", "data_science", "data_engineering", "cloud_devops", "cybersecurity", "ui_ux_design"}
-            if target_class in technical_targets:
-                is_positive = skill_count >= 5
-                impact["impact"] = f"{strength} {'boosts' if is_positive else 'holds back'}"
-                if is_positive:
-                    impact["reason"] = f"skill count={skill_count} provides solid breadth for {target_path}"
-                else:
-                    impact["reason"] = f"skill count={skill_count} is still below the stronger profile range for {target_path}"
-                impact["shap_value"] = round(abs(shap_value) if is_positive else -abs(shap_value), 4)
+            if is_positive:
+                impact["impact"] = f"{strength} boosts"
+                impact["reason"] = f"skill count={skill_count} provides solid breadth for {target_path}"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"skill count={skill_count} is still below the stronger profile range for {target_path}"
+            else:
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"skill count={skill_count} has a neutral influence"
         elif factor == "Project count":
             project_count = int(normalized.get("project_count", 0) or 0)
-            is_positive = project_count >= 2
-            impact["impact"] = f"{strength} {'boosts' if is_positive else 'holds back'}"
             if is_positive:
+                impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"project count={project_count} gives better execution proof for {target_path}"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"project count={project_count} is below the level where successful profiles show clear execution proof"
             else:
-                impact["reason"] = f"project count={project_count} is below the level where successful profiles usually show clearer execution proof"
-            impact["shap_value"] = round(abs(shap_value) if is_positive else -abs(shap_value), 4)
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"project count={project_count} has a neutral influence"
         elif factor == "Internship count":
             internship_count = len(normalized.get("internships") or [])
-            is_positive = internship_count >= 1
-            impact["impact"] = f"{strength} {'boosts' if is_positive else 'holds back'}"
-            impact["reason"] = (
-                f"internship count={internship_count} adds real-world proof that strengthens {target_path}"
-                if is_positive else
-                f"internship count={internship_count} means the profile still lacks real-world validation for {target_path}"
-            )
-            impact["shap_value"] = round(abs(shap_value) if is_positive else -abs(shap_value), 4)
+            if is_positive:
+                impact["impact"] = f"{strength} boosts"
+                impact["reason"] = f"internship count={internship_count} adds real-world proof that strengthens {target_path}"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"internship count={internship_count} means the profile lacks external industry validation for {target_path}"
+            else:
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"internship count={internship_count} has a neutral impact"
         elif factor == "Experience years":
             experience_years = float(normalized.get("experience_years", 0.0) or 0.0)
-            is_positive = experience_years >= 0.5
-            impact["impact"] = f"{strength} {'boosts' if is_positive else 'holds back'}"
-            impact["reason"] = (
-                f"you already show some real execution exposure ({experience_years:.1f} years equivalent)"
-                if is_positive else
-                "the profile is still mostly academic, so one internship or production-style project would strengthen credibility"
-            )
-            impact["shap_value"] = round(abs(shap_value) if is_positive else -abs(shap_value), 4)
+            if is_positive:
+                impact["impact"] = f"{strength} boosts"
+                impact["reason"] = f"work experience ({experience_years:.1f} years) provides verified industry execution for {target_path}"
+            elif is_negative:
+                impact["impact"] = f"{strength} holds back"
+                impact["reason"] = f"limited prior industry experience ({experience_years:.1f} years) holds back the score"
+            else:
+                impact["impact"] = "Neutral"
+                impact["reason"] = f"experience years ({experience_years:.1f} years) has a neutral contribution"
+
+        # Preserve the true mathematical SHAP value computed by the model!
+        impact["shap_value"] = round(shap_value, 4)
 
     return human_shap
 
@@ -1246,8 +1308,19 @@ def _profile_aliases(profile_key: str, profile: dict[str, Any]) -> list[str]:
     return [_clean_token(alias) for alias in aliases if _clean_text(alias)]
 
 
+OUT_OF_SCOPE_DISCIPLINES = {
+    "civil", "mechanical", "chemical", "aerospace", "biotech", "biotechnology",
+    "marine", "petroleum", "mining", "metallurg", "automobile", "textile",
+    "architecture", "agriculture", "medical", "dentistry", "pharmacy"
+}
+
+
 def _map_option_to_class(option: str, path_profiles: dict[str, dict[str, Any]]) -> tuple[str | None, float]:
     normalized_option = _clean_token(option)
+    # Prevent out-of-scope engineering disciplines from falsely matching "data_engineering" or "software"
+    if any(disc in normalized_option for disc in OUT_OF_SCOPE_DISCIPLINES):
+        return None, 0.0
+
     best_class = None
     best_score = 0.0
     for profile_key, profile in path_profiles.items():
@@ -1288,9 +1361,31 @@ def _dynamic_option_scores(normalized: dict[str, Any], readiness: float | None =
             if mapped_class and mapped_class in class_order and match_strength >= 0.72:
                 mapped_index = class_order.index(mapped_class)
                 probability = float(probabilities[mapped_index])
+                is_out_of_scope = False
             else:
-                probability = float(probabilities[predicted_index])
-                mapped_class = predicted_class
+                # Option is outside the 10 benchmarked career tracks - do NOT force-fit into software_dev or data_science!
+                mapped_class = "out_of_scope"
+                is_out_of_scope = True
+                probability = float(_clamp(readiness * 0.55, 0.1, 0.6))
+
+            if is_out_of_scope:
+                calibrated_probability = probability
+                calibrated_score = round(calibrated_probability * 100.0, 1)
+                scored.append({
+                    "name": option,
+                    "score": calibrated_score,
+                    "probability": round(calibrated_probability, 4),
+                    "raw_probability": round(probability, 4),
+                    "mapped_class": "out_of_scope",
+                    "mapped_label": f"{option} (Non-Benchmark Domain)",
+                    "is_out_of_scope": True,
+                    "out_of_scope_note": f"'{option}' is outside our 10 supported benchmark career tracks. Evaluation is an approximate domain estimate.",
+                    "path_profile": {},
+                    "evidence_probability": round(calibrated_probability, 4),
+                    "evidence_score": 0.0,
+                    "rank_probability": calibrated_probability,
+                })
+                continue
 
             calibrated_probability = _blend_probability(probability)
             calibrated_probability = _clamp(
@@ -1321,7 +1416,10 @@ def _dynamic_option_scores(normalized: dict[str, Any], readiness: float | None =
                 "raw_probability": round(probability, 4),
                 "mapped_class": mapped_class,
                 "mapped_label": spec_name,
-                "path_profile": path_profiles.get(mapped_class, {})
+                "path_profile": path_profiles.get(mapped_class, {}),
+                "evidence_probability": float(evidence_probabilities.get(mapped_class, calibrated_probability)),
+                "evidence_score": float(evidence_raw_scores.get(mapped_class, 0.0)),
+                "rank_probability": calibrated_probability,
             })
     else:
         # Auto-generate top paths
@@ -1358,27 +1456,42 @@ def _dynamic_option_scores(normalized: dict[str, Any], readiness: float | None =
                 "raw_probability": round(raw_probability, 4),
                 "mapped_class": class_name,
                 "mapped_label": spec_name,
-                "path_profile": path_profiles.get(class_name, {})
+                "path_profile": path_profiles.get(class_name, {}),
+                "evidence_probability": float(evidence_probabilities.get(class_name, calibrated_probability)),
+                "evidence_score": float(evidence_raw_scores.get(class_name, 0.0)),
+                "rank_probability": calibrated_probability,
             })
 
     if scored:
-        model_leader = max(scored, key=lambda item: item.get("rank_probability", item.get("probability", 0)))
-        evidence_leader = max(scored, key=lambda item: item.get("evidence_score", 0))
-        strong_evidence_conflict = (
-            evidence_leader["mapped_class"] != model_leader["mapped_class"]
-            and evidence_leader.get("evidence_score", 0) >= 3.0
-            and evidence_leader.get("evidence_score", 0) >= model_leader.get("evidence_score", 0) + 2.0
-        )
-        rank_weight = 0.35 if strong_evidence_conflict else 0.7
-        evidence_weight = 1.0 - rank_weight
-        for item in scored:
-            final_probability = _clamp(
-                item.get("rank_probability", item["probability"]) * rank_weight + item.get("evidence_probability", 0) * evidence_weight,
-                0.02,
-                0.98,
+        in_scope_items = [item for item in scored if not item.get("is_out_of_scope")]
+        if in_scope_items:
+            model_leader = max(in_scope_items, key=lambda item: item.get("rank_probability", item.get("probability", 0)))
+            evidence_leader = max(in_scope_items, key=lambda item: item.get("evidence_score", 0))
+            strong_evidence_conflict = (
+                evidence_leader["mapped_class"] != model_leader["mapped_class"]
+                and evidence_leader.get("evidence_score", 0) >= 3.0
+                and evidence_leader.get("evidence_score", 0) >= model_leader.get("evidence_score", 0) + 2.0
             )
+        else:
+            strong_evidence_conflict = False
+
+        for item in scored:
+            if item.get("is_out_of_scope"):
+                continue
+            rank_prob = item.get("rank_probability", item["probability"])
+            ev_prob = item.get("evidence_probability", rank_prob)
+            ev_score = item.get("evidence_score", 0.0)
+
+            if strong_evidence_conflict:
+                final_probability = _clamp(rank_prob * 0.45 + ev_prob * 0.55, 0.02, 0.98)
+            else:
+                # If path has concrete evidence, blend gently without deflating; otherwise retain rank probability
+                if ev_score > 0:
+                    final_probability = _clamp(rank_prob * 0.80 + ev_prob * 0.20, 0.02, 0.98)
+                else:
+                    final_probability = rank_prob
+
             item["probability"] = round(final_probability, 4)
-            # Ensure even the blended score is calibrated
             item["score"] = _calibrate_final_score(normalized, final_probability)
 
 
@@ -1617,12 +1730,12 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
     action_plan = _dynamic_action_plan(normalized, model_result, option_scores)
     what_if_text, rerun_score = _pure_model_what_if(normalized, model_result)
     
-    top_probability = option_scores[0]["score"] / 100.0 if option_scores else readiness
-    score = _calibrate_final_score(normalized, top_probability)
+    # Candidate overall placement readiness score derived from profile factors (CGPA, projects, certs, skills, exp)
+    overall_score = _calibrate_final_score(normalized, readiness)
+    top_path_score = option_scores[0]["score"] if option_scores else overall_score
+    top_path_probability = option_scores[0]["probability"] if option_scores else round(readiness, 4)
     
-    # ENSURE ALIGNMENT: Profile Score must equal Top Path Match %
-    if option_scores:
-        score = option_scores[0]["score"]
+    score = overall_score
     
     confidence = _career_confidence(normalized, option_scores, score)
     skill_strength = _skill_strength_label(int(normalized.get("skill_count", 0) or 0))
@@ -1642,9 +1755,12 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
     
     result = {
         "decision": best_option,
-        "probability": round(top_probability, 4),
+        "probability": round(readiness, 4),
         "readiness_probability": round(readiness, 4),
-        "score": score,
+        "top_path_probability": top_path_probability,
+        "score": overall_score,
+        "readiness_score": overall_score,
+        "top_path_score": top_path_score,
         "confidence": confidence,
         "insights": insights,
         "risks": risks,
@@ -1781,11 +1897,6 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
         result["next_step"] = result["action_plan"][0] if result["action_plan"] else ""
         result["details"] = dict(result.get("details") or {})
         result["details"]["action_plan_source"] = "ollama"
-
-    # FORCED ALIGNMENT: Overall Score MUST match Top Path Match %
-    if option_scores:
-        result["score"] = option_scores[0]["score"]
-        result["probability"] = option_scores[0]["probability"]
 
     return result
 

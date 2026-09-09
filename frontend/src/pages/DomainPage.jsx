@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import {
   submitCareer,
   submitCareerPrompt,
@@ -8,9 +8,13 @@ import {
   submitStartupPrompt,
   submitPolicy,
   downloadPdf,
+  saveDecision,
 } from '../api'
 import DecisionReport from '../components/DecisionReport'
 import InsightPanel from '../components/InsightPanel'
+import CompareModal from '../components/CompareModal'
+import { useAuth } from '../components/AuthContext'
+
 
 const domainConfig = {
   career: {
@@ -22,7 +26,7 @@ const domainConfig = {
       'मेरी CGPA 7.8 है, skills Python SQL हैं, data science ke liye roadmap batao',
     ],
     fields: [
-      { name: 'cgpa', label: 'CGPA', type: 'number', min: 0, max: 10, required: true },
+      { name: 'cgpa', label: 'Academic Score', type: 'number', min: 0, max: 10, required: true },
       { name: 'course', label: 'Course / Degree', type: 'text', required: true },
       { name: 'specialization', label: 'Specialization', type: 'text' },
       { name: 'education_level', label: 'Education Level', type: 'text' },
@@ -86,6 +90,159 @@ const domainConfig = {
   },
 }
 
+const INDUSTRY_PRESETS = {
+  career: [
+    {
+      label: 'AI Systems Engineer',
+      desc: 'PyTorch, vLLM, Agentic Workflows',
+      icon: '🤖',
+      data: {
+        cgpa: 8.7,
+        course: 'B.Tech CSE',
+        specialization: 'Artificial Intelligence',
+        education_level: 'Undergraduate',
+        year_of_study: 4,
+        skills: ['Python', 'PyTorch', 'LangChain', 'vLLM', 'Docker', 'FastAPI'],
+        certifications: ['DeepLearning.AI GenAI', 'AWS Machine Learning'],
+        projects: ['Autonomous Multi-Agent RAG', 'Local LLM Inference Engine'],
+        interest: 'ai engineer',
+      },
+    },
+    {
+      label: 'Cloud & DevOps Architect',
+      desc: 'Kubernetes, Terraform, CI/CD pipelines',
+      icon: '☁️',
+      data: {
+        cgpa: 8.2,
+        course: 'B.Tech IT',
+        specialization: 'Cloud Infrastructure',
+        education_level: 'Undergraduate',
+        year_of_study: 4,
+        skills: ['Kubernetes', 'Docker', 'Terraform', 'Python', 'Go', 'AWS'],
+        certifications: ['CKA Kubernetes', 'AWS Solutions Architect'],
+        projects: ['Zero-Downtime Microservices Cluster', 'MLOps Model CI/CD'],
+        interest: 'cloud devops',
+      },
+    },
+    {
+      label: 'Technical Product Manager',
+      desc: 'Agile execution, SQL, PRD roadmaps',
+      icon: '📊',
+      data: {
+        cgpa: 7.9,
+        course: 'B.Tech + Minor MBA',
+        specialization: 'Product & Analytics',
+        education_level: 'Undergraduate',
+        year_of_study: 4,
+        skills: ['Product Strategy', 'SQL', 'Mixpanel', 'Figma', 'Agile', 'Scrum'],
+        certifications: ['Certified Scrum Product Owner (CSPO)'],
+        projects: ['SaaS Growth Funnel Audit', 'B2B User Onboarding Redesign'],
+        interest: 'product management',
+      },
+    },
+  ],
+  finance: [
+    {
+      label: 'Prime Mortgage Applicant',
+      desc: 'High credit score, healthy leverage',
+      icon: '🏡',
+      data: {
+        income: 95000,
+        loan: 180000,
+        credit_score: 760,
+      },
+    },
+    {
+      label: 'High-Risk Consolidation',
+      desc: 'Sub-prime credit, high debt ratio',
+      icon: '⚠️',
+      data: {
+        income: 42000,
+        loan: 38000,
+        credit_score: 590,
+      },
+    },
+    {
+      label: 'Commercial Business Credit',
+      desc: 'Working capital financing request',
+      icon: '💼',
+      data: {
+        income: 140000,
+        loan: 65000,
+        credit_score: 715,
+      },
+    },
+  ],
+  startup: [
+    {
+      label: 'Pre-Seed Generative AI',
+      desc: 'Angel-backed B2B AI copilot team',
+      icon: '🚀',
+      data: {
+        funding: 250000,
+        team_size: 4,
+        market: 'Enterprise B2B AI',
+        experience: 3.5,
+      },
+    },
+    {
+      label: 'Bootstrapped Fintech Engine',
+      desc: 'Lean, capital-efficient settlement app',
+      icon: '💳',
+      data: {
+        funding: 75000,
+        team_size: 2,
+        market: 'Payments & Settlement',
+        experience: 6,
+      },
+    },
+    {
+      label: 'Series-A HealthTech Scaleup',
+      desc: 'Clinical traction, expanding engineering',
+      icon: '🏥',
+      data: {
+        funding: 1600000,
+        team_size: 15,
+        market: 'Healthcare Diagnostics',
+        experience: 8,
+      },
+    },
+  ],
+  policy: [
+    {
+      label: 'Clean Energy Grid Expansion',
+      desc: 'Municipal renewable energy subsidy',
+      icon: '⚡',
+      data: {
+        sector: 'Renewable Energy',
+        budget: 8000000,
+        population: 650000,
+      },
+    },
+    {
+      label: 'Rural Healthcare Network',
+      desc: 'Primary medical distribution scheme',
+      icon: '🩺',
+      data: {
+        sector: 'Healthcare',
+        budget: 3500000,
+        population: 1200000,
+      },
+    },
+    {
+      label: 'Smart Urban Transit Fleet',
+      desc: 'Electric bus and metro corridors',
+      icon: '🚌',
+      data: {
+        sector: 'Transportation',
+        budget: 15000000,
+        population: 2800000,
+      },
+    },
+  ],
+}
+
+
 const sectionBreaks = '(?=\\b(?:cgpa|gpa|skills?|expertise|projects?|interest|certifications?|course|degree|specialization|education level|year of study|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people)\\b|$)'
 
 const splitItems = (value) => {
@@ -145,7 +302,19 @@ const parseFreeText = (domain, text) => {
 
   switch (domain) {
     case 'career': {
-      const cgpa = pickNumber(extractNumber(text, ['cgpa', 'gpa']), Number(commaParts[0])) ?? null
+      let cgpa = null
+      let scoreType = 'cgpa_10'
+      const match4 = text.match(/(\d+(?:\.\d+)?)\s*(?:\/|out of)\s*4(?:\.0)?\b/i)
+      const matchPct = text.match(/(?:percentage|percent|%)\s*[:=]?\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*(?:%|percent\b)/i)
+      if (match4) {
+        cgpa = parseFloat(match4[1])
+        scoreType = 'gpa_4'
+      } else if (matchPct) {
+        cgpa = parseFloat(matchPct[1] || matchPct[2])
+        scoreType = 'percentage'
+      } else {
+        cgpa = pickNumber(extractNumber(text, ['cgpa', 'gpa']), Number(commaParts[0])) ?? null
+      }
       const course = extractSection(text, ['course', 'degree']) || commaParts[1] || ''
       const specialization = extractSection(text, ['specialization']) || ''
       const educationLevel = extractSection(text, ['education level']) || ''
@@ -160,6 +329,8 @@ const parseFreeText = (domain, text) => {
 
       return {
         cgpa,
+        score_type: scoreType,
+        raw_score: cgpa,
         course,
         specialization,
         education_level: educationLevel,
@@ -228,8 +399,12 @@ const getRangeForField = (domain, name, value) => {
 
 export default function DomainPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { domain } = useParams()
+  const { token, refreshUser } = useAuth()
   const config = domainConfig[domain]
+  const presets = INDUSTRY_PRESETS[domain] || []
+
   const resultRef = useRef(null)
   const liveUpdateTimerRef = useRef(null)
   const [mode, setMode] = useState('structured')
@@ -243,10 +418,37 @@ export default function DomainPage() {
   const [liveUpdating, setLiveUpdating] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
+  // Workspace & Save state
+  const [saveModalOpen, setSaveModalOpen] = useState(false)
+  const [saveTitle, setSaveTitle] = useState('')
+  const [saveNotes, setSaveNotes] = useState('')
+  const [saveTags, setSaveTags] = useState('')
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+
+  // A/B Comparison Baseline state
+  const [baselineItem, setBaselineItem] = useState(null)
+  const [isCompareOpen, setIsCompareOpen] = useState(false)
+
   const numericSliderFields = useMemo(
     () => (config?.fields || []).filter((field) => field.type === 'number'),
     [config],
   )
+
+  // Restore preloaded state if navigated from Saved Projects workspace
+  useEffect(() => {
+    if (location.state?.preloadedInput) {
+      setInput(location.state.preloadedInput)
+      syncInteractiveInput(location.state.preloadedInput)
+      if (location.state.preloadedOutput) {
+        setResult(location.state.preloadedOutput)
+        setIsSidebarCollapsed(true)
+      }
+      if (location.state.preloadedTitle) {
+        setSaveTitle(location.state.preloadedTitle)
+      }
+    }
+  }, [location.state])
 
   useEffect(() => {
     if (!result || !resultRef.current) return
@@ -279,6 +481,20 @@ export default function DomainPage() {
         else value = ''
       }
       if (field.type === 'number') value = parseOptionalNumber(value)
+      if (domain === 'career' && field.name === 'cgpa') {
+        const st = rawInput?.score_type || 'cgpa_10'
+        let norm = value
+        if (value !== null) {
+          if (st === 'percentage' || value > 10.0) norm = Math.min(10, Math.max(0, value / 10.0))
+          else if (st === 'gpa_4') norm = Math.min(10, Math.max(0, (value / 4.0) * 10.0))
+          else norm = Math.min(10, Math.max(0, value))
+          norm = Number(norm.toFixed(2))
+        }
+        payload.cgpa = norm
+        payload.raw_score = value
+        payload.score_type = st
+        continue
+      }
       if (domain === 'finance' && field.name === 'credit_score' && value !== null) value = clamp(value, 300, 850)
       if (domain === 'finance' && (field.name === 'income' || field.name === 'loan') && value !== null) value = Math.max(0, value)
       if (field.name === 'skills' || field.name === 'projects' || field.name === 'certifications') {
@@ -297,6 +513,16 @@ export default function DomainPage() {
         const empty = Array.isArray(value) ? value.length === 0 : value === null || value === undefined || value === ''
         if (empty) nextErrors[field.name] = `${field.label} is required.`
       }
+      if (domain === 'career' && field.name === 'cgpa') {
+        const rawVal = payload.raw_score ?? value
+        const st = payload.score_type || 'cgpa_10'
+        if (rawVal !== null && rawVal !== undefined) {
+          if (st === 'percentage' && (rawVal < 0 || rawVal > 100)) nextErrors.cgpa = 'Percentage must be between 0 and 100.'
+          else if (st === 'gpa_4' && (rawVal < 0 || rawVal > 4.0)) nextErrors.cgpa = 'GPA must be between 0 and 4.0.'
+          else if (st === 'cgpa_10' && (rawVal < 0 || rawVal > 10.0)) nextErrors.cgpa = 'CGPA must be between 0 and 10.0.'
+        }
+        continue
+      }
       if (field.type === 'number' && value !== null) {
         if (field.min !== undefined && value < field.min) nextErrors[field.name] = `${field.label} should be at least ${field.min}.`
         if (field.max !== undefined && value > field.max) nextErrors[field.name] = `${field.label} should be at most ${field.max}.`
@@ -311,6 +537,10 @@ export default function DomainPage() {
     const next = {}
     for (const field of config.fields) {
       next[field.name] = payload?.[field.name] ?? ''
+    }
+    if (domain === 'career') {
+      next.score_type = payload?.score_type || 'cgpa_10'
+      if (payload?.raw_score !== undefined && payload?.raw_score !== null) next.cgpa = payload.raw_score
     }
     setInteractiveInput(next)
   }
@@ -406,6 +636,66 @@ export default function DomainPage() {
     }, 350)
   }
 
+  const handleApplyPreset = (preset) => {
+    setInput(preset.data)
+    syncInteractiveInput(preset.data)
+    setMode('structured')
+    setFieldErrors({})
+    runAnalysis(preset.data)
+  }
+
+  const handleSaveDecision = async (e) => {
+    e.preventDefault()
+    if (!result) return
+    setSaveLoading(true)
+    try {
+      const score = Math.round(result.score || (result.probability ? result.probability * 100 : 0))
+      const verdict = result.score_label || result.decision || 'Evaluated'
+      const titleToSave = saveTitle.trim() || `${config.title} Analysis - Score ${score}`
+      
+      await saveDecision({
+        domain,
+        title: titleToSave,
+        notes: saveNotes.trim(),
+        tags: saveTags.trim() || domain,
+        input_payload: resultInput || input,
+        output_payload: result,
+        score,
+        verdict,
+      }, token)
+
+      setSaveSuccess(true)
+      if (refreshUser) refreshUser()
+      setTimeout(() => {
+        setSaveSuccess(false)
+        setSaveModalOpen(false)
+      }, 1400)
+    } catch (err) {
+      alert(err.message || 'Failed to save decision to workspace')
+    } finally {
+      setSaveLoading(false)
+    }
+  }
+
+  const handleSetBaseline = () => {
+    if (!result) return
+    const score = Math.round(result.score || (result.probability ? result.probability * 100 : 0))
+    setBaselineItem({
+      id: 'baseline',
+      title: `${config.title} Baseline (Score ${score})`,
+      domain,
+      score,
+      verdict: result.score_label || result.decision || 'Baseline Run',
+      output_payload: result,
+    })
+  }
+
+  const handleOpenComparison = () => {
+    if (!baselineItem || !result) return
+    setIsCompareOpen(true)
+  }
+
+
   const hasComparisonResult = Boolean(
     result && (
       result.mode === 'comparison'
@@ -417,6 +707,102 @@ export default function DomainPage() {
   )
 
   const resultInput = interactiveInput || (mode === 'free' ? (result?.parsed_input || input) : input)
+
+  const renderField = (field, isModifyPanel = false) => {
+    const isWide = ['skills', 'projects', 'certifications'].includes(field.name)
+    if (domain === 'career' && field.name === 'cgpa') {
+      const currentScoreType = input.score_type || 'cgpa_10'
+      const rawVal = input.cgpa ?? ''
+      const numVal = parseFloat(rawVal)
+      let normVal = null
+      if (!isNaN(numVal)) {
+        if (currentScoreType === 'percentage' || numVal > 10) normVal = (numVal / 10).toFixed(1)
+        else if (currentScoreType === 'gpa_4') normVal = ((numVal / 4) * 10).toFixed(1)
+        else normVal = numVal.toFixed(1)
+      }
+      return (
+        <div key="cgpa" className="flex flex-col col-span-1">
+          <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+            <span>Academic Score</span>
+            <span className="text-rose-500 text-[10px] font-semibold lowercase">required</span>
+          </label>
+          <div className="flex rounded-xl border border-slate-200 bg-slate-50/60 overflow-hidden focus-within:border-sky-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-sky-100 transition-all">
+            <select
+              value={currentScoreType}
+              onChange={(e) => {
+                onFieldChange('score_type', e.target.value)
+                setFieldErrors((prev) => ({ ...prev, cgpa: undefined }))
+              }}
+              className="bg-slate-100/90 text-xs font-bold text-slate-700 px-2.5 py-2 border-r border-slate-200 outline-none cursor-pointer hover:bg-slate-200/70 transition"
+            >
+              <option value="cgpa_10">CGPA (10 Scale)</option>
+              <option value="gpa_4">GPA (4.0 Scale)</option>
+              <option value="percentage">Percentage (%)</option>
+            </select>
+            <input
+              type="number"
+              min={0}
+              max={currentScoreType === 'percentage' ? 100 : currentScoreType === 'gpa_4' ? 4 : 10}
+              step={currentScoreType === 'percentage' ? '0.1' : '0.01'}
+              value={rawVal}
+              onChange={(e) => onFieldChange('cgpa', e.target.value)}
+              placeholder={
+                currentScoreType === 'percentage'
+                  ? 'e.g. 82'
+                  : currentScoreType === 'gpa_4'
+                  ? 'e.g. 3.6'
+                  : 'e.g. 8.5'
+              }
+              className="w-full bg-transparent px-3 py-2 text-sm text-slate-800 outline-none"
+            />
+          </div>
+          {normVal !== null && currentScoreType !== 'cgpa_10' && (
+            <span className="text-[11px] text-sky-600 font-semibold mt-1">
+              ✨ Auto-converted: {normVal} / 10.0 for ML evaluation
+            </span>
+          )}
+          {fieldErrors.cgpa && (
+            <span className="text-xs text-rose-600 mt-1 font-medium">{fieldErrors.cgpa}</span>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div
+        key={field.name}
+        className={`flex flex-col ${isWide && config.fields.length > 4 ? 'md:col-span-2 lg:col-span-1' : 'col-span-1'}`}
+      >
+        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+          <span>{field.label}</span>
+          {field.required && (
+            <span className="text-rose-500 text-[10px] font-semibold lowercase">required</span>
+          )}
+        </label>
+        <input
+          type={field.type}
+          min={field.min}
+          max={field.max}
+          step={field.type === 'number' ? 'any' : undefined}
+          value={Array.isArray(input[field.name]) ? input[field.name].join(', ') : (input[field.name] ?? '')}
+          onChange={(e) => onFieldChange(field.name, e.target.value)}
+          placeholder={
+            field.type === 'number'
+              ? (field.min !== undefined ? `e.g. ${field.min}` : '0')
+              : `Enter ${field.label.toLowerCase()}`
+          }
+          className={`w-full rounded-xl border ${isModifyPanel ? 'bg-slate-50/50' : 'bg-slate-50/60'} px-3.5 py-2 text-sm text-slate-800 outline-none transition-all duration-200 focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100 ${
+            fieldErrors[field.name]
+              ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-100'
+              : 'border-slate-200 hover:border-slate-300'
+          }`}
+        />
+        {fieldErrors[field.name] && (
+          <span className="text-xs text-rose-600 mt-1 font-medium">{fieldErrors[field.name]}</span>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="px-4 py-4 sm:px-6 md:p-8 bg-slate-50/50 min-h-screen">
@@ -466,7 +852,7 @@ export default function DomainPage() {
               </button>
             )}
             <div className="flex items-center gap-3 bg-white border border-slate-200/80 rounded-xl p-2 pr-4 shadow-sm">
-              <img src="/logo.jpeg" alt="DeciXAI logo" className="h-10 w-10 rounded-xl object-cover border border-slate-100" />
+      <img src="/logo.jpeg" alt="DeciXAI logo" className="h-10 w-10 rounded-xl object-cover border border-slate-100" />
               <div>
                 <div className="text-base font-bold text-slate-900 leading-none">DeciXAI Engine</div>
                 <div className="text-[12px] uppercase tracking-wider text-slate-400 font-bold mt-0.5">English + Hindi friendly</div>
@@ -475,186 +861,452 @@ export default function DomainPage() {
           </div>
         </div>
 
-        {/* Two-Column Responsive Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-          {/* Left Panel: Control Center (col-span-3 when open, hidden when collapsed) */}
-          {!isSidebarCollapsed && (
-            <div className="md:col-span-3 space-y-4 animate-fade-in">
-              <div className="glass-panel p-5 rounded-2xl space-y-5">
-                <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
-                  <h2 className="text-base font-bold uppercase tracking-wider text-slate-400">Control Center</h2>
-                  <span className="h-2 w-2 rounded-full bg-sky-400 animate-pulse"></span>
-                </div>
-
-                {/* Segmented slider tab for Input Mode Selection */}
-                <div>
-                  <span className="text-[13px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">Input Mode</span>
-                  <div className="relative flex rounded-xl bg-slate-100 p-1">
+        {/* Studio Form & Results Dashboard Layout */}
+        {!result ? (
+          /* Initial State: Wide, Zero-Scroll 3-Column Studio Form */
+          <div className="py-2 animate-fade-in">
+            <div className="glass-panel rounded-3xl border border-slate-200/90 bg-white/95 shadow-xl p-6 md:p-8 max-w-5xl mx-auto space-y-6">
+              
+              {/* Top Controls: Mode Switcher & 1-Click Presets */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-500">Mode:</span>
+                  <div className="inline-flex rounded-xl bg-slate-100 p-1">
                     <button
                       type="button"
                       onClick={() => setMode('structured')}
-                      className={`flex-1 rounded-lg py-1.5 text-base font-bold transition-all duration-300 ${mode === 'structured' ? 'bg-white text-slate-950 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-900'}`}
+                      className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all duration-200 ${
+                        mode === 'structured'
+                          ? 'bg-white text-slate-900 shadow-sm scale-[1.02]'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
                     >
-                      Structured Input
+                      🎛️ Structured Form
                     </button>
                     <button
                       type="button"
                       onClick={() => setMode('free')}
-                      className={`flex-1 rounded-lg py-1.5 text-base font-bold transition-all duration-300 ${mode === 'free' ? 'bg-white text-slate-950 shadow-md scale-[1.02]' : 'text-slate-500 hover:text-slate-900'}`}
+                      className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all duration-200 ${
+                        mode === 'free'
+                          ? 'bg-white text-slate-900 shadow-sm scale-[1.02]'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
                     >
-                      Free-text Prompt
+                      ✍️ AI Free-Text Prompt
                     </button>
                   </div>
                 </div>
 
-                {/* Compact Example Prompts Badges */}
-                <div className="space-y-2">
-                  <span className="text-[13px] font-bold uppercase tracking-wider text-slate-400 block">Example Prompts</span>
-                  <div className="flex flex-col gap-2">
+                {/* 1-Click Presets (Horizontal Chips) */}
+                {presets.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">
+                      ⚡ 1-Click Presets:
+                    </span>
+                    {presets.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleApplyPreset(preset)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all shadow-sm active:scale-95 cursor-pointer"
+                      >
+                        <span>{preset.icon}</span>
+                        <span>{preset.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Form Body: Multi-column clean grid (No scrolling needed!) */}
+              <form onSubmit={submit} className="space-y-6">
+                {mode === 'structured' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {config.fields.map((field) => renderField(field, false))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <label className="text-xs font-bold text-slate-600 uppercase tracking-wider block">
+                      Describe your scenario in plain English or Hindi:
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={textPrompt}
+                      onChange={(e) => setTextPrompt(e.target.value)}
+                      placeholder={config.freeTextExample}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-800 outline-none transition-all duration-200 focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100 resize-none leading-relaxed"
+                    />
+                  </div>
+                )}
+
+                {/* Action & Submit Row */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-slate-100">
+                  {/* Example prompt pills */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                    <span className="font-extrabold text-slate-400 uppercase tracking-wider text-[11px] mr-1">
+                      💬 Try:
+                    </span>
                     {config.examples.map((example) => (
                       <button
                         key={example}
                         type="button"
                         onClick={() => handleExampleClick(example)}
-                        className="text-left text-[14px] leading-relaxed text-slate-600 bg-white/60 hover:bg-white border border-slate-200/60 hover:border-sky-400 rounded-xl px-3 py-2.5 transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+                        className="inline-flex items-center rounded-lg bg-slate-100 hover:bg-sky-50 border border-slate-200/70 hover:border-sky-300 px-2.5 py-1 text-xs text-slate-600 hover:text-sky-700 transition truncate max-w-xs cursor-pointer"
+                        title={example}
                       >
                         {example}
                       </button>
                     ))}
                   </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full sm:w-auto rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold uppercase tracking-wider text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-lg hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span>Analyzing Decision...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🚀</span>
+                        <span>Analyze Decision with DeciXAI</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {error && (
+                <div className="rounded-xl bg-rose-50 border border-rose-100 p-3.5 text-sm text-rose-700 mt-4 flex items-center gap-2">
+                  <span>⚠️</span>
+                  <span>{error}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Evaluated State: Full-Width Decision Dashboard + Collapsible Top Input Panel */
+          <div className="space-y-6">
+            {/* Collapsible Input Modification Panel (when user clicks 'Modify Inputs') */}
+            {!isSidebarCollapsed && (
+              <div className="animate-fade-in glass-panel rounded-3xl border border-sky-200 bg-white/95 p-6 shadow-xl mb-6">
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-800">
+                      Modify Decision Inputs
+                    </h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarCollapsed(true)}
+                    className="text-xs font-bold text-slate-400 hover:text-slate-700 transition flex items-center gap-1"
+                  >
+                    <span>✕</span>
+                    <span>Close Panel</span>
+                  </button>
                 </div>
 
-                {/* Form Input fields */}
-                <form onSubmit={submit} className="space-y-4 pt-1">
-                  {mode === 'structured' ? (
-                    <div className="space-y-3">
-                      {config.fields.map((field) => (
-                        <div key={field.name} className="flex flex-col">
-                          <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-                            {field.label} {field.required && <span className="text-red-500">*</span>}
-                          </label>
-                          <input
-                            type={field.type}
-                            min={field.min}
-                            max={field.max}
-                            step={field.type === 'number' ? 'any' : undefined}
-                            value={Array.isArray(input[field.name]) ? input[field.name].join(', ') : (input[field.name] ?? '')}
-                            onChange={(e) => onFieldChange(field.name, e.target.value)}
-                            className={`w-full rounded-xl border bg-white/80 px-3.5 py-2 text-base outline-none transition-all duration-300 focus:border-sky-500 focus:bg-white focus:shadow-[0_0_0_3px_rgba(14,165,233,0.12)] ${fieldErrors[field.name] ? 'border-rose-300 focus:border-rose-500 focus:shadow-[0_0_0_3px_rgba(244,63,94,0.12)]' : 'border-slate-200'}`}
-                          />
-                          {fieldErrors[field.name] && <span className="text-[13px] text-rose-600 mt-1">{fieldErrors[field.name]}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col">
-                      <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider mb-1">Prompt</label>
-                      <textarea
-                        rows={4}
-                        value={textPrompt}
-                        onChange={(e) => setTextPrompt(e.target.value)}
-                        placeholder={config.freeTextExample}
-                        className="w-full rounded-xl border border-slate-200 bg-white/80 p-3 text-base outline-none transition-all duration-300 focus:border-sky-500 focus:bg-white focus:shadow-[0_0_0_3px_rgba(14,165,233,0.12)] resize-none"
-                      />
-                    </div>
-                  )}
+                {/* 1-Click Presets inside modify panel */}
+                {presets.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 mb-5">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                      ⚡ Quick Presets:
+                    </span>
+                    {presets.map((preset, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleApplyPreset(preset)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-slate-700 hover:border-sky-400 hover:bg-sky-50 hover:text-sky-700 transition-all shadow-sm active:scale-95 cursor-pointer"
+                      >
+                        <span>{preset.icon}</span>
+                        <span>{preset.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
-                  <div className="pt-2">
+                {/* Form fields in 3 columns */}
+                <form onSubmit={submit} className="space-y-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {config.fields.map((field) => renderField(field, true))}
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsSidebarCollapsed(true)}
+                      className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-600 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
                     <button
                       type="submit"
-                      className="w-full rounded-xl bg-slate-955 py-2.5 text-base font-bold uppercase tracking-wider text-white transition-all duration-300 hover:bg-slate-900 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 shadow-[0_4px_12px_rgba(15,23,42,0.15)] hover:shadow-[0_6px_18px_rgba(15,23,42,0.22)] bg-slate-950"
                       disabled={loading}
+                      className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition shadow-md shadow-blue-500/20 disabled:opacity-50 flex items-center gap-2"
                     >
-                      {loading ? (
-                        <>
-                          <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Analyzing...
-                        </>
-                      ) : 'Analyze Decision'}
+                      {loading ? 'Re-analyzing...' : 'Update Decision Analysis 🚀'}
                     </button>
-                    <div className="text-[13px] text-slate-400 text-center mt-2.5 leading-relaxed font-bold">
-                      {liveUpdating ? 'Refreshing what-if output...' : 'Results refresh dynamically via live sliders.'}
-                    </div>
                   </div>
                 </form>
-
-                {error && (
-                  <div className="rounded-xl bg-rose-50 border border-rose-100 p-3 text-base text-rose-700 mt-2">
-                    {error}
-                  </div>
-                )}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Right Panel: Main Analysis & Output Board */}
-          <div className={isSidebarCollapsed ? 'md:col-span-12 w-full transition-all duration-300' : 'md:col-span-9 w-full transition-all duration-300'}>
-            {result ? (
-              <div ref={resultRef} className="scroll-mt-6 animate-fade-in">
-                {hasComparisonResult ? (
-                  <DecisionReport
-                    payload={result}
-                    interactiveFields={numericSliderFields.map((field) => ({
-                      ...field,
-                      range: getRangeForField(domain, field.name, resultInput?.[field.name]),
-                      value: resultInput?.[field.name],
-                    }))}
-                    onInteractiveChange={handleInteractiveChange}
-                    isLiveUpdating={liveUpdating}
-                    onRefresh={recalc}
-                    onDownload={() => downloadPdf(domain, result)}
-                  />
-                ) : (
-                  <InsightPanel
-                    result={result}
-                    domain={domain}
-                    title={`${config.title} decision`}
-                    subtitle={config.subtitle}
-                    input={resultInput}
-                    interactiveFields={numericSliderFields.map((field) => ({
-                      ...field,
-                      range: getRangeForField(domain, field.name, resultInput?.[field.name]),
-                      value: resultInput?.[field.name],
-                    }))}
-                    onInteractiveChange={handleInteractiveChange}
-                    isLiveUpdating={liveUpdating}
-                    footerAction={(
-                      <div className="flex items-center gap-1.5">
-                        <button 
-                          onClick={() => downloadPdf(domain, result)} 
-                          className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white transition hover:bg-white/30"
-                        >
-                          PDF
-                        </button>
-                        <button 
-                          onClick={recalc} 
-                          className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white transition hover:bg-white/30"
-                        >
-                          Refresh
-                        </button>
-                      </div>
-                    )}
-                  />
-                )}
+            {/* Main Full-Width Results Dashboard */}
+            <div ref={resultRef} className="scroll-mt-6 animate-fade-in space-y-4">
+              
+              {/* Executive SaaS Action Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white/90 p-3 shadow-sm backdrop-blur-md">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-800">
+                    Evaluated Simulation Active
+                  </span>
+                  {baselineItem && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                      Baseline Pinned ({baselineItem.score} pts)
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Save to Workspace */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const score = Math.round(result?.score || (result?.probability ? result.probability * 100 : 0))
+                      setSaveTitle(`${config.title} - ${result?.decision || result?.score_label || 'Analysis'} (${score})`)
+                      setSaveModalOpen(true)
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-sky-700 shadow-sm transition hover:bg-sky-600 hover:text-white cursor-pointer"
+                  >
+                    <span>💾</span>
+                    <span>Save Dossier</span>
+                  </button>
+
+                  {/* Compare with Baseline */}
+                  {baselineItem ? (
+                    <button
+                      type="button"
+                      onClick={handleOpenComparison}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-amber-800 shadow-sm transition hover:bg-amber-500 hover:text-white cursor-pointer"
+                    >
+                      <span>⚡</span>
+                      <span>Compare Delta</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSetBaseline}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-sm transition hover:bg-slate-100 cursor-pointer"
+                      title="Pin this simulation as baseline to compare changes when adjusting sliders"
+                    >
+                      <span>📌</span>
+                      <span>Pin Baseline</span>
+                    </button>
+                  )}
+
+                  {/* PDF */}
+                  <button
+                    type="button"
+                    onClick={() => downloadPdf(domain, result)}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-sm transition hover:bg-slate-100 cursor-pointer"
+                  >
+                    <span>📄</span>
+                    <span>PDF</span>
+                  </button>
+
+                  {/* Recalculate */}
+                  <button
+                    type="button"
+                    onClick={recalc}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-sm transition hover:bg-slate-100 cursor-pointer"
+                  >
+                    <span>🔄</span>
+                    <span>Recalc</span>
+                  </button>
+                </div>
+              </div>
+
+              {hasComparisonResult ? (
+                <DecisionReport
+                  payload={result}
+                  interactiveFields={numericSliderFields.map((field) => ({
+                    ...field,
+                    range: getRangeForField(domain, field.name, resultInput?.[field.name]),
+                    value: resultInput?.[field.name],
+                  }))}
+                  onInteractiveChange={handleInteractiveChange}
+                  isLiveUpdating={liveUpdating}
+                  onRefresh={recalc}
+                  onDownload={() => downloadPdf(domain, result)}
+                />
+              ) : (
+                <InsightPanel
+                  result={result}
+                  domain={domain}
+                  title={`${config.title} decision`}
+                  subtitle={config.subtitle}
+                  input={resultInput}
+                  interactiveFields={numericSliderFields.map((field) => ({
+                    ...field,
+                    range: getRangeForField(domain, field.name, resultInput?.[field.name]),
+                    value: resultInput?.[field.name],
+                  }))}
+                  onInteractiveChange={handleInteractiveChange}
+                  isLiveUpdating={liveUpdating}
+                  footerAction={(
+                    <div className="flex items-center gap-1.5">
+                      <button 
+                        onClick={() => {
+                          const score = Math.round(result?.score || (result?.probability ? result.probability * 100 : 0))
+                          setSaveTitle(`${config.title} - ${result?.decision || result?.score_label || 'Analysis'} (${score})`)
+                          setSaveModalOpen(true)
+                        }}
+                        className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white transition hover:bg-white/30"
+                      >
+                        💾 Save
+                      </button>
+                      <button 
+                        onClick={() => downloadPdf(domain, result)} 
+                        className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white transition hover:bg-white/30"
+                      >
+                        PDF
+                      </button>
+                      <button 
+                        onClick={recalc} 
+                        className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white transition hover:bg-white/30"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  )}
+                />
+              )}
+            </div>
+          </div>
+        )}
+
+      {/* Save Decision Dossier Modal */}
+      {saveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-sky-600">Workspace Dossier</span>
+                <h3 className="text-xl font-black text-slate-900">Save Decision to Workspace</h3>
+              </div>
+              <button
+                onClick={() => setSaveModalOpen(false)}
+                className="rounded-full bg-slate-100 p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            {saveSuccess ? (
+              <div className="py-8 text-center animate-fadeIn">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-2xl text-emerald-600">
+                  ✓
+                </div>
+                <h4 className="mt-3 text-base font-black text-slate-900">Dossier Saved to Workspace!</h4>
+                <p className="mt-1 text-xs text-slate-500">You can reload, share, or compare this run anytime.</p>
+                <div className="mt-4 flex justify-center gap-2">
+                  <Link
+                    to="/dashboard/workspace"
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                  >
+                    Open Workspace →
+                  </Link>
+                </div>
               </div>
             ) : (
-              <div className="h-full min-h-[480px] flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-350 bg-white/50 backdrop-blur-sm p-8 text-center shadow-sm glass-panel-hover border-slate-300">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-500 mb-5 border border-sky-100/60 shadow-[0_4px_12px_rgba(14,165,233,0.1)]">
-                  <svg className="h-6 w-6 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
-                  </svg>
+              <form onSubmit={handleSaveDecision} className="mt-4 space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Dossier Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={saveTitle}
+                    onChange={(e) => setSaveTitle(e.target.value)}
+                    placeholder="e.g. Q3 Startup Funding Viability"
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  />
                 </div>
-                <h3 className="text-base font-extrabold text-slate-900 tracking-tight">Awaiting Decision Input</h3>
-                <p className="mt-2 text-base text-slate-500 max-w-md leading-relaxed">
-                  Configure the inputs in the control center on the left, select an example, or write a free-text prompt, then run analysis to inspect your decision signals and custom roadmap.
-                </p>
-              </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Notes & Hypothesis
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={saveNotes}
+                    onChange={(e) => setSaveNotes(e.target.value)}
+                    placeholder="e.g. Tested scenario with 8.5 CGPA and 2 internships"
+                    className="w-full rounded-xl border border-slate-200 p-2.5 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                    Tags (comma separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={saveTags}
+                    onChange={(e) => setSaveTags(e.target.value)}
+                    placeholder="e.g. Q3, AI, Bangalore, Target"
+                    className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-xs text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-100"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setSaveModalOpen(false)}
+                    className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saveLoading}
+                    className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-sky-600 disabled:opacity-50"
+                  >
+                    {saveLoading ? 'Saving...' : 'Save Dossier'}
+                  </button>
+                </div>
+              </form>
             )}
           </div>
         </div>
+      )}
+
+      {/* Baseline A/B Comparison Modal */}
+      {isCompareOpen && baselineItem && result && (
+        <CompareModal
+          itemA={baselineItem}
+          itemB={{
+            id: 'current',
+            title: `${config.title} - Current Variant`,
+            domain,
+            score: Math.round(result.score || (result.probability ? result.probability * 100 : 0)),
+            verdict: result.score_label || result.decision || 'Current Evaluation',
+            output_payload: result,
+          }}
+          onClose={() => setIsCompareOpen(false)}
+        />
+      )}
       </div>
     </div>
   )

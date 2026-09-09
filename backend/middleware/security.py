@@ -27,8 +27,11 @@ API_KEY = os.getenv("DECIXAI_API_KEY", "").strip()
 # Maximum request body size (bytes). Default: 1 MB.
 MAX_BODY_SIZE = int(os.getenv("MAX_REQUEST_BODY_BYTES", 1_048_576))
 
-# Paths that bypass authentication.
-PUBLIC_PATHS = {"/", "/docs", "/redoc", "/openapi.json", "/api/v1/health"}
+# Paths that bypass API key authentication.
+PUBLIC_PATHS = {
+    "/", "/docs", "/redoc", "/openapi.json", "/api/v1/health",
+    "/api/v1/auth/register", "/api/v1/auth/login",
+}
 
 
 class RequestTrackingMiddleware(BaseHTTPMiddleware):
@@ -62,24 +65,40 @@ class RequestTrackingMiddleware(BaseHTTPMiddleware):
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
     """
-    Optional API key gate. Disabled when DECIXAI_API_KEY is not set.
+    Optional API key gate. Supports master DECIXAI_API_KEY and user-generated dx_live_... keys.
     """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        if not API_KEY:
-            return await call_next(request)
-
-        if request.url.path in PUBLIC_PATHS or request.method == "OPTIONS":
+        # Allow OPTIONS and public paths
+        path = request.url.path
+        if (
+            path in PUBLIC_PATHS
+            or path.startswith("/api/v1/decisions/public/")
+            or path.startswith("/api/v1/auth/")
+            or request.method == "OPTIONS"
+        ):
             return await call_next(request)
 
         provided_key = (request.headers.get("X-API-Key") or "").strip()
-        if provided_key != API_KEY:
-            from fastapi.responses import JSONResponse
 
+        # If user provides a developer API key (dx_live_...)
+        if provided_key.startswith("dx_live_"):
+            from services.apikeys_service import verify_developer_api_key
+            verified = verify_developer_api_key(provided_key)
+            if verified:
+                request.state.developer_key = verified
+                return await call_next(request)
+
+        # If master API_KEY is set in environment
+        if API_KEY:
+            if provided_key == API_KEY:
+                return await call_next(request)
+            from fastapi.responses import JSONResponse
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Invalid or missing API key."},
             )
+
         return await call_next(request)
 
 

@@ -84,6 +84,8 @@ def create_user(email: str, name: str, password: str) -> dict | None:
                 "id": user_id,
                 "email": email.strip().lower(),
                 "name": name.strip(),
+                "tier": "free",
+                "credits_used": 0,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
     except sqlite3.IntegrityError:
@@ -98,7 +100,7 @@ def authenticate_user(email: str, password: str) -> dict | None:
     """
     with get_db() as db:
         cursor = db.execute(
-            "SELECT id, email, name, password_hash, created_at FROM users WHERE email = ?",
+            "SELECT id, email, name, password_hash, created_at, tier, credits_used FROM users WHERE email = ?",
             (email.strip().lower(),),
         )
         row = cursor.fetchone()
@@ -114,6 +116,8 @@ def authenticate_user(email: str, password: str) -> dict | None:
         "email": row[1],
         "name": row[2],
         "created_at": row[4],
+        "tier": row[5] if len(row) > 5 and row[5] else "free",
+        "credits_used": row[6] if len(row) > 6 and row[6] is not None else 0,
     }
 
 
@@ -121,7 +125,7 @@ def get_user_by_id(user_id: int) -> dict | None:
     """Fetch a user by their ID."""
     with get_db() as db:
         cursor = db.execute(
-            "SELECT id, email, name, created_at FROM users WHERE id = ?",
+            "SELECT id, email, name, created_at, tier, credits_used FROM users WHERE id = ?",
             (user_id,),
         )
         row = cursor.fetchone()
@@ -134,4 +138,25 @@ def get_user_by_id(user_id: int) -> dict | None:
         "email": row[1],
         "name": row[2],
         "created_at": row[3],
+        "tier": row[4] if len(row) > 4 and row[4] else "free",
+        "credits_used": row[5] if len(row) > 5 and row[5] is not None else 0,
     }
+
+
+def update_user_tier(user_id: int, tier: str) -> bool:
+    """Upgrade or switch user tier (free, pro, enterprise)."""
+    with get_db() as db:
+        cursor = db.execute("UPDATE users SET tier = ? WHERE id = ?", (tier.lower(), user_id))
+        db.commit()
+        return cursor.rowcount > 0
+
+
+def increment_user_credits(user_id: int) -> int:
+    """Increment decision analysis credits used for user."""
+    with get_db() as db:
+        db.execute("UPDATE users SET credits_used = credits_used + 1 WHERE id = ?", (user_id,))
+        db.commit()
+        cursor = db.execute("SELECT credits_used FROM users WHERE id = ?", (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row else 0
+

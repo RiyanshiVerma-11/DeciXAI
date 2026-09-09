@@ -4,6 +4,9 @@ import DomainPage from './pages/DomainPage'
 import AuditTrail from './pages/AuditTrail'
 import LandingPage from './pages/LandingPage'
 import AuthPage from './pages/AuthPage'
+import SavedProjects from './pages/SavedProjects'
+import DeveloperHub from './pages/DeveloperHub'
+import PublicReport from './pages/PublicReport'
 import Chatbot from './components/Chatbot'
 import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -48,8 +51,10 @@ function DashboardShell() {
             <NavLink to="/dashboard/finance" className={getLinkClass}>Finance</NavLink>
             <NavLink to="/dashboard/startup" className={getLinkClass}>Startup</NavLink>
             <NavLink to="/dashboard/policy" className={getLinkClass}>Policy</NavLink>
+            <NavLink to="/dashboard/workspace" className={getLinkClass}>Workspace</NavLink>
+            <NavLink to="/dashboard/developer" className={getLinkClass}>Developer</NavLink>
             <NavLink to="/dashboard/audit" className={({ isActive }) => 
-              `ml-3 flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/50 px-3.5 py-1 text-xs font-semibold uppercase tracking-wider transition hover:bg-slate-100 hover:text-slate-900 ${
+              `ml-1 flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50/50 px-3 py-1 text-xs font-semibold uppercase tracking-wider transition hover:bg-slate-100 hover:text-slate-900 ${
                 isActive ? 'border-sky-300 bg-sky-50/50 text-sky-700 active-indicator-pulse' : 'text-slate-500'
               }`
             }>
@@ -65,6 +70,8 @@ function DashboardShell() {
 
       <Routes>
         <Route index element={<Home />} />
+        <Route path="workspace" element={<SavedProjects />} />
+        <Route path="developer" element={<DeveloperHub />} />
         <Route path="audit" element={<AuditTrail />} />
         <Route path=":domain" element={<DomainPage />} />
       </Routes>
@@ -81,6 +88,8 @@ export default function App() {
         {/* Public routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/share/:token" element={<PublicReport />} />
+        <Route path="/shared/:token" element={<PublicReport />} />
 
         {/* Protected dashboard routes */}
         <Route path="/dashboard/*" element={<DashboardLayout />} />
@@ -91,6 +100,8 @@ export default function App() {
         <Route path="/startup" element={<Navigate to="/dashboard/startup" replace />} />
         <Route path="/policy" element={<Navigate to="/dashboard/policy" replace />} />
         <Route path="/audit" element={<Navigate to="/dashboard/audit" replace />} />
+        <Route path="/workspace" element={<Navigate to="/dashboard/workspace" replace />} />
+        <Route path="/developer" element={<Navigate to="/dashboard/developer" replace />} />
 
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />

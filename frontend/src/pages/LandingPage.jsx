@@ -193,51 +193,77 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero Section - Compact gap below header */}
-      <section className="relative z-10 px-6 pt-10 pb-16 text-center">
-        <div className="mx-auto max-w-5xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 mb-6 shadow-sm">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
-            Decision Intelligence OS 2.0
-          </div>
+      {/* Hero Section - 2-Column Split: Content Left & App Logo Right */}
+      <section className="relative z-10 px-6 pt-8 pb-14 lg:pt-14 lg:pb-20">
+        <div className="mx-auto max-w-7xl">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+            
+            {/* Left Column: Headline, Description, CTAs, Trust Bar */}
+            <div className="lg:col-span-7 text-left">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-xs font-bold text-blue-700 mb-6 shadow-sm">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-ping" />
+                Decision Intelligence OS 2.0
+              </div>
 
-          <h1 className="text-4xl font-black leading-[1.15] tracking-tight md:text-6xl lg:text-7xl text-slate-950 font-sans">
-            Make decisions with
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent">
-              explainable confidence.
-            </span>
-          </h1>
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black leading-[1.12] tracking-tight text-slate-950 font-sans">
+                Make decisions with
+                <br />
+                <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 bg-clip-text text-transparent">
+                  explainable confidence.
+                </span>
+              </h1>
 
-          <p className="mx-auto mt-6 max-w-3xl text-sm md:text-base leading-relaxed text-slate-800 font-medium">
-            Stop treating AI predictions as black boxes. DeciXAI couples advanced ML prediction scoring with live SHAP explainability charts and integrated LLM advisory guidance in one unified SaaS workspace.
-          </p>
+              <p className="mt-6 max-w-xl text-sm sm:text-base leading-relaxed text-slate-700 font-medium">
+                Stop treating AI predictions as black boxes. DeciXAI couples advanced ML prediction scoring with live SHAP explainability charts and integrated LLM advisory guidance in one unified SaaS workspace.
+              </p>
 
-          <div className="mt-8 flex flex-col items-center gap-3.5 sm:flex-row sm:justify-center">
-            <button
-              onClick={handleGetStarted}
-              className="rounded-full bg-blue-600 hover:bg-blue-700 px-7 py-3.5 text-sm font-bold text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-lg w-full sm:w-auto"
-            >
-              Start For Free
-            </button>
-            <a
-              href="#demo"
-              className="rounded-full border border-slate-300 bg-white hover:bg-slate-50 px-7 py-3.5 text-sm font-bold text-slate-800 transition-all shadow-sm hover:shadow-md w-full sm:w-auto"
-            >
-              Interactive Demo
-            </a>
-          </div>
+              <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5">
+                <button
+                  onClick={handleGetStarted}
+                  className="rounded-full bg-blue-600 hover:bg-blue-700 px-7 py-3.5 text-sm font-bold text-white transition-all shadow-md shadow-blue-500/20 hover:shadow-lg hover:-translate-y-0.5 text-center cursor-pointer"
+                >
+                  Start For Free
+                </button>
+                <a
+                  href="#demo"
+                  className="rounded-full border border-slate-300 bg-white hover:bg-slate-50 px-7 py-3.5 text-sm font-bold text-slate-800 transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 text-center"
+                >
+                  Interactive Demo
+                </a>
+              </div>
 
-          {/* SaaS Trust Bar */}
-          <div className="mt-16 border-y border-slate-200 py-6">
-            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-4">TRUSTED BY BUILDERS AND DECISION MAKERS AT</p>
-            <div className="flex flex-wrap justify-center items-center gap-x-12 gap-y-4 text-slate-800 font-extrabold font-mono text-sm">
-              <span>STRIPE</span>
-              <span>VERCEL</span>
-              <span>LINEAR</span>
-              <span>RETOOL</span>
-              <span>SUPABASE</span>
+              {/* SaaS Trust Bar */}
+              <div className="mt-12 pt-6 border-t border-slate-200/90 max-w-xl">
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mb-3.5">
+                  TRUSTED BY BUILDERS AND DECISION MAKERS AT
+                </p>
+                <div className="flex flex-wrap items-center gap-x-8 gap-y-3 text-slate-700 font-extrabold font-mono text-xs sm:text-sm">
+                  <span className="hover:text-blue-600 transition-colors">STRIPE</span>
+                  <span className="hover:text-blue-600 transition-colors">VERCEL</span>
+                  <span className="hover:text-blue-600 transition-colors">LINEAR</span>
+                  <span className="hover:text-blue-600 transition-colors">RETOOL</span>
+                  <span className="hover:text-blue-600 transition-colors">SUPABASE</span>
+                </div>
+              </div>
             </div>
+
+            {/* Right Column: App Logo (Clean, No Extra Text) */}
+            <div className="lg:col-span-5 flex justify-center lg:justify-end">
+              <div className="relative w-full max-w-[380px]">
+                {/* Ambient glow behind logo */}
+                <div className="absolute -inset-3 rounded-3xl bg-gradient-to-tr from-blue-500/20 via-indigo-500/20 to-cyan-400/20 blur-2xl -z-10" />
+
+                {/* Clean Logo Container */}
+                <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xl transition-all duration-300 hover:shadow-blue-500/15">
+                  <img
+                    src="/logo.jpeg"
+                    alt="DeciXAI App Logo"
+                    className="w-full aspect-square object-cover rounded-2xl shadow-sm transition-transform duration-500 hover:scale-[1.02]"
+                  />
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>

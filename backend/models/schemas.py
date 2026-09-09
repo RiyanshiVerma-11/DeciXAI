@@ -6,7 +6,9 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class CareerInput(BaseModel):
-    cgpa: float = Field(..., ge=0.0, le=10.0, description="Cumulative Grade Point Average, bounded between 0.0 and 10.0")
+    cgpa: float = Field(..., ge=0.0, le=100.0, description="Academic score (CGPA bounded between 0.0 and 10.0, or Percentage up to 100)")
+    score_type: str | None = Field("cgpa_10", description="cgpa_10, gpa_4, or percentage")
+    raw_score: float | None = Field(None, description="Original user entered score before normalization")
     skills: list[str] = Field(default_factory=list)
     projects: list[str] = Field(default_factory=list)
     interest: str
@@ -148,6 +150,8 @@ class UserResponse(BaseModel):
     id: int
     email: str
     name: str
+    tier: str = "free"
+    credits_used: int = 0
     created_at: str | None = None
 
 
@@ -155,4 +159,79 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+# ---------------------------------------------------------------------------
+# Workspace & Decision Dossier schemas
+# ---------------------------------------------------------------------------
+
+
+class SaveDecisionInput(BaseModel):
+    domain: str = Field(..., description="Decision domain: career, finance, startup, policy")
+    title: str = Field(..., min_length=2, max_length=120, description="Title for this decision run")
+    notes: str = Field(default="", description="Optional user notes")
+    tags: str = Field(default="", description="Comma separated tags")
+    input_payload: dict[str, Any]
+    output_payload: dict[str, Any]
+    score: float
+    verdict: str = ""
+
+
+class UpdateDecisionInput(BaseModel):
+    title: str | None = None
+    notes: str | None = None
+    tags: str | None = None
+    is_public: bool | None = None
+
+
+class SavedDecisionResponse(BaseModel):
+    id: int
+    user_id: int
+    domain: str
+    title: str
+    notes: str = ""
+    tags: str = ""
+    input_payload: dict[str, Any]
+    output_payload: dict[str, Any]
+    score: float
+    verdict: str = ""
+    share_token: str | None = None
+    is_public: bool = False
+    created_at: str
+
+
+class PublicDecisionResponse(BaseModel):
+    domain: str
+    title: str
+    input_payload: dict[str, Any]
+    output_payload: dict[str, Any]
+    score: float
+    verdict: str = ""
+    created_at: str
+    verified: bool = True
+    audit_hash: str
+
+
+# ---------------------------------------------------------------------------
+# Developer API Key schemas
+# ---------------------------------------------------------------------------
+
+
+class CreateApiKeyInput(BaseModel):
+    name: str = Field(..., min_length=2, max_length=60, description="Friendly label for the API key")
+
+
+class ApiKeyResponse(BaseModel):
+    id: int
+    name: str
+    prefix: str
+    rate_limit: int
+    created_at: str
+    last_used_at: str | None = None
+    is_active: bool
+
+
+class CreatedApiKeyResponse(ApiKeyResponse):
+    secret_key: str
+
 

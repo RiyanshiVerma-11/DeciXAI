@@ -24,7 +24,7 @@ from middleware.security import (
 )
 from middleware.rate_limiter import RateLimitMiddleware
 from middleware.audit_logger import AuditLogMiddleware
-from routers import career, finance, startup, policy, chatbot, export, audit, auth
+from routers import career, finance, startup, policy, chatbot, export, audit, auth, decisions, apikeys
 from utils.app_logging import configure_logging, get_logger
 
 configure_logging()
@@ -82,6 +82,8 @@ app.add_middleware(BodySizeLimitMiddleware)
 # ---------------------------------------------------------------------------
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
+app.include_router(decisions.router, prefix="/api/v1/decisions", tags=["Decisions Workspace"])
+app.include_router(apikeys.router, prefix="/api/v1/keys", tags=["Developer API Keys"])
 app.include_router(career.router, prefix="/api/v1/career", tags=["Career"])
 app.include_router(finance.router, prefix="/api/v1/finance", tags=["Finance"])
 app.include_router(startup.router, prefix="/api/v1/startup", tags=["Startup"])

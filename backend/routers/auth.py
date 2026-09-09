@@ -102,3 +102,20 @@ async def get_me(authorization: str | None = Header(None)):
         raise HTTPException(status_code=404, detail="User not found")
 
     return UserResponse(**user)
+
+
+@router.post("/tier", response_model=UserResponse)
+async def change_tier(body: dict, authorization: str | None = Header(None)):
+    """Switch user subscription tier (simulated for product demo)."""
+    user_id = _get_current_user_id(authorization)
+    tier = body.get("tier", "pro").lower()
+    if tier not in ("free", "pro", "enterprise"):
+        raise HTTPException(status_code=400, detail="Invalid tier")
+
+    from services.auth_service import update_user_tier
+    update_user_tier(user_id, tier)
+    user = get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserResponse(**user)
+
