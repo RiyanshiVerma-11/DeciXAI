@@ -7,15 +7,26 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
+from dotenv import find_dotenv, load_dotenv
+load_dotenv(find_dotenv())
 
-RAW_OLLAMA_URL = os.getenv("OLLAMA_API_URL", "http://127.0.0.1:11434/v1/chat/completions")
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+RAW_OLLAMA_URL = (
+    os.getenv("GROQ_API_URL")
+    or os.getenv("LLM_API_URL")
+    or os.getenv("OLLAMA_API_URL", "https://api.groq.com/openai/v1/chat/completions" if GROQ_API_KEY else "http://127.0.0.1:11434/v1/chat/completions")
+)
 OLLAMA_URL = (
     RAW_OLLAMA_URL
     if urlparse(RAW_OLLAMA_URL).path not in {"", "/"}
     else urljoin(RAW_OLLAMA_URL.rstrip("/") + "/", "v1/chat/completions")
 )
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+OLLAMA_MODEL = (
+    os.getenv("GROQ_MODEL")
+    or os.getenv("LLM_MODEL")
+    or os.getenv("OLLAMA_MODEL", "openai/gpt-oss-20b" if GROQ_API_KEY else "llama3.1:8b")
+)
 
 
 def _ollama_request(messages: list[dict[str, str]], *, temperature: float = 0.4, num_predict: int = 220) -> Request:
@@ -29,7 +40,10 @@ def _ollama_request(messages: list[dict[str, str]], *, temperature: float = 0.4,
     else:
         payload["num_predict"] = num_predict
 
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
     if GROQ_API_KEY:
         headers["Authorization"] = f"Bearer {GROQ_API_KEY}"
 

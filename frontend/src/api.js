@@ -93,6 +93,28 @@ export const fetchCurrentUser = (token) => getJson('/api/v1/auth/me', token)
 
 export const submitCareer = (payload) => postJson('/api/v1/career/', payload)
 export const submitCareerPrompt = (payload) => postJson('/api/v1/career/parse', payload)
+export const uploadResume = async (file, targetRole = '') => {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (targetRole && targetRole.trim()) {
+    formData.append('target_role', targetRole.trim())
+  }
+  const res = await fetch(`${API_BASE}/api/v1/career/upload-resume`, {
+    method: 'POST',
+    body: formData,
+  })
+  const rawText = await res.text()
+  if (!res.ok) {
+    try {
+      const errJson = JSON.parse(rawText)
+      throw new Error(errJson.detail || `Upload failed with code ${res.status}`)
+    } catch (e) {
+      if (e.message && !e.message.startsWith('Upload failed')) throw e
+      throw new Error(`Upload error ${res.status}: ${rawText || res.statusText || 'Request failed'}`)
+    }
+  }
+  return JSON.parse(rawText)
+}
 export const submitFinance = (payload) => postJson('/api/v1/finance/', payload)
 export const submitStartup = (payload) => postJson('/api/v1/startup/', payload)
 export const submitStartupPrompt = (payload) => postJson('/api/v1/startup/parse', payload)

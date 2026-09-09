@@ -10,6 +10,9 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
+from dotenv import find_dotenv, load_dotenv
+load_dotenv(find_dotenv())
+
 from services.career_service import get_career_analysis_from_text
 from services.domain_classifier_service import build_chat_language_instruction, classify_domain
 from services.finance_service import get_finance_decision
@@ -17,16 +20,21 @@ from services.policy_service import get_policy_comparison, get_policy_decision
 from services.startup_service import get_startup_decision_from_text
 from utils.parse_prompt import parse_prompt
 
-raw_ollama_url = os.getenv('OLLAMA_API_URL', 'http://127.0.0.1:11434/v1/chat/completions')
-OLLAMA_URL = (
-    raw_ollama_url
-    if urlparse(raw_ollama_url).path not in {'', '/'}
-    else urljoin(raw_ollama_url.rstrip('/') + '/', 'v1/chat/completions')
-)
-OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3.1:8b')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+raw_llm_url = (
+    os.getenv('GROQ_API_URL')
+    or os.getenv('LLM_API_URL')
+    or os.getenv('OLLAMA_API_URL', 'https://api.groq.com/openai/v1/chat/completions' if GROQ_API_KEY else 'http://127.0.0.1:11434/v1/chat/completions')
+)
+OLLAMA_URL = (
+    raw_llm_url
+    if urlparse(raw_llm_url).path not in {'', '/'}
+    else urljoin(raw_llm_url.rstrip('/') + '/', 'v1/chat/completions')
+)
+OLLAMA_MODEL = os.getenv('GROQ_MODEL') or os.getenv('LLM_MODEL') or os.getenv('OLLAMA_MODEL', 'openai/gpt-oss-20b' if GROQ_API_KEY else 'llama3.1:8b')
+SERVICE_NAME = 'Groq' if (GROQ_API_KEY or 'groq' in OLLAMA_URL.lower()) else 'LLM'
 MAX_HISTORY = 10
-TIMEOUT_SECONDS = int(os.getenv('OLLAMA_TIMEOUT_SECONDS', '60'))
+TIMEOUT_SECONDS = int(os.getenv('GROQ_TIMEOUT_SECONDS') or os.getenv('OLLAMA_TIMEOUT_SECONDS', '60'))
 RETRY_ATTEMPTS = 2
 PROJECT_DOMAINS = ('career', 'finance', 'startup', 'policy')
 
@@ -486,9 +494,10 @@ def _read_streamed_response(response):
                 pass
 
 
-def _build_ollama_request(messages: list[dict[str, str]], stream: bool = False) -> Request:
+def _build_ollama_request(messages: list[dict[str, str]], stream: bool = False, model_override: str | None = None) -> Request:
+    active_model = model_override or OLLAMA_MODEL
     payload = {
-        'model': OLLAMA_MODEL,
+        'model': active_model,
         'messages': messages,
         'temperature': 0.7,
     }
@@ -496,11 +505,14 @@ def _build_ollama_request(messages: list[dict[str, str]], stream: bool = False) 
         payload['stream'] = True
 
     if GROQ_API_KEY:
-        payload['max_tokens'] = 512
+        payload['max_tokens'] = 768
     else:
         payload['num_predict'] = 512
 
-    headers = {'Content-Type': 'application/json'}
+    headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    }
     if GROQ_API_KEY:
         headers['Authorization'] = f'Bearer {GROQ_API_KEY}'
 
@@ -513,8 +525,8 @@ def _build_ollama_request(messages: list[dict[str, str]], stream: bool = False) 
 
 def _ollama_fallback_reply() -> str:
     return (
-        f"Chat model is unavailable right now. Check that Ollama is running and the model '{OLLAMA_MODEL}' is installed. "
-        "You can still ask career, finance, startup, or policy questions here and I'll answer from the app's decision logic."
+        "AI response service is currently initializing or rate-limited. "
+        "You can still ask career, finance, startup, or policy questions here and I'll evaluate them using our XAI decision engine."
     )
 
 
@@ -527,6 +539,12 @@ def _friendly_ollama_error(error: RuntimeError) -> str:
         'empty response',
         'connection refused',
         'http 500',
+        'http 403',
+        'http 400',
+        'http 404',
+        'http 401',
+        '1010',
+        'model_decommissioned',
     )
     if any(marker in lowered for marker in unstable_markers):
         return _ollama_fallback_reply()
@@ -549,31 +567,31 @@ def _call_ollama_chat_once(
                 data = json.loads(raw)
                 content = _extract_chat_content(data).strip()
                 if not content:
-                    raise ValueError('No response returned from Ollama.')
+                    raise ValueError(f'No response returned from {SERVICE_NAME}.')
                 return content
         except HTTPError as exc:
             attempt += 1
             try:
                 error_body = exc.read().decode('utf-8')
-                error_msg = f'Ollama HTTP {exc.code}: {error_body}'
+                error_msg = f'{SERVICE_NAME} HTTP {exc.code}: {error_body}'
             except Exception:
-                error_msg = f'Ollama HTTP {exc.code}: {exc.reason}'
+                error_msg = f'{SERVICE_NAME} HTTP {exc.code}: {exc.reason}'
 
             if attempt >= RETRY_ATTEMPTS:
                 raise RuntimeError(error_msg) from exc
         except URLError as exc:
             attempt += 1
             if attempt >= RETRY_ATTEMPTS:
-                raise RuntimeError(f'Cannot reach Ollama at {OLLAMA_URL}. Is Ollama running?') from exc
+                raise RuntimeError(f'Cannot reach {SERVICE_NAME} at {OLLAMA_URL}. Is the service running?') from exc
         except TimeoutError as exc:
             attempt += 1
             if attempt >= RETRY_ATTEMPTS:
                 raise RuntimeError(
-                    f'Ollama timed out after {TIMEOUT_SECONDS} seconds at {OLLAMA_URL}. '
+                    f'{SERVICE_NAME} timed out after {TIMEOUT_SECONDS} seconds at {OLLAMA_URL}. '
                     'The model may still be loading or responding too slowly.'
                 ) from exc
         except (ValueError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f'Ollama request failed: {exc}') from exc
+            raise RuntimeError(f'{SERVICE_NAME} request failed: {exc}') from exc
 
 
 def _stream_ollama_chat(messages: list[dict[str, str]]):
@@ -588,31 +606,31 @@ def _stream_ollama_chat(messages: list[dict[str, str]]):
                     yielded = True
                     yield delta
                 if not yielded:
-                    yield 'I received an empty response from Ollama.'
+                    yield f'I received an empty response from {SERVICE_NAME}.'
                 return
         except HTTPError as exc:
             attempt += 1
             try:
                 error_body = exc.read().decode('utf-8')
-                error_msg = f'Ollama HTTP {exc.code}: {error_body}'
+                error_msg = f'{SERVICE_NAME} HTTP {exc.code}: {error_body}'
             except Exception:
-                error_msg = f'Ollama HTTP {exc.code}: {exc.reason}'
+                error_msg = f'{SERVICE_NAME} HTTP {exc.code}: {exc.reason}'
 
             if attempt >= RETRY_ATTEMPTS:
                 raise RuntimeError(error_msg) from exc
         except URLError as exc:
             attempt += 1
             if attempt >= RETRY_ATTEMPTS:
-                raise RuntimeError(f'Cannot reach Ollama at {OLLAMA_URL}. Is Ollama running?') from exc
+                raise RuntimeError(f'Cannot reach {SERVICE_NAME} at {OLLAMA_URL}. Is the service running?') from exc
         except TimeoutError as exc:
             attempt += 1
             if attempt >= RETRY_ATTEMPTS:
                 raise RuntimeError(
-                    f'Ollama timed out after {TIMEOUT_SECONDS} seconds at {OLLAMA_URL}. '
+                    f'{SERVICE_NAME} timed out after {TIMEOUT_SECONDS} seconds at {OLLAMA_URL}. '
                     'The model may still be loading or responding too slowly.'
                 ) from exc
         except (ValueError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f'Ollama request failed: {exc}') from exc
+            raise RuntimeError(f'{SERVICE_NAME} request failed: {exc}') from exc
 
 
 def _error_stream(message: str):

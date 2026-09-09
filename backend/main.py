@@ -36,7 +36,7 @@ logger = get_logger(__name__)
 
 ALLOWED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:5173").split(",")
     if origin.strip()
 ]
 
@@ -159,27 +159,28 @@ async def startup_event():
     status = get_model_status()
     logger.info("ml_models_loaded status=%s", status)
 
-    # 2. Warm up Ollama (LLM)
-    # We send a tiny empty prompt to trigger VRAM loading on the host Ollama instance.
+    # 2. Warm up LLM (Groq / OpenAI / Local)
     import httpx
-    ollama_url = os.getenv("OLLAMA_API_URL")
     api_key = os.getenv("GROQ_API_KEY")
-    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-    if ollama_url:
+    llm_url = os.getenv("GROQ_API_URL") or os.getenv("LLM_API_URL") or os.getenv("OLLAMA_API_URL")
+    model = os.getenv("GROQ_MODEL") or os.getenv("LLM_MODEL") or os.getenv("OLLAMA_MODEL", "openai/gpt-oss-20b")
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    if llm_url:
         try:
             async with httpx.AsyncClient() as client:
-                # Just a heartbeat/warmup request
                 await client.post(
-                    ollama_url,
-                    json={"model": os.getenv("OLLAMA_MODEL", "llama3"), "messages": [{"role": "user", "content": "hi"}], "stream": False},
+                    llm_url,
+                    json={"model": model, "messages": [{"role": "user", "content": "hi"}], "stream": False},
                     headers=headers,
-                    timeout=1.0 # Short timeout, we just want to kick the process
+                    timeout=2.0
                 )
             logger.info("llm_warmup_triggered success=true")
         except Exception:
-            # We don't want to block startup if Ollama is unreachable, 
-            # as it might be started later or handled by host.
-            logger.warning("llm_warmup_triggered success=false reason=ollama_unreachable")
+            logger.info("llm_warmup_skipped")
 
 
 @app.on_event("shutdown")
@@ -212,3 +213,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
             "request_id": request_id,
         },
     )
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("BACKEND_PORT", "8002"))
+    host = os.getenv("BACKEND_HOST", "0.0.0.0")
+    uvicorn.run("main:app", host=host, port=port, reload=True)
+

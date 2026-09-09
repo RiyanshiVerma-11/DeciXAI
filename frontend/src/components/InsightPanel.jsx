@@ -578,12 +578,27 @@ function RoadmapBlock({ title, items, tone = 'slate' }) {
   return (
     <div className={`rounded-xl border p-3 ${tones[tone] || tones.slate}`}>
       <span className="text-[12px] uppercase tracking-wider text-slate-400 font-bold block mb-1.5">{title}</span>
-      <div className="space-y-1">
-        {(items || []).slice(0, 3).map((item, index) => (
-          <div key={index} className="rounded-lg bg-white border border-slate-100 px-2 py-1 text-[13px] font-bold text-slate-700 shadow-sm" title={item}>
-            {item}
-          </div>
-        ))}
+      <div className="space-y-1.5">
+        {(items || []).slice(0, 3).map((item, index) => {
+          const isObj = typeof item === 'object' && item !== null
+          const itemText = isObj ? item.title || item.name || JSON.stringify(item) : String(item)
+          return (
+            <div key={index} className="rounded-lg bg-white border border-slate-100 p-2 text-xs text-slate-700 shadow-sm" title={itemText}>
+              <div className="font-bold text-slate-900">{itemText}</div>
+              {isObj && item.problem && (
+                <div className="mt-1 text-[11px] text-slate-500">
+                  <span className="font-semibold text-slate-600">Problem:</span> {item.problem}
+                </div>
+              )}
+              {isObj && (item.stack || item.impact) && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {item.stack && <span className="bg-sky-50 text-sky-700 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">{item.stack}</span>}
+                  {item.impact && <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold">{item.impact}</span>}
+                </div>
+              )}
+            </div>
+          )
+        })}
         {!(items || []).length && <span className="text-[12px] text-slate-400 font-bold">None detected</span>}
       </div>
     </div>
@@ -611,7 +626,7 @@ function DualRoadmapCard({ intel }) {
       {Array.isArray(intel.difference) && intel.difference.length > 0 && (
         <div className="mb-3 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 text-[14px] text-slate-600 leading-normal">
           {intel.difference.slice(0, 2).map((line, index) => (
-            <div key={index}>{line}</div>
+            <div key={index}>{typeof line === 'object' && line !== null ? JSON.stringify(line) : String(line)}</div>
           ))}
         </div>
       )}

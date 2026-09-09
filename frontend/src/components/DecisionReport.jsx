@@ -221,11 +221,14 @@ function RoadmapCard({ eyebrow, title, alignment, roadmap, tone = 'slate' }) {
           <div className="rounded-lg border border-slate-100 bg-slate-50/30 p-2">
             <span className="text-[12px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Skills to add</span>
             <div className="flex flex-wrap gap-1">
-              {(roadmap?.skills_to_add || []).slice(0, 4).map((item) => (
-                <span key={item} className="rounded bg-white border border-slate-100 px-1 py-0.5 text-[12px] font-bold text-slate-600">
-                  {item}
-                </span>
-              ))}
+              {(roadmap?.skills_to_add || []).slice(0, 4).map((item, idx) => {
+                const text = typeof item === 'object' && item !== null ? item.name || item.title || JSON.stringify(item) : String(item)
+                return (
+                  <span key={idx} className="rounded bg-white border border-slate-100 px-1 py-0.5 text-[12px] font-bold text-slate-600">
+                    {text}
+                  </span>
+                )
+              })}
               {!(roadmap?.skills_to_add || []).length && <span className="text-[12px] text-slate-400">None</span>}
             </div>
           </div>
@@ -234,11 +237,14 @@ function RoadmapCard({ eyebrow, title, alignment, roadmap, tone = 'slate' }) {
           <div className="rounded-lg border border-slate-100 bg-slate-50/30 p-2">
             <span className="text-[12px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Certifications</span>
             <div className="space-y-1">
-              {(roadmap?.certifications || []).slice(0, 2).map((item, index) => (
-                <div key={index} className="text-[12px] font-bold text-slate-700" title={item}>
-                  &bull; {item}
-                </div>
-              ))}
+              {(roadmap?.certifications || []).slice(0, 2).map((item, index) => {
+                const text = typeof item === 'object' && item !== null ? item.name || item.title || JSON.stringify(item) : String(item)
+                return (
+                  <div key={index} className="text-[12px] font-bold text-slate-700" title={text}>
+                    &bull; {text}
+                  </div>
+                )
+              })}
               {!(roadmap?.certifications || []).length && <span className="text-[12px] text-slate-400">None</span>}
             </div>
           </div>
@@ -474,7 +480,7 @@ function ActionJourney({ actions }) {
                   {isFirst ? 'Priority Action' : `Step ${stepNum}`}
                 </span>
                 <p className="text-slate-700 leading-relaxed text-[14px] font-bold mx-auto">
-                  {action}
+                  {typeof action === 'object' && action !== null ? action.text || action.action || action.title || JSON.stringify(action) : String(action)}
                 </p>
               </div>
             </div>

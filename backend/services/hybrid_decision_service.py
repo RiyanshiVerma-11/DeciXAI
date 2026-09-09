@@ -341,7 +341,9 @@ def _path_affinity_adjustment(normalized: dict[str, Any], path_class: str, path_
     specialization = _clean_token(normalized.get("specialization"))
     raw_interest = _clean_token(normalized.get("raw_interest"))
     interest_domain = normalized.get("interest_domain", "")
-    hint_terms = PATH_KEYWORD_HINTS.get(path_class, set())
+    hint_terms = set(PATH_KEYWORD_HINTS.get(path_class, set()))
+    if path_class == "data_science":
+        hint_terms.update(PATH_KEYWORD_HINTS.get("ai_engineer", set()))
     top_skill_terms = {_clean_token(skill) for skill in path_profile.get("top_skills", [])}
 
     direct_hint_hits = sum(1 for hint in hint_terms if hint in skill_terms or hint in specialization or hint in raw_interest)
@@ -368,7 +370,7 @@ def _path_affinity_adjustment(normalized: dict[str, Any], path_class: str, path_
 
     explicit_interest_mentions = {key for key, hints in PATH_KEYWORD_HINTS.items() if any(hint in raw_interest for hint in hints)}
     if explicit_interest_mentions:
-        if path_class in explicit_interest_mentions:
+        if path_class in explicit_interest_mentions or (path_class == "data_science" and "ai_engineer" in explicit_interest_mentions):
             adjustment += 0.12
         else:
             adjustment -= 0.06
@@ -396,7 +398,9 @@ def _path_evidence_score(normalized: dict[str, Any], path_class: str, path_profi
     certification_text = " ".join(normalized.get("certifications") or [])
     specialization = _clean_token(normalized.get("specialization"))
     raw_interest = _clean_token(normalized.get("raw_interest"))
-    hint_terms = PATH_KEYWORD_HINTS.get(path_class, set())
+    hint_terms = set(PATH_KEYWORD_HINTS.get(path_class, set()))
+    if path_class == "data_science":
+        hint_terms.update(PATH_KEYWORD_HINTS.get("ai_engineer", set()))
     top_skill_terms = {_clean_token(skill) for skill in path_profile.get("top_skills", [])}
 
     skill_hint_hits = sum(1 for hint in hint_terms if hint in skill_terms)
@@ -473,47 +477,83 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
     """
     Explain "why this path" in decision-intelligence terms:
     skills, projects, certifications, and interest alignment.
+    Dynamically checks skills against path-specific ontologies and inspects
+    full project implementation descriptions, internships, and verified credentials.
     """
     path_profile = option.get("path_profile", {}) or {}
     path_class = _path_class(option)
-    top_skills = path_profile.get("top_skills", []) or []
+    path_display = _path_display_name(option).lower()
+    top_skills = list(path_profile.get("top_skills", []) or [])
 
     user_skills = {_clean_token(skill) for skill in (normalized.get("expanded_skills") or normalized.get("skills", []))}
+
+    # Dynamically expand hint terms based on target path domain
+    hint_terms = set(PATH_KEYWORD_HINTS.get(path_class, set()))
+    raw_interest = str(normalized.get("raw_interest") or "").lower()
+
+    # If the target path or interest is an AI/ML/GenAI track (which maps to data_science in comparison bundle)
+    if "ai" in path_display or "machine learning" in path_display or "ai" in raw_interest or "llm" in path_display:
+        hint_terms.update(PATH_KEYWORD_HINTS.get("ai_engineer", set()))
+
+    # Direct skill hits: check top skills and relevant domain hint terms
     skill_hits = [skill for skill in top_skills if _clean_token(skill) in user_skills]
+    for hint in sorted(hint_terms):
+        clean_hint = _clean_token(hint)
+        if clean_hint in user_skills or any(clean_hint in s for s in user_skills):
+            if hint not in skill_hits:
+                skill_hits.append(hint)
 
+    # Project alignment text: combine project titles, descriptions, internships, and prompt text
     projects = normalized.get("projects") or []
+    project_elements = [
+        *projects,
+        *(normalized.get("project_descriptions") or []),
+        *(normalized.get("internships") or []),
+        normalized.get("raw_prompt", "")
+    ]
+    project_text = " ".join(str(p) for p in project_elements)
+    project_hits = _path_text_hits(project_text, [*top_skills[:8], *sorted(hint_terms)])
+
+    # Certifications & achievements text
     certifications = normalized.get("certifications") or []
-    project_text = " ".join(projects)
-    cert_text = " ".join(certifications)
+    cert_elements = [
+        *certifications,
+        *(normalized.get("achievements") or [])
+    ]
+    cert_text = " ".join(str(c) for c in cert_elements)
+    cert_hits = _path_text_hits(cert_text, [*top_skills[:8], *sorted(hint_terms)])
 
-    # Project/cert alignment is primarily keyword-based (top skills + path hints).
-    hint_terms = PATH_KEYWORD_HINTS.get(path_class, set())
-    project_hits = _path_text_hits(project_text, [*top_skills[:8], *sorted(hint_terms)[:12]])
-    cert_hits = _path_text_hits(cert_text, [*top_skills[:8], *sorted(hint_terms)[:12]])
+    # Generic recognized certification & learning platforms
+    tech_learning_platforms = (
+        "google", "aws", "azure", "microsoft", "meta", "nvidia", "ibm", "oracle",
+        "coursera", "udemy", "edx", "deeplearning.ai", "datacamp", "kaggle",
+        "springboard", "infosys", "hackathon", "stanford", "harvard", "mit",
+        "nptel", "certif", "badge", "license", "credential", "academy", "institute",
+        "specialization", "cohort", "olympiad"
+    )
+    has_recognized_cert = any(platform in cert_text.lower() for platform in tech_learning_platforms)
 
-    project_count = int(normalized.get("project_count", 0) or 0)
-    cert_count = int(normalized.get("certification_count", 0) or 0)
+    project_count = int(normalized.get("project_count", 0) or len(projects))
+    cert_count = int(normalized.get("certification_count", 0) or len(certifications))
 
     aligned_interest = _path_aligned_interest(path_class)
     interest_domain = normalized.get("interest_domain") or ""
     explicit_interest_paths = _explicit_interest_paths(normalized.get("raw_interest"))
-    # If the user explicitly mentions a path (e.g., "cloud engineer"), prefer that over broad buckets like "technical".
     interest_aligned = bool(path_class in explicit_interest_paths) if explicit_interest_paths else bool(aligned_interest and interest_domain == aligned_interest)
     explicit_interest_hit = path_class in explicit_interest_paths
 
     skills_aligned = len(skill_hits) >= 2 or (len(skill_hits) >= 1 and len(user_skills) <= 4)
-    projects_aligned = len(project_hits) >= 1
-    
-    # Certification relevance: Direct match vs Partial match (e.g., AWS for SDE)
-    certs_aligned = len(cert_hits) >= 1
+    projects_aligned = len(project_hits) >= 1 or (project_count >= 1 and len(projects) >= 1)
+
+    # Certification relevance: direct match or verified credentials on recognized platforms
+    certs_aligned = len(cert_hits) >= 1 or has_recognized_cert
     certs_partial = False
-    if not certs_aligned and cert_count > 0:
-        # Check if cert matches related technical/management domains
+    if not certs_aligned and (cert_count > 0 or has_recognized_cert):
         related_hints = INTEREST_HINTS.get(PATH_INTEREST_ALIGNMENT.get(path_class, ""), [])
-        if _path_text_hits(cert_text, related_hints):
+        if _path_text_hits(cert_text, related_hints) or has_recognized_cert:
             certs_partial = True
 
-    # Treat missing projects/certs as "missing evidence" rather than mismatch.
+    # Treat missing projects/certs as "missing evidence" rather than mismatch
     projects_missing = project_count == 0
     certs_missing = cert_count == 0
 
@@ -528,8 +568,8 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
         "explicit_interest_hit": explicit_interest_hit,
         "projects_missing": projects_missing,
         "certs_missing": certs_missing,
-        "skill_hits": skill_hits[:4],
-        "project_hits": project_hits[:3],
+        "skill_hits": skill_hits[:6],
+        "project_hits": project_hits[:4],
         "cert_hits": cert_hits[:3],
     }
 
@@ -1235,13 +1275,16 @@ def _contextualize_factor_impacts(
                 impact["impact"] = "Neutral"
                 impact["reason"] = f"project count={project_count} has a neutral influence"
         elif factor == "Internship count":
-            internship_count = len(normalized.get("internships") or [])
+            internship_count = int(normalized.get("internship_count") or len(normalized.get("internships") or []))
             if is_positive:
                 impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"internship count={internship_count} adds real-world proof that strengthens {target_path}"
             elif is_negative:
                 impact["impact"] = f"{strength} holds back"
-                impact["reason"] = f"internship count={internship_count} means the profile lacks external industry validation for {target_path}"
+                if internship_count > 0:
+                    impact["reason"] = f"internship count={internship_count} provides early proof, but benchmark candidates show more extensive industry tenure"
+                else:
+                    impact["reason"] = f"internship count={internship_count} means the profile lacks external industry validation for {target_path}"
             else:
                 impact["impact"] = "Neutral"
                 impact["reason"] = f"internship count={internship_count} has a neutral impact"
@@ -1315,8 +1358,43 @@ OUT_OF_SCOPE_DISCIPLINES = {
 }
 
 
+BENCHMARK_ROLE_MAP = {
+    "ai systems & machine learning engineer": "data_science",
+    "ai systems & ml engineer": "data_science",
+    "ai engineer": "data_science",
+    "machine learning engineer": "data_science",
+    "data scientist & analytics engineer": "data_science",
+    "data scientist & analytics": "data_science",
+    "data science": "data_science",
+    "full-stack software engineer": "software_development",
+    "full stack software engineer": "software_development",
+    "software development": "software_development",
+    "software engineer": "software_development",
+    "backend software engineer": "software_development",
+    "cloud & devops architect": "cloud_devops",
+    "cloud & devops engineering": "cloud_devops",
+    "cloud devops": "cloud_devops",
+    "cybersecurity engineer": "cybersecurity",
+    "cybersecurity specialist": "cybersecurity",
+    "cybersecurity": "cybersecurity",
+    "data engineering": "data_engineering",
+    "big data & pipeline engineer": "data_engineering",
+    "product & tech strategy": "product_management",
+    "product & engineering lead": "product_management",
+    "product management": "product_management",
+}
+
+
 def _map_option_to_class(option: str, path_profiles: dict[str, dict[str, Any]]) -> tuple[str | None, float]:
     normalized_option = _clean_token(option)
+    # Check explicit benchmark role map first
+    if normalized_option in BENCHMARK_ROLE_MAP:
+        return BENCHMARK_ROLE_MAP[normalized_option], 1.0
+
+    for role_name, class_key in BENCHMARK_ROLE_MAP.items():
+        if role_name in normalized_option or normalized_option in role_name:
+            return class_key, 0.95
+
     # Prevent out-of-scope engineering disciplines from falsely matching "data_engineering" or "software"
     if any(disc in normalized_option for disc in OUT_OF_SCOPE_DISCIPLINES):
         return None, 0.0
@@ -1735,7 +1813,12 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
     top_path_score = option_scores[0]["score"] if option_scores else overall_score
     top_path_probability = option_scores[0]["probability"] if option_scores else round(readiness, 4)
     
-    score = overall_score
+    # Path fit score represents the candidate match against the recommended role,
+    # or general readiness if evaluating explicitly requested options
+    if options:
+        score = overall_score
+    else:
+        score = top_path_score if (top_path_score and top_path_score > 0) else overall_score
     
     confidence = _career_confidence(normalized, option_scores, score)
     skill_strength = _skill_strength_label(int(normalized.get("skill_count", 0) or 0))
@@ -1755,10 +1838,10 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
     
     result = {
         "decision": best_option,
-        "probability": round(readiness, 4),
+        "probability": round(top_path_probability, 4),
         "readiness_probability": round(readiness, 4),
         "top_path_probability": top_path_probability,
-        "score": overall_score,
+        "score": round(score, 1),
         "readiness_score": overall_score,
         "top_path_score": top_path_score,
         "confidence": confidence,

@@ -85,3 +85,33 @@ def test_rate_limiter(monkeypatch):
     assert r3.status_code == 429
     assert r3.json()["detail"] == "Too many requests. Please slow down."
 
+
+def test_resume_upload_pdf():
+    """Test resume upload endpoint with a generated PDF byte stream."""
+    import io
+    from reportlab.pdfgen import canvas
+
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer)
+    p.drawString(100, 750, "Jane Doe - Full Stack AI Developer")
+    p.drawString(100, 730, "Education: B.Tech Computer Science, CGPA 8.9")
+    p.drawString(100, 710, "Skills: Python, FastAPI, React, Docker, SQL, Machine Learning")
+    p.drawString(100, 690, "Experience: Built scalable inference backend handling 50k requests/day")
+    p.drawString(100, 670, "Projects: Autonomous RAG Copilot with 40% accuracy improvement")
+    p.drawString(100, 650, "Certifications: AWS Certified Machine Learning Specialty")
+    p.showPage()
+    p.save()
+
+    pdf_bytes = buffer.getvalue()
+    files = {"file": ("test_resume.pdf", pdf_bytes, "application/pdf")}
+    response = client.post("/api/v1/career/upload-resume", files=files)
+    assert response.status_code == 200
+    data = response.json()
+    assert "ats_audit" in data
+    assert "ats_score" in data["ats_audit"]
+    assert data["ats_audit"]["ats_score"] > 0
+    assert "parsed_profile" in data
+    assert "decision" in data
+    assert "decision" in data["decision"]
+
+

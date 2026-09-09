@@ -482,36 +482,53 @@ def _extract_number_near_keywords(text: str, keywords: tuple[str, ...]) -> int |
 
 def _extract_cgpa(text: str) -> float:
     """Extract CGPA/GPA/Percentage and auto-convert to 10-point scale."""
-    # 1. Check for explicit 4-point scale (e.g. "3.8/4", "3.8 out of 4", "gpa 3.6 / 4")
-    match_4 = re.search(r"(\d+(?:\.\d+)?)\s*(?:/|out of)\s*4(?:\.0)?\b", text, flags=re.IGNORECASE)
-    if match_4:
-        val = float(match_4.group(1))
-        return max(0.0, min((val / 4.0) * 10.0, 10.0))
-
-    # 2. Check for percentage (e.g. "82%", "82 percent", "percentage 85")
-    match_pct = re.search(r"(?:percentage|percent|%)\s*[:=]?\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*(?:%|percent\b)", text, flags=re.IGNORECASE)
-    if match_pct:
-        val_str = match_pct.group(1) or match_pct.group(2)
-        val = float(val_str)
-        if val > 10.0:
-            val = val / 10.0
-        return max(0.0, min(val, 10.0))
-
-    # 3. Standard CGPA / GPA patterns
+    # 1. Standard CGPA / GPA / SGPA patterns with explicit keyword (highest priority)
+    # e.g., "CGPA: 8.5", "CGPA: 8.28/10", "GPA 3.8 / 4.0", "CGPA 9.2", "8.5 CGPA", "Grade: 8.4"
     patterns = (
-        r"\b(?:cgpa|gpa)\b[^\d]{0,10}(\d+(?:\.\d+)?)",
-        r"\b(\d+(?:\.\d+)?)\b[^\n]{0,10}\b(?:cgpa|gpa)\b",
+        r"\b(?:cgpa|sgpa|gpa|grade|academic score)\b\s*(?:is\s+|of\s+|[:=\-])*\s*(\d+(?:\.\d+)?)\s*(?:/\s*(10(?:\.0)?|4(?:\.0)?))?",
+        r"(\d+(?:\.\d+)?)\s*(?:/\s*(10(?:\.0)?|4(?:\.0)?))?\s*(?:cgpa|sgpa|gpa)\b",
     )
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)
-        if not match:
-            continue
-        value = float(match.group(1))
-        if value > 10.0:
-            value = value / 10.0
-        elif 0.0 < value <= 4.0:
-            value = (value / 4.0) * 10.0
-        return max(0.0, min(value, 10.0))
+        if match:
+            val = float(match.group(1))
+            denom = match.group(2) if len(match.groups()) > 1 else None
+            # If explicit denominator given
+            if denom and "4" in denom:
+                return max(0.0, min((val / 4.0) * 10.0, 10.0))
+            elif denom and "10" in denom:
+                return max(0.0, min(val, 10.0))
+
+            # Determine scale from value
+            if val > 10.0 and val <= 100.0:
+                return max(0.0, min(val / 10.0, 10.0))
+            elif 0.0 < val <= 4.0 and re.search(r"\b(?:gpa|4(?:\.0)?)\b", match.group(0), flags=re.IGNORECASE):
+                return max(0.0, min((val / 4.0) * 10.0, 10.0))
+            elif val >= 1.0:
+                return max(0.0, min(val, 10.0))
+
+    # 2. Check for explicit 4-point scale with keyword 'gpa' or 'score'
+    match_4 = re.search(r"\b(?:gpa|score|grade)\s*[:=\-]?\s*(\d+(?:\.\d+)?)\s*(?:/|out of)\s*4(?:\.0)?\b", text, flags=re.IGNORECASE)
+    if match_4:
+        val = float(match_4.group(1))
+        if 1.0 <= val <= 4.0:
+            return max(0.0, min((val / 4.0) * 10.0, 10.0))
+
+    # 3. Check for percentage (e.g. "82%", "82 percent", "percentage 85")
+    match_pct = re.search(r"(\d+(?:\.\d+)?)\s*(?:%|percent\b)|\b(?:percentage|percent|aggregate|marks)\b\s*[:=]?\s*(\d+(?:\.\d+)?)", text, flags=re.IGNORECASE)
+    if match_pct:
+        val_str = match_pct.group(1) or match_pct.group(2)
+        val = float(val_str)
+        if 30.0 <= val <= 100.0:
+            return max(0.0, min(val / 10.0, 10.0))
+
+    # 4. Check for score out of 10
+    match_10 = re.search(r"\b(?:cgpa|gpa|grade)?\s*[:=\-]?\s*(\d+(?:\.\d+)?)\s*(?:/|out of)\s*10(?:\.0)?\b", text, flags=re.IGNORECASE)
+    if match_10:
+        val = float(match_10.group(1))
+        if 1.0 <= val <= 10.0:
+            return max(0.0, min(val, 10.0))
+
     return 0.0
 
 
