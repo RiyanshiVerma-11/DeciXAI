@@ -28,6 +28,7 @@ SKILL_ALIASES = {
     "mongodb": ["backend"],
 }
 INTEREST_HINTS = {
+    "ai": ["ai engineering", "ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq"],
     "data": ["data science", "analytics", "machine learning"],
     "management": ["product management", "business analyst", "management"],
     "technical": ["software development", "software engineer", "web developer", "frontend", "backend", "cloud", "devops", "aws", "azure", "gcp", "docker", "kubernetes", "sre"],
@@ -45,6 +46,7 @@ REAL_WORLD_HINTS = (
     "hackathon",
 )
 PATH_INTEREST_ALIGNMENT = {
+    "ai_engineer": "ai",
     "data_science": "data",
     "data_engineering": "data",
     "finance": "management",
@@ -57,6 +59,7 @@ PATH_INTEREST_ALIGNMENT = {
     "ui_ux_design": "technical",
 }
 PATH_GROUP_ALIGNMENT = {
+    "ai_engineer": {"degree": {"engineering", "science", "computer_applications"}, "specialization": {"engineering", "science", "computer_applications"}},
     "data_science": {"degree": {"engineering", "science", "computer_applications"}, "specialization": {"engineering", "science", "computer_applications"}},
     "data_engineering": {"degree": {"engineering", "science", "computer_applications"}, "specialization": {"engineering", "science", "computer_applications"}},
     "software_development": {"degree": {"engineering", "computer_applications"}, "specialization": {"engineering", "computer_applications"}},
@@ -69,6 +72,7 @@ PATH_GROUP_ALIGNMENT = {
     "consulting": {"degree": {"business", "engineering", "general"}, "specialization": {"business", "general", "engineering"}},
 }
 PATH_KEYWORD_HINTS = {
+    "ai_engineer": {"ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq", "fastapi", "docker", "python", "vector db", "rag"},
     "data_science": {"data science", "machine learning", "deep learning", "statistics", "pandas", "numpy", "analytics", "python"},
     "data_engineering": {"data engineering", "etl", "spark", "pipelines", "data pipeline", "sql", "python", "big data"},
     "software_development": {"software", "development", "developer", "frontend", "backend", "react", "javascript", "java", "testing"},
@@ -482,6 +486,27 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
 
 def _suggest_projects_for_path(path_class: str) -> list[dict[str, str]]:
     # High-quality, resume-worthy project templates
+    if path_class == "ai_engineer":
+        return [
+            {
+                "title": "Agentic Multi-Modal RAG System",
+                "problem": "Structuring and auditing complex domain documents with zero hallucination.",
+                "stack": "FastAPI, LangGraph / LlamaIndex, Groq / Gemini API, Qdrant / Neon PGVector",
+                "impact": "Multi-agent LLM orchestration and vector retrieval production proof."
+            },
+            {
+                "title": "Enterprise LLM Observability & Evals Suite",
+                "problem": "Measuring model accuracy, token costs, and safety in continuous integration.",
+                "stack": "DeepEval / Ragas, Arize Phoenix, Python, Docker",
+                "impact": "Automated LLM evaluation and production telemetry maturity."
+            },
+            {
+                "title": "Local LLM Fine-Tuning & High-Throughput Engine",
+                "problem": "Serving low-latency domain models on budget cloud hardware.",
+                "stack": "vLLM, Ollama, Unsloth QLoRA, Streamlit",
+                "impact": "Self-hosted inference optimization and parameter-efficient tuning."
+            }
+        ]
     if path_class in {"data_science", "data_engineering"}:
         return [
             {
@@ -518,6 +543,27 @@ def _suggest_projects_for_path(path_class: str) -> list[dict[str, str]]:
                 "impact": "DevOps mindset and systems awareness."
             }
         ]
+    if path_class == "product_management":
+        return [
+            {
+                "title": "B2B SaaS Growth & Churn PRD Case Study",
+                "problem": "Reducing user churn in mid-market SaaS subscription funnels.",
+                "stack": "Figma, Mixpanel, SQL, Jira, PRD Specs",
+                "impact": "End-to-end product scoping, funnel analytics, and executive story."
+            },
+            {
+                "title": "AI-Powered Feature Spec & API Architecture",
+                "problem": "Bridging business requirements with developer-ready REST API schemas.",
+                "stack": "Postman, OpenAPI/Swagger, Wireframes, User Stories",
+                "impact": "Technical PM signal, schema design, and developer alignment proof."
+            },
+            {
+                "title": "A/B Testing & Conversion Optimization Framework",
+                "problem": "Improving user onboarding funnel conversion rates.",
+                "stack": "Google Analytics 4, Mixpanel, SQL, A/B Experimentation",
+                "impact": "Data-driven product decision making and hypothesis validation."
+            }
+        ]
     if path_class == "cloud_devops":
         return [
             {
@@ -538,6 +584,8 @@ def _suggest_projects_for_path(path_class: str) -> list[dict[str, str]]:
 
 
 def _suggest_certifications_for_path(path_class: str) -> list[str]:
+    if path_class == "ai_engineer":
+        return ["Google PromptWars / Generative AI Competitive Credentials", "DeepLearning.AI Generative AI & Agentic Systems Specialization"]
     if path_class == "cloud_devops":
         return ["AWS Cloud Practitioner", "AWS Solutions Architect Associate"]
     if path_class == "software_development":
@@ -795,6 +843,10 @@ def normalize_career_input(data: dict[str, Any]) -> dict[str, Any]:
     interest_domain = _normalize_interest(raw_interest, option_text)
     expanded_skills = _expand_skill_terms(skills)
 
+    exp_val = _safe_float(data.get("experience_years", data.get("experience", 0)), 0.0)
+    if internships and exp_val == 0.0:
+        exp_val = max(0.5 * len(internships), 0.5)
+
     return {
         "cgpa": _normalize_cgpa(data.get("cgpa", float("nan"))),
         "skills": skills,
@@ -813,7 +865,7 @@ def normalize_career_input(data: dict[str, Any]) -> dict[str, Any]:
         "specialization": specialization_value,
         "education_level": _clean_text(data.get("education_level")),
         "year_of_study": _safe_float(data.get("year_of_study", 0), 0.0),
-        "experience_years": _safe_float(data.get("experience_years", data.get("experience", 0)), 0.0),
+        "experience_years": exp_val,
         "raw_prompt": str(data.get("raw_prompt", "")),
         "project_quality_score": project_quality_score,
         "project_signal": project_signal,
@@ -916,6 +968,39 @@ def _comparison_frame(normalized: dict[str, Any], option_text: str = "") -> pd.D
         "certifications": normalized["certification_count"],
         "salary": 0.0,
     }])
+
+
+def _get_specialized_display_name(class_name: str, normalized: dict[str, Any]) -> str:
+    raw_interest = _clean_token(normalized.get("raw_interest", ""))
+    skills_text = " ".join(_clean_token(s) for s in (normalized.get("expanded_skills") or normalized.get("skills", [])))
+
+    if class_name == "data_science":
+        if any(term in raw_interest or term in skills_text for term in ["ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq"]):
+            return "AI Engineer (Agentic & LLM Systems)"
+        if any(term in raw_interest or term in skills_text for term in ["ml engineer", "machine learning engineer", "mlops"]):
+            return "Machine Learning Engineer"
+        return "Data Science & AI"
+
+    if class_name == "software_development":
+        if any(term in raw_interest or term in skills_text for term in ["full stack", "fullstack", "react", "fastapi", "node"]):
+            return "Full-Stack Software Engineer"
+        if any(term in raw_interest or term in skills_text for term in ["backend", "api", "microservices"]):
+            return "Backend Software Engineer"
+        return "Software Engineering"
+
+    if class_name == "cloud_devops":
+        if any(term in raw_interest or term in skills_text for term in ["sre", "site reliability"]):
+            return "Site Reliability Engineer (SRE)"
+        if any(term in raw_interest or term in skills_text for term in ["mlops", "ai ops"]):
+            return "MLOps & Cloud Architect"
+        return "Cloud & DevOps Engineering"
+
+    if class_name == "data_engineering":
+        if any(term in raw_interest or term in skills_text for term in ["big data", "spark", "hadoop", "etl"]):
+            return "Big Data & Pipeline Engineer"
+        return "Data Engineering"
+
+    return class_name.replace("_", " ").title()
 
 
 def _path_display_name(option_score: dict[str, Any]) -> str:
@@ -1227,14 +1312,15 @@ def _dynamic_option_scores(normalized: dict[str, Any], readiness: float | None =
             )
             # Use the same calibration logic for the item score
             calibrated_score = _calibrate_final_score(normalized, calibrated_probability)
-            
+            default_options = {"data science", "software development", "product management", "cloud devops", "cybersecurity", "data engineering", "ui ux design", "marketing", "finance", "consulting"}
+            spec_name = _get_specialized_display_name(mapped_class, normalized) if option.lower() in default_options or option.lower().replace("_", " ") in default_options else option
             scored.append({
-                "name": option,
+                "name": spec_name,
                 "score": calibrated_score,
                 "probability": round(calibrated_probability, 4),
                 "raw_probability": round(probability, 4),
                 "mapped_class": mapped_class,
-                "mapped_label": path_profiles.get(mapped_class, {}).get("display_name", mapped_class.replace("_", " ").title()),
+                "mapped_label": spec_name,
                 "path_profile": path_profiles.get(mapped_class, {})
             })
     else:
@@ -1264,13 +1350,14 @@ def _dynamic_option_scores(normalized: dict[str, Any], readiness: float | None =
             # Use the same calibration logic for the item score
             calibrated_score = _calibrate_final_score(normalized, calibrated_probability)
             
+            spec_name = _get_specialized_display_name(class_name, normalized)
             scored.append({
-                "name": path_profiles.get(class_name, {}).get("display_name", class_name.replace("_", " ").title()),
+                "name": spec_name,
                 "score": calibrated_score,
                 "probability": round(calibrated_probability, 4),
                 "raw_probability": round(raw_probability, 4),
                 "mapped_class": class_name,
-                "mapped_label": path_profiles.get(class_name, {}).get("display_name", class_name.replace("_", " ").title()),
+                "mapped_label": spec_name,
                 "path_profile": path_profiles.get(class_name, {})
             })
 
@@ -1410,12 +1497,17 @@ def _dynamic_action_plan(normalized: dict[str, Any], model_result: dict[str, Any
             actions.append(impact['reason'])
     
     # Path-specific skill gaps
-    path_top_skills = top_path.get('top_skills', [])
+    if top_class == "ai_engineer":
+        path_top_skills = ["agentic frameworks (langgraph / llamaindex)", "llm evals (deepeval / ragas)", "vllm & local inference", "vector databases (qdrant / pgvector)"]
+    elif top_class == "product_management":
+        path_top_skills = ["product strategy & prds", "user growth analytics (mixpanel/ga4)", "agile & scrum (cspo)", "system architecture for pms"]
+    else:
+        path_top_skills = top_path.get('top_skills', [])
     missing_skills = [skill for skill in path_top_skills[:4] if _clean_token(skill) not in user_skills]
     if missing_skills:
-        actions.append(f"Build {', '.join(missing_skills)} - core skills for {option_scores[0]['name']}")
+        actions.append(f"Build {', '.join(missing_skills[:2])} - core skills for {option_scores[0]['name']}")
 
-    if not normalized.get("internships"):
+    if not normalized.get("internships") and len(normalized.get("internships") or []) == 0:
         actions.append(f"Add one internship or client-style project to strengthen real-world proof for {option_scores[0]['name']}")
     elif _real_world_signal(normalized) < 0.04:
         actions.append("Turn internship work into deployed, client-facing, or production-style outcomes")
@@ -1423,6 +1515,10 @@ def _dynamic_action_plan(normalized: dict[str, Any], model_result: dict[str, Any
     # Execution proof
     if normalized.get('project_count', 0) < 3:
         actions.append("Complete 2-3 domain-relevant projects for execution proof")
+    elif top_class == "ai_engineer":
+        actions.append("Publish latency & token cost benchmarks for multi-agent workflows")
+    elif top_class == "product_management":
+        actions.append("Publish a public Product Case Study portfolio (Figma PRDs + Funnel Metrics)")
     
     return actions[:5]
 

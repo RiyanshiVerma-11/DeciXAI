@@ -1,13 +1,19 @@
 import re
 
 
-SECTION_BREAKS = r"(?=\b(?:cgpa|gpa|skills?|expertise|projects?|interest|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people|urgency|priority|political support|political|infrastructure readiness|infrastructure|risk level|risk)\b|$)"
+SECTION_BREAKS = r"(?=\b(?:cgpa|gpa|skills?|expertise|projects?|key projects|achievements?|internships?|experience|interest|income|salary|loan|debt|credit score|credit|funding|capital|team size|team|market|experience|years|sector|budget|funds|population|people|urgency|priority|political support|political|infrastructure readiness|infrastructure|risk level|risk)\b|$)"
 VALID_CAREER_CLASSES = [
+    'ai_engineer',
     'cloud_devops',
     'cybersecurity',
     'data_science',
+    'data_engineering',
     'product_management',
     'software_development',
+    'ui_ux_design',
+    'finance',
+    'marketing',
+    'consulting',
 ]
 
 CAREER_OPTION_NORMALIZATION = {
@@ -17,6 +23,7 @@ CAREER_OPTION_NORMALIZATION = {
     'managerial': 'product_management',
     'mba': 'product_management',
     'product management': 'product_management',
+    'product manager': 'product_management',
     'business analyst': 'product_management',
     'technical': 'software_development',
     'developer': 'software_development',
@@ -24,6 +31,7 @@ CAREER_OPTION_NORMALIZATION = {
     'coding': 'software_development',
     'software': 'software_development',
     'software development': 'software_development',
+    'software engineer': 'software_development',
     'software engineering': 'software_development',
     'technical jobs': 'software_development',
     'cybersecurity': 'cybersecurity',
@@ -32,11 +40,29 @@ CAREER_OPTION_NORMALIZATION = {
     'devops': 'cloud_devops',
     'cloud devops': 'cloud_devops',
     'cloud / devops': 'cloud_devops',
+    'cloud engineer': 'cloud_devops',
+    'ai engineer': 'ai_engineer',
+    'ai engineering': 'ai_engineer',
+    'llm engineer': 'ai_engineer',
+    'llm systems engineer': 'ai_engineer',
+    'agentic ai': 'ai_engineer',
+    'genai engineer': 'ai_engineer',
+    'llm orchestration': 'ai_engineer',
     'data science': 'data_science',
     'data scientist': 'data_science',
     'ai': 'data_science',
     'ml': 'data_science',
     'machine learning': 'data_science',
+    'machine learning engineer': 'data_science',
+    'ml engineer': 'data_science',
+    'data engineering': 'data_engineering',
+    'data engineer': 'data_engineering',
+    'ui/ux': 'ui_ux_design',
+    'ui/ux design': 'ui_ux_design',
+    'ui ux design': 'ui_ux_design',
+    'finance': 'finance',
+    'marketing': 'marketing',
+    'consulting': 'consulting',
 }
 
 FILLER_PATTERNS = [

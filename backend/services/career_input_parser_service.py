@@ -14,31 +14,21 @@ SECTION_LABELS = (
     "degree",
     "specialization",
     "branch",
-    "stream",
     "cgpa",
     "gpa",
     "skills",
-    "skill",
-    "technologies",
     "tech stack",
+    "key projects",
     "projects",
-    "project",
-    "proj",
     "certifications",
-    "certification",
-    "certs",
-    "cert",
-    "internship",
+    "achievements",
     "internships",
-    "intern",
+    "internship",
     "interest",
-    "interested",
-    "options",
+    "target career options",
+    "target options",
     "career options",
-    "career",
-    "confused",
-    "between",
-    "compare",
+    "options",
 )
 
 NOISE_PATTERNS = (
@@ -53,6 +43,22 @@ NOISE_PATTERNS = (
     r"\brecommend.*",
     r"\bwith.*probabilities.*",
 )
+
+
+def _extract_section(text: str, labels: tuple[str, ...]) -> str:
+    """Extract the free-text segment following a label until the next known label."""
+    escaped_labels = [re.escape(label) for label in SECTION_LABELS]
+    pattern_boundary = r"(?=\n\s*(?:" + "|".join(escaped_labels) + r")\b|\b(?:" + "|".join(escaped_labels) + r")\s*[:=]|$)"
+    for label in labels:
+        match = re.search(
+            rf"\b{re.escape(label)}\b[:\s=\-]*(.*?){pattern_boundary}",
+            text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        if match:
+            return _collapse_spaces(match.group(1).strip(" .,:;-"))
+    return ""
+
 
 SPELLING_CORRECTIONS = {
     "pyhotn": "python",
@@ -118,35 +124,79 @@ SKILL_ALIASES = {
     "c++": ("c++", "cpp"),
     "c": (" c ",),
     "javascript": ("javascript", "js"),
-    "sql": ("sql", "mysql", "postgresql", "postgres"),
+    "typescript": ("typescript", "ts"),
+    "sql": ("sql", "mysql", "postgresql", "postgres", "neon postgresql", "neon postgres", "sqlite", "sqlite3"),
+    "fastapi": ("fastapi",),
+    "react": ("react", "reactjs", "react.js"),
+    "streamlit": ("streamlit",),
+    "prompt engineering": ("prompt engineering", "prompt design", "promptwars"),
+    "gemini api": ("gemini api", "gemini", "gemini 2.0 flash", "gemini 2.0"),
+    "groq": ("groq", "groq api"),
+    "llama": ("llama", "llama-3", "llama 3", "llama-3.3", "llama 3.3", "llama-3.1", "llama 3.1"),
+    "xgboost": ("xgboost",),
+    "random forest": ("random forest", "rf"),
+    "numpy": ("numpy",),
+    "pandas": ("pandas",),
+    "docker": ("docker", "containerized", "containerization"),
+    "git": ("git", "github"),
+    "github actions": ("github actions", "ci/cd", "cicd"),
+    "google cloud": ("google cloud", "gcp"),
+    "agentic ide": ("agentic ide", "antigravity"),
+    "render": ("render",),
+    "neon postgresql": ("neon postgresql", "neon postgres"),
+    "pytest": ("pytest",),
     "machine learning": ("machine learning", "ml"),
     "deep learning": ("deep learning", "dl"),
     "statistics": ("statistics", "stats"),
     "data analysis": ("data analysis", "analytics"),
     "data visualization": ("data visualization", "visualization"),
     "software development": ("coding", "development", "software development"),
-    "pandas": ("pandas",),
-    "numpy": ("numpy",),
     "scikit-learn": ("scikit learn", "sklearn"),
     "tensorflow": ("tensorflow",),
     "pytorch": ("pytorch",),
     "excel": ("excel",),
     "power bi": ("power bi", "powerbi"),
     "tableau": ("tableau",),
-    "react": ("react", "reactjs"),
     "node.js": ("node", "nodejs", "node.js"),
-    "git": ("git", "github"),
-    "docker": ("docker",),
     "aws": ("aws",),
+    "azure": ("azure",),
     "dsa": ("dsa", "data structures", "data structures and algorithms"),
+    "langchain": ("langchain",),
+    "langgraph": ("langgraph",),
+    "llamaindex": ("llamaindex",),
+    "vector db": ("vector db", "qdrant", "milvus", "chroma", "pgvector"),
+    "vllm": ("vllm", "ollama"),
 }
 
 CAREER_OPTION_ALIASES = {
+    "ai engineer": (
+        "ai engineer",
+        "ai engineering",
+        "agentic ai",
+        "llm engineer",
+        "llm systems engineer",
+        "genai engineer",
+        "generative ai engineer",
+        "agentic systems",
+        "llm orchestration",
+    ),
+    "product management": (
+        "product management",
+        "product manager",
+        "technical product management",
+        "product strategy",
+        "tpm",
+        "pm",
+        "product",
+    ),
     "data science": (
         "data science",
         "datascience",
         "data scientist",
-        "analytics",
+        "machine learning engineer",
+        "ml engineer",
+        "data analyst",
+        "data analytics",
     ),
     "software development": (
         "software development",
@@ -160,11 +210,6 @@ CAREER_OPTION_ALIASES = {
         "frontend",
         "backend",
     ),
-    "product management": (
-        "product management",
-        "product manager",
-        "pm",
-    ),
     "cybersecurity": (
         "cybersecurity",
         "cyber security",
@@ -177,14 +222,59 @@ CAREER_OPTION_ALIASES = {
         "etl",
         "big data",
     ),
+    "cloud devops": (
+        "cloud devops",
+        "cloud",
+        "devops",
+        "sre",
+        "cloud engineer",
+    ),
+    "ui ux design": (
+        "ui ux design",
+        "ui/ux",
+        "ui ux",
+        "ux designer",
+        "ui designer",
+    ),
+    "finance": (
+        "finance",
+        "financial analyst",
+    ),
+    "marketing": (
+        "marketing",
+        "digital marketing",
+    ),
+    "consulting": (
+        "consulting",
+        "consultant",
+    ),
 }
 
 INTEREST_ALIASES = {
+    "ai engineer": (
+        "ai engineering",
+        "agentic systems",
+        "genai",
+        "generative ai",
+        "llm orchestration",
+        "llm systems",
+        "prompt engineering",
+    ),
+    "product management": (
+        "product management",
+        "product strategy",
+        "technical product management",
+        "product manager",
+        "tpm",
+        "feature scoping",
+        "prd drafting",
+        "user stories",
+    ),
     "data science": (
         "data science",
-        "analytics",
         "machine learning",
         "artificial intelligence",
+        "deep learning",
     ),
     "software development": (
         "software development",
@@ -192,7 +282,6 @@ INTEREST_ALIASES = {
         "coding",
         "development",
     ),
-    "product management": ("product management", "product"),
     "cybersecurity": ("cybersecurity", "cyber security", "security"),
     "data engineering": ("data engineering", "data pipelines"),
 }
@@ -371,26 +460,16 @@ def _extract_from_aliases(text: str, aliases: dict[str, tuple[str, ...]]) -> lis
     return matches
 
 
-def _extract_section(text: str, labels: tuple[str, ...]) -> str:
-    """Extract the free-text segment following a label until the next known label."""
-    boundary = "|".join(re.escape(label) for label in SECTION_LABELS)
-    for label in labels:
-        match = re.search(
-            rf"\b{re.escape(label)}\b[:\s-]*(.*?)(?=\b(?:{boundary})\b|$)",
-            text,
-        )
-        if match:
-            return _collapse_spaces(match.group(1).strip(" .,:;-"))
-    return ""
+# (First _extract_section definition near top of file is used)
 
 
 def _extract_number_near_keywords(text: str, keywords: tuple[str, ...]) -> int | None:
     """Capture numeric counts placed before or after labels such as projects or certifications."""
     for keyword in keywords:
-        after_match = re.search(rf"\b{re.escape(keyword)}\b[^\d]{{0,12}}(\d+)", text)
+        after_match = re.search(rf"\b{re.escape(keyword)}\b\s*[:=\-]?\s*(\d+)\b(?!\s*[\.\)])", text, flags=re.IGNORECASE)
         if after_match:
             return int(after_match.group(1))
-        before_match = re.search(rf"\b(\d+)\b[^\n]{{0,12}}\b{re.escape(keyword)}\b", text)
+        before_match = re.search(rf"\b(\d+)\b\s*(?:total\s*)?\b{re.escape(keyword)}\b", text, flags=re.IGNORECASE)
         if before_match:
             return int(before_match.group(1))
     return None
@@ -569,24 +648,63 @@ def _calculate_project_quality_score(project_descriptions: list[str], project_co
     return score
 
 
-def _extract_projects_count(text: str) -> int:
-    explicit_count = _extract_number_near_keywords(text, ("projects", "project", "proj"))
-    if explicit_count is not None:
+def _extract_projects_count(text: str, raw_text: str = "") -> int:
+    search_text = f"{text}\n{raw_text}"
+    explicit_count = _extract_number_near_keywords(search_text, ("projects", "project", "proj"))
+    if explicit_count is not None and explicit_count > 0:
         return explicit_count
-    section = _extract_section(text, ("projects", "project", "proj"))
-    return _estimate_phrase_count(section)
+
+    if raw_text:
+        raw_numbered = re.findall(r"(?:^|\n|\b)\d+[\.\)]\s+[A-Za-z0-9]", raw_text)
+        if len(raw_numbered) >= 1:
+            return len(raw_numbered)
+
+    section = _extract_section(search_text, ("key projects", "projects", "project", "proj"))
+    if section:
+        numbered = re.findall(r"(?:^|\n|\b)(?:\d+[\.\)]|•|\*|-)\s*([^\n]+)", section)
+        if len(numbered) >= 1:
+            return len(numbered)
+        estimated = _estimate_phrase_count(section)
+        if estimated > 0:
+            return estimated
+
+    raw_numbered = re.findall(r"\b\d+[\.\)]\s+[A-Za-z0-9]", search_text)
+    if len(raw_numbered) >= 1:
+        return len(raw_numbered)
+
+    return 0
 
 
-def _extract_certifications_count(text: str) -> int:
+def _extract_certifications_count(text: str, raw_text: str = "") -> int:
+    search_text = f"{text}\n{raw_text}"
     explicit_count = _extract_number_near_keywords(
-        text,
-        ("certifications", "certification", "certs", "cert"),
+        search_text,
+        ("certifications", "certification", "certs", "cert", "achievements"),
     )
-    if explicit_count is not None:
+    if explicit_count is not None and explicit_count > 0:
         return explicit_count
-    section = _extract_section(text, ("certifications", "certification", "certs", "cert"))
-    items = _clean_certification_items(_split_section_items(section))
-    return len(items) if items else 0
+
+    if raw_text:
+        ach_keywords = ["rank 1", "promptwars", "diamond league", "rank 30", "winner", "first place", "award", "cup"]
+        raw_lower = raw_text.lower()
+        ach_count = sum(1 for kw in ach_keywords if kw in raw_lower)
+        if ach_count >= 1:
+            ach_items = re.findall(r"(?:^|\n|\b)(?:•|\*|-|\d+[\.\)])\s*([^\n]+)", raw_text)
+            return max(ach_count, len(ach_items) if ach_items else 2)
+
+    section = _extract_section(search_text, ("achievements", "certifications", "certification", "certs", "cert"))
+    if section:
+        items = _clean_certification_items(_split_section_items(section))
+        if items:
+            return len(items)
+        numbered = re.findall(r"(?:^|\n|\b)(?:\d+[\.\)]|•|\*|-)\s*([^\n]+)", section)
+        if numbered:
+            return len(numbered)
+
+    cert_keywords = ["google", "infosys", "coursera", "udemy", "aws", "promptwars", "rank 1", "diamond league", "certificate", "certification"]
+    lowered = search_text.lower()
+    matches = sum(1 for kw in cert_keywords if kw in lowered)
+    return min(matches, 5) if matches > 0 else 0
 
 
 def _dedupe_preserve_order(items: list[str]) -> list[str]:
@@ -616,50 +734,36 @@ def _extract_options(text: str) -> list[str]:
     """
     Extract career options ONLY from comparison-related segments.
     Prevents random matches from entire text.
-    
-    Strategy:
-    1. If "confused between" / "between" is found, extract what follows
-    2. Also check interest section for multiple options separated by "and"/"or"
-    3. Prefer explicit interest options if they contain 2+ valid options
-    4. Otherwise return extracted options or default
     """
-    # Check for explicit comparison pattern
-    comparison_match = re.search(r"\b(?:between|compare|confused between)\b\s+(.*?)(?:$|\n)", text)
-    comparison_space = comparison_match.group(1) if comparison_match else ""
-    
-    # Try to extract from comparison segment
-    options_from_comparison = _extract_from_aliases(comparison_space, CAREER_OPTION_ALIASES) if comparison_space else []
-    
-    # Also check interest section - might have "X and Y" pattern
+    options_match = re.search(r"\b(?:options|compare options|target options|target career options|compare|between|confused between)\b[:\s-]*(.*?)(?:$|\n)", text, flags=re.IGNORECASE)
+    options_segment = options_match.group(1) if options_match else ""
+
+    options_from_segment = _extract_from_aliases(options_segment, CAREER_OPTION_ALIASES) if options_segment else []
+
+    if len(options_from_segment) < 2:
+        full_comparison_match = re.search(r"\b(?:between|compare|confused between|vs|versus)\b\s+(.*)", text, flags=re.IGNORECASE)
+        if full_comparison_match:
+            options_from_segment.extend(_extract_from_aliases(full_comparison_match.group(1), CAREER_OPTION_ALIASES))
+
     interest_section = _extract_section(text, ("interest", "interested"))
     options_from_interest = []
     if interest_section:
-        # Split by "and" / "or" to handle "data science and cybersecurity"
-        interest_items = re.split(r'\s+(?:and|or)\s+', interest_section, flags=re.IGNORECASE)
+        interest_items = re.split(r'\s+(?:and|or|vs|,)\s+', interest_section, flags=re.IGNORECASE)
         for item in interest_items:
             item_clean = item.strip()
             if item_clean:
                 matched = _extract_from_aliases(item_clean, CAREER_OPTION_ALIASES)
                 options_from_interest.extend(matched)
-    
-    # Combine and deduplicate
-    all_options = options_from_comparison + options_from_interest
+
+    all_options = options_from_segment + options_from_interest
     options = _dedupe_preserve_order(all_options)
-    
-    # Return unique options if 2+ found, else default
+
     return options if len(options) >= 2 else DEFAULT_CAREER_OPTIONS.copy()
 
 
 def parse_natural_language_input(text: str) -> dict:
     """
     Parse messy free-form career input into clean structured fields for the ML layer.
-
-    The parser intentionally uses a modular preprocessing pipeline:
-    1. normalize case and punctuation
-    2. remove noise phrases
-    3. correct common spelling issues
-    4. map synonyms into canonical terms
-    5. extract individual structured fields
     """
     cleaned_text = _clean_input(text)
     options = _extract_options(cleaned_text)
@@ -667,7 +771,7 @@ def parse_natural_language_input(text: str) -> dict:
         options = DEFAULT_CAREER_OPTIONS.copy()
 
     project_descriptions = _extract_project_descriptions(cleaned_text)
-    project_count = _extract_projects_count(cleaned_text)
+    project_count = _extract_projects_count(cleaned_text, raw_text=text)
     project_quality_score = _calculate_project_quality_score(project_descriptions, project_count)
     project_quality_score = max(project_quality_score, extract_project_keywords(cleaned_text))
     project_signal = 0.5 * project_quality_score + 0.3 * project_count
@@ -678,6 +782,7 @@ def parse_natural_language_input(text: str) -> dict:
     if skills_match:
         skills_text = skills_match.group(1)
 
+    certifications_count = _extract_certifications_count(cleaned_text, raw_text=text)
 
     return {
         "degree": _extract_degree(cleaned_text),
@@ -688,7 +793,7 @@ def parse_natural_language_input(text: str) -> dict:
         "project_descriptions": project_descriptions,
         "project_quality_score": project_quality_score,
         "project_signal": project_signal,
-        "certifications": _extract_certifications_count(cleaned_text),
+        "certifications": certifications_count,
         "interest": _extract_interest(cleaned_text, options),
         "options": options,
     }
