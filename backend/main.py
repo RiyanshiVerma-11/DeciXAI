@@ -24,7 +24,7 @@ from middleware.security import (
 )
 from middleware.rate_limiter import RateLimitMiddleware
 from middleware.audit_logger import AuditLogMiddleware
-from routers import career, finance, startup, policy, chatbot, export, audit, auth, decisions, apikeys
+from routers import career, finance, startup, policy, chatbot, export, audit, auth, decisions, apikeys, loan_application
 from utils.app_logging import configure_logging, get_logger
 
 configure_logging()
@@ -91,6 +91,7 @@ app.include_router(policy.router, prefix="/api/v1/policy", tags=["Policy"])
 app.include_router(chatbot.router, prefix="/api/v1/chatbot", tags=["Chatbot"])
 app.include_router(export.router, prefix="/api/v1/export", tags=["Export"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit Trail"])
+app.include_router(loan_application.router, prefix="/loan-application", tags=["Finance Application"])
 
 # Backward-compatible routes (no /api/v1 prefix) — keeps existing clients working.
 app.include_router(career.router, prefix="/career", tags=["Career (legacy)"], include_in_schema=False)

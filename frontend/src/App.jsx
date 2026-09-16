@@ -13,6 +13,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import ProtectedRoute from './components/ProtectedRoute'
 import ProfileMenu from './components/ProfileMenu'
 import { useAuth } from './components/AuthContext'
+import LoanApplicationPage from './pages/LoanApplicationPage'
 
 import AppSidebar from './components/AppSidebar'
 
@@ -100,6 +101,7 @@ export default function App() {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/share/:token" element={<PublicReport />} />
         <Route path="/shared/:token" element={<PublicReport />} />
+        <Route path="/loan-application" element={<LoanApplicationPage />} />
 
         {/* Protected dashboard routes */}
         <Route path="/dashboard/*" element={<DashboardLayout />} />

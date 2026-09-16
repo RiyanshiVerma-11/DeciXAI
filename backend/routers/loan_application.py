@@ -8,8 +8,6 @@ from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from models.schemas import LoanApplicationPayload
-
 router = APIRouter()
 
 APPLICATIONS: dict[str, dict[str, Any]] = {}
