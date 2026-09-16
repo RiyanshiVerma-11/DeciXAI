@@ -260,16 +260,6 @@ def parse_prompt(domain, prompt_text):
             },
         }
 
-    if domain == 'finance':
-        return {
-            'options': [],
-            'features': {
-                'income': _extract_number(prompt_text, ['income', 'salary'], allow_fallback=False),
-                'loan': _extract_number(prompt_text, ['loan', 'debt'], allow_fallback=False),
-                'credit_score': _extract_number(prompt_text, ['credit score', 'credit'], allow_fallback=False),
-            },
-        }
-
     if domain == 'startup':
         market = _extract_section(prompt_text, ['market']) or ('enterprise' if 'enterprise' in prompt_lower else 'consumer' if 'consumer' in prompt_lower else '')
         return {

@@ -4,11 +4,6 @@ const DOMAIN_STYLES = {
     soft: 'from-cyan-50 via-sky-50 to-blue-100',
     chip: 'bg-cyan-100 text-cyan-900',
   },
-  finance: {
-    accent: 'from-emerald-500 via-lime-500 to-teal-600',
-    soft: 'from-emerald-50 via-lime-50 to-teal-100',
-    chip: 'bg-emerald-100 text-emerald-900',
-  },
   startup: {
     accent: 'from-fuchsia-500 via-violet-500 to-indigo-600',
     soft: 'from-fuchsia-50 via-violet-50 to-indigo-100',
@@ -195,6 +190,7 @@ const buildNarrativePoints = (result) => {
   }
   return []
 }
+
 
 const buildBlockingFactors = (result) =>
   (Array.isArray(result.blocking_factors) ? result.blocking_factors : [])

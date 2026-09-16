@@ -19,14 +19,6 @@ DOMAIN_EXAMPLES = {
         "meri skills python sql hain career kya choose karun",
         "job ke liye cgpa aur projects kaise improve karun",
     ],
-    "finance": [
-        "should i take this loan with my income and credit score",
-        "personal finance risk for debt and salary",
-        "can i afford this emi",
-        "investment and loan decision support",
-        "mera credit score aur income dekh kar loan safe hai kya",
-        "debt risk analyze karo",
-    ],
     "startup": [
         "startup funding and team readiness",
         "founder experience and market fit analysis",
@@ -49,10 +41,6 @@ KEYWORD_PRIORS = {
     "career": {
         "career": 1.0, "job": 1.0, "resume": 1.0, "cgpa": 1.2, "student": 0.8,
         "placement": 1.0, "internship": 0.8, "skills": 0.5, "career path": 1.2,
-    },
-    "finance": {
-        "loan": 1.2, "credit": 1.0, "income": 0.9, "debt": 1.0, "emi": 1.1,
-        "finance": 0.9, "investment": 0.6, "afford": 0.8,
     },
     "startup": {
         "startup": 1.2, "founder": 1.0, "funding": 1.1, "runway": 1.0, "team": 0.7,

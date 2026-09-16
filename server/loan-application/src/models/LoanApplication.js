@@ -1,0 +1,82 @@
+import mongoose from 'mongoose';
+
+const loanApplicationSchema = new mongoose.Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    status: {
+      type: String,
+      enum: ['draft', 'submitted', 'under_review', 'approved', 'rejected', 'disbursed'],
+      default: 'draft',
+    },
+    personalDetails: {
+      fullName: String,
+      dateOfBirth: String,
+      gender: String,
+      mobileNumber: String,
+      email: String,
+      panNumber: String,
+      aadhaarNumber: String,
+      currentAddress: String,
+      permanentAddress: String,
+      sameAsCurrentAddress: Boolean,
+      maritalStatus: String,
+    },
+    loanDetails: {
+      loanType: String,
+      loanAmountRequired: Number,
+      purposeOfLoan: String,
+      otherPurpose: String,
+      preferredRepaymentTenure: Number,
+    },
+    employmentDetails: {
+      applicantType: String,
+      companyName: String,
+      designation: String,
+      monthlySalary: Number,
+      workExperienceYears: Number,
+      collegeName: String,
+      course: String,
+      yearOfStudy: String,
+      admissionDetails: String,
+      guarantorName: String,
+      guarantorRelation: String,
+      guarantorPan: String,
+      guarantorIncome: Number,
+      businessName: String,
+      annualIncome: Number,
+      businessType: String,
+      yearsInBusiness: Number,
+    },
+    financialInfo: {
+      monthlyIncome: Number,
+      monthlyExpenses: Number,
+      existingLoans: [{ loanName: String, emiAmount: Number, outstandingBalance: Number }],
+      bankAccountNumber: String,
+      ifsc: String,
+      consentForCreditCheck: Boolean,
+    },
+    verification: {
+      otpVerified: Boolean,
+      emailVerified: Boolean,
+      aadhaarVerified: Boolean,
+      bankVerified: Boolean,
+      otpCode: String,
+    },
+    documents: [{
+      fileName: String,
+      fileType: String,
+      filePath: String,
+      uploadedAt: { type: Date, default: Date.now },
+    }],
+    creditScore: Number,
+    reviewSummary: String,
+    approvedInterestRate: Number,
+    approvedEMI: Number,
+    approvedTenure: Number,
+    totalPayable: Number,
+    disbursedAt: Date,
+  },
+  { timestamps: true }
+);
+
+export const LoanApplication = mongoose.model('LoanApplication', loanApplicationSchema);

@@ -11,7 +11,6 @@ DOMAIN_KEYWORDS = {
         'career', 'job', 'student', 'experience', 'cgpa', 'gpa', 'skills', 'projects', 'internship',
         'resume', 'placement', 'machine learning', 'data science', 'dsa', 'software development',
     ],
-    'finance': ['finance', 'loan', 'credit', 'income', 'investment', 'debt'],
     'startup': [
         'startup', 'business', 'funding', 'raised', 'venture', 'founder', 'team size',
         'runway', 'b2b', 'b2c', 'saas', 'market fit', 'traction',
@@ -19,7 +18,7 @@ DOMAIN_KEYWORDS = {
     'policy': ['policy', 'government', 'students', 'education policy', 'infrastructure', 'budget'],
 }
 
-DOMAIN_PRIORITY = ['startup', 'career', 'finance', 'policy']
+DOMAIN_PRIORITY = ['startup', 'career', 'policy']
 
 POLICY_OPTIONS = {
     'free laptop': 'Free Laptop Policy',
@@ -64,12 +63,6 @@ def _canonicalize_option(domain: str, option: str) -> str:
             return 'Enterprise Startup'
         if 'consumer' in lowered or 'b2c' in lowered:
             return 'Consumer Startup'
-    if domain == 'finance':
-        if 'loan' in lowered or 'borrow' in lowered:
-            return 'Take the Loan'
-        if 'wait' in lowered or 'delay' in lowered:
-            return 'Delay the Loan'
-
     return cleaned.strip()
 
 
