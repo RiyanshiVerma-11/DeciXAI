@@ -110,6 +110,10 @@ export default function CareerDomain() {
   const [mode, setMode] = useState('structured')
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState(true)
 
+  // Form Step & Intake Sub-mode persistence state
+  const [formStep, setFormStep] = useState(1)
+  const [intakeMode, setIntakeMode] = useState('form') // 'resume' | 'form' | 'prompt'
+
   // Input states
   const [input, setInput] = useState(INITIAL_CAREER_INPUT)
   const [interactiveInput, setInteractiveInput] = useState(INITIAL_CAREER_INPUT)
@@ -198,6 +202,8 @@ export default function CareerDomain() {
       setResult(res)
       setResultInput(normalized)
       syncInteractiveInput(normalized)
+      setFormStep(3)
+      setIntakeMode('form')
       setIsWorkbenchOpen(false) // Collapse workbench to let results take center stage
     } catch (err) {
       setError(err.message || 'Analysis failed.')
@@ -221,6 +227,8 @@ export default function CareerDomain() {
       setResultInput(nextInput)
       setInput(nextInput)
       syncInteractiveInput(nextInput)
+      setFormStep(3)
+      setIntakeMode('prompt')
       setIsWorkbenchOpen(false)
     } catch (err) {
       setError(err.message || 'NLP prompt evaluation failed.')
@@ -282,6 +290,8 @@ export default function CareerDomain() {
       setInput(mappedInput)
       setResultInput(mappedInput)
       syncInteractiveInput(mappedInput)
+      setFormStep(3)
+      setIntakeMode('resume')
       setIsWorkbenchOpen(false) // Cleanly collapse workbench so results shine in full landscape!
     } catch (err) {
       setError(err.message || 'Failed to parse resume document.')
@@ -311,8 +321,9 @@ export default function CareerDomain() {
     }
   }
 
-  const handleTuneInForm = () => {
-    setMode('structured')
+  const handleTuneInForm = (targetMode = 'form') => {
+    setIntakeMode(targetMode)
+    setFormStep(3)
     setIsWorkbenchOpen(true)
     window.scrollTo({ top: 120, behavior: 'smooth' })
   }
@@ -386,6 +397,8 @@ export default function CareerDomain() {
   const handleNewRun = () => {
     setResult(null)
     setResumeData(null)
+    setFormStep(1)
+    setIntakeMode('form')
     setIsWorkbenchOpen(true)
   }
 
@@ -409,6 +422,10 @@ export default function CareerDomain() {
         onSubmit={handleStructuredSubmit}
         loading={loading}
         onApplyPreset={handleApplyPreset}
+        step={formStep}
+        setStep={setFormStep}
+        intakeMode={intakeMode}
+        setIntakeMode={setIntakeMode}
       />
     </div>
   )

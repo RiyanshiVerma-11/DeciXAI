@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import { CAREER_PERSONAS, CAREER_PARENT_DOMAINS, CAREER_TARGET_ROLES, CAREER_PRESETS } from './careerConfig'
 
@@ -71,15 +71,35 @@ export default function CareerForm({
   onSubmit,
   loading,
   onApplyPreset,
+  step: propStep,
+  setStep: propSetStep,
+  intakeMode: propIntakeMode,
+  setIntakeMode: propSetIntakeMode,
 }) {
-  const [step, setStep] = useState(1)
-  const [intakeMode, setIntakeMode] = useState('form') // 'resume' | 'form' | 'prompt'
+  const [localStep, setLocalStep] = useState(1)
+  const [localIntakeMode, setLocalIntakeMode] = useState('form') // 'resume' | 'form' | 'prompt'
+
+  const step = propStep !== undefined ? propStep : localStep
+  const setStep = propSetStep || setLocalStep
+
+  const intakeMode = propIntakeMode !== undefined ? propIntakeMode : localIntakeMode
+  const setIntakeMode = propSetIntakeMode || setLocalIntakeMode
+
   const [uploadingResume, setUploadingResume] = useState(false)
   const [resumeSuccessMsg, setResumeSuccessMsg] = useState('')
   const [resumeErrorMsg, setResumeErrorMsg] = useState('')
   const [promptText, setPromptText] = useState(input.raw_prompt || input.freeText || '')
   const [promptParseSuccess, setPromptParseSuccess] = useState('')
   const [targetIntentChoice, setTargetIntentChoice] = useState(input.target_role && input.target_role !== 'auto' ? 'specific' : 'ai_recommend')
+
+  useEffect(() => {
+    if (input.raw_prompt || input.freeText) {
+      const activePrompt = input.raw_prompt || input.freeText || ''
+      if (activePrompt !== promptText) {
+        setPromptText(activePrompt)
+      }
+    }
+  }, [input.raw_prompt, input.freeText])
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002'
 
