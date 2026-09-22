@@ -213,10 +213,6 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
     sim_prob = float(sim_res.get("probability") or 0.75)
     sim_pred = sim_res.get("prediction", "Accepted")
 
-    # Probability bounds
-    sim_prob = min(0.99, max(0.20, sim_prob))
-    delta_prob = round(sim_prob - base_prob, 3)
-
     # 4. Compute waterfall attribution for each added factor
     waterfall = []
     if added_skills:
@@ -255,6 +251,21 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
             "category": "academic",
             "description": "Improves institutional academic standing and initial screening percentile.",
         })
+
+    # Probability bounds & monotonic alignment with counterfactual waterfall
+    waterfall_sum = sum(w["delta"] for w in waterfall)
+    if waterfall_sum > 0:
+        headroom = max(0.01, 0.99 - base_prob)
+        scaled_gain = min(headroom, waterfall_sum * min(1.0, headroom / 0.35 + 0.1))
+        sim_prob = min(0.99, max(sim_prob, round(base_prob + scaled_gain, 3)))
+    elif waterfall_sum < 0:
+        sim_prob = max(0.15, min(sim_prob, round(base_prob + waterfall_sum, 3)))
+    else:
+        sim_prob = min(0.99, max(0.20, sim_prob))
+
+    delta_prob = round(sim_prob - base_prob, 3)
+    if delta_prob >= 0 and sim_prob >= 0.70:
+        sim_pred = "Accepted"
 
     # Recommended Optimal Pivot (the fastest combination to hit >= 90%)
     optimal_recommendations = []
