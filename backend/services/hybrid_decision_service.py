@@ -40,6 +40,10 @@ INTEREST_HINTS = {
     "data": ["data science", "analytics", "machine learning"],
     "management": ["product management", "business analyst", "management", "finance", "consulting", "marketing"],
     "technical": ["software development", "software engineer", "web developer", "frontend", "backend", "cloud", "devops", "aws", "azure", "gcp", "docker", "kubernetes", "sre", "ui/ux", "cybersecurity"],
+    "legal": ["corporate law", "legal counsel", "compliance", "regulatory", "due diligence", "contract drafting", "gdpr", "intellectual property", "ip law", "litigation"],
+    "finance": ["financial analysis", "investment banking", "equity research", "accounting", "portfolio management", "valuation", "fintech"],
+    "healthcare": ["clinical research", "pharmacovigilance", "medical affairs", "regulatory affairs", "healthcare consultant", "biotech"],
+    "design": ["ui/ux design", "product design", "user experience", "figma", "interaction design", "wireframing"],
 }
 INTERNSHIP_HINTS = ("internship", "intern", "apprentice", "trainee", "industry training")
 REAL_WORLD_HINTS = (
@@ -57,14 +61,27 @@ PATH_INTEREST_ALIGNMENT = {
     "ai_engineer": "ai",
     "data_science": "data",
     "data_engineering": "data",
-    "finance": "management",
+    "finance": "finance",
     "product_management": "management",
     "marketing": "management",
     "consulting": "management",
     "software_development": "technical",
     "cloud_devops": "technical",
     "cybersecurity": "technical",
-    "ui_ux_design": "technical",
+    "ui_ux_design": "design",
+}
+PATH_INTEREST_DOMAINS = {
+    "ai_engineer": {"ai"},
+    "data_science": {"data", "ai"},
+    "data_engineering": {"data"},
+    "finance": {"finance"},
+    "product_management": {"management", "legal"},
+    "marketing": {"management"},
+    "consulting": {"consulting", "legal", "management", "healthcare"},
+    "software_development": {"technical"},
+    "cloud_devops": {"technical"},
+    "cybersecurity": {"technical"},
+    "ui_ux_design": {"design"},
 }
 PATH_GROUP_ALIGNMENT = {
     "ai_engineer": {"degree": {"engineering", "science", "computer_applications"}, "specialization": {"engineering", "science", "computer_applications"}},
@@ -73,11 +90,11 @@ PATH_GROUP_ALIGNMENT = {
     "software_development": {"degree": {"engineering", "computer_applications"}, "specialization": {"engineering", "computer_applications"}},
     "cloud_devops": {"degree": {"engineering", "computer_applications"}, "specialization": {"engineering", "computer_applications"}},
     "cybersecurity": {"degree": {"engineering", "computer_applications"}, "specialization": {"engineering", "computer_applications"}},
-    "ui_ux_design": {"degree": {"engineering", "general", "computer_applications"}, "specialization": {"engineering", "general", "computer_applications"}},
-    "finance": {"degree": {"business", "engineering", "general"}, "specialization": {"business", "general", "engineering"}},
-    "product_management": {"degree": {"business", "engineering", "general"}, "specialization": {"business", "general", "engineering"}},
-    "marketing": {"degree": {"business", "general"}, "specialization": {"business", "general"}},
-    "consulting": {"degree": {"business", "engineering", "general"}, "specialization": {"business", "general", "engineering"}},
+    "ui_ux_design": {"degree": {"engineering", "general", "computer_applications", "design"}, "specialization": {"engineering", "general", "computer_applications", "design"}},
+    "finance": {"degree": {"business", "finance", "engineering", "general"}, "specialization": {"business", "finance", "general", "engineering"}},
+    "product_management": {"degree": {"business", "engineering", "general", "legal"}, "specialization": {"business", "general", "engineering", "legal"}},
+    "marketing": {"degree": {"business", "general", "design"}, "specialization": {"business", "general", "design"}},
+    "consulting": {"degree": {"business", "engineering", "general", "legal", "finance", "healthcare"}, "specialization": {"business", "general", "engineering", "legal", "finance", "healthcare"}},
 }
 PATH_KEYWORD_HINTS = {
     "ai_engineer": {"ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq", "fastapi", "docker", "python", "vector db", "rag"},
@@ -89,8 +106,8 @@ PATH_KEYWORD_HINTS = {
     "cybersecurity": {"cybersecurity", "security", "ethical hacking", "networking", "linux", "ceh", "penetration testing", "soc", "infosec"},
     "ui_ux_design": {"ui", "ux", "ui/ux", "user interface", "user experience", "figma", "wireframing", "prototyping", "design system", "interaction design", "user research", "product design", "adobe xd", "sketch"},
     "marketing": {"marketing", "digital marketing", "seo", "sem", "content marketing", "social media", "brand", "growth", "campaigns", "copywriting", "advertising", "email marketing", "analytics"},
-    "finance": {"finance", "financial", "accounting", "investment", "banking", "financial modeling", "excel", "valuation", "portfolio", "equity", "cfa", "corporate finance", "risk analysis"},
-    "consulting": {"consulting", "consultant", "strategy", "management consulting", "business strategy", "advisory", "case study", "market entry", "operations", "stakeholder management", "problem solving"},
+    "finance": {"finance", "financial", "accounting", "investment", "banking", "financial modeling", "excel", "valuation", "portfolio", "equity", "cfa", "corporate finance", "risk analysis", "fintech", "audit", "budgeting"},
+    "consulting": {"consulting", "consultant", "strategy", "management consulting", "business strategy", "advisory", "case study", "market entry", "operations", "stakeholder management", "problem solving", "contract drafting", "due diligence", "gdpr", "legal research", "corporate law", "compliance", "regulatory", "nda review", "intellectual property", "cyber law", "clinical research", "regulatory affairs", "legal", "law", "lawyer", "counsel"},
 }
 
 
@@ -172,14 +189,28 @@ def _normalize_interest(interest: str, options_text: str) -> str:
     def _classify(value: str) -> str | None:
         if not value:
             return None
-        # Check direct career path alignments first
+        # Check Law / Legal tracks FIRST so "tech" in "legal counsel in tech" doesn't trigger "technical"!
+        if any(token in value for token in [
+            "legal", "law", "lawyer", "counsel", "advocate", "compliance", "regulatory",
+            "litigation", "contract", "arbitration", "intellectual property", "ip law", "corporate law"
+        ]):
+            return "legal"
+        # Healthcare / Clinical / Biotech tracks
+        if any(token in value for token in ["health", "healthcare", "medical", "clinical", "pharma", "pharmacy", "biotech", "medicine"]):
+            return "healthcare"
+        # UI/UX & Design tracks
+        if any(token in value for token in ["ui", "ux", "ui/ux", "user interface", "user experience", "design", "figma"]):
+            return "design"
+        # Finance & Banking tracks
+        if any(token in value for token in ["finance", "financial", "banking", "investment", "accounting", "equity", "valuation", "fintech", "audit"]):
+            return "finance"
+        # Check direct career path alignments
         for path_name, aligned_int in PATH_INTEREST_ALIGNMENT.items():
             if path_name in value or path_name.replace("_", " ") in value:
                 return aligned_int
-        # Management / Business / Finance / Consulting / Marketing tracks
+        # Consulting / Strategy / Business / Marketing tracks
         if any(token in value for token in [
             "consulting", "consultant", "strategy", "advisory", "management consulting",
-            "finance", "financial", "banking", "investment", "accounting", "equity", "valuation",
             "market", "marketing", "digital marketing", "seo", "sales", "brand", "advertising",
             "product management", "product manager", "project management", "business", "manage", "leader", "mba"
         ]):
@@ -192,9 +223,6 @@ def _normalize_interest(interest: str, options_text: str) -> str:
             return "technical"
         # Cybersecurity
         if any(token in value for token in ["cybersecurity", "security", "ethical hacking", "soc", "infosec", "penetration testing", "network"]):
-            return "technical"
-        # UI/UX design
-        if any(token in value for token in ["ui", "ux", "ui/ux", "user interface", "user experience", "design", "figma"]):
             return "technical"
         # Software engineering & technical tracks
         if any(token in value for token in ["software", "development", "developer", "engineering", "coding", "frontend", "backend", "full stack", "web developer", "programmer", "technical", "tech"]):
@@ -211,13 +239,22 @@ def _normalize_interest(interest: str, options_text: str) -> str:
 
 def _normalize_course_group(value: Any) -> str:
     text = _clean_token(value)
-    if any(token in text for token in ["btech", "b tech", "b.tech", "be", "b.e", "engineering", "computer", "computer science", "cse", "information", "it", "software", "data science", "artificial intelligence", "ai"]):
+    # Check Legal / Compliance FIRST before engineering so terms like cyber law & compliance are never misread as tech
+    if any(token in text for token in ["law", "llb", "ba llb", "bba llb", "llm", "legal", "juris", "compliance", "regulatory", "cyber law", "corporate law", "advocate", "barrister", "solicitor"]):
+        return "legal"
+    if any(token in text for token in ["btech", "b tech", "b.tech", "be", "b.e", "engineering", "computer", "computer science", "cse", "information technology", "info tech", "software", "data science", "artificial intelligence", "ai"]):
         return "engineering"
-    if any(token in text for token in ["b.sc", "science", "mathematics", "physics"]):
+    if any(token in text for token in ["b.com", "bcom", "ca", "cfa", "cpa", "finance", "accounting", "banking"]):
+        return "finance"
+    if any(token in text for token in ["mbbs", "bds", "bpharm", "mpharm", "pharmacy", "medical", "nursing", "biotech", "biotechnology"]):
+        return "healthcare"
+    if any(token in text for token in ["bdes", "mdes", "design", "fine arts", "animation"]):
+        return "design"
+    if any(token in text for token in ["b.sc", "science", "mathematics", "physics", "chemistry", "biology"]):
         return "science"
     if any(token in text for token in ["bca", "mca"]):
         return "computer_applications"
-    if any(token in text for token in ["business", "commerce", "management", "mba"]):
+    if any(token in text for token in ["business", "commerce", "management", "mba", "bba"]):
         return "business"
     return "general"
 
@@ -537,10 +574,24 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
     cert_count = int(normalized.get("certification_count", 0) or len(certifications))
 
     aligned_interest = _path_aligned_interest(path_class)
+    aligned_domains = PATH_INTEREST_DOMAINS.get(path_class, {aligned_interest} if aligned_interest else set())
     interest_domain = normalized.get("interest_domain") or ""
     explicit_interest_paths = _explicit_interest_paths(normalized.get("raw_interest"))
-    interest_aligned = bool(path_class in explicit_interest_paths) if explicit_interest_paths else bool(aligned_interest and interest_domain == aligned_interest)
-    explicit_interest_hit = path_class in explicit_interest_paths
+
+    clean_raw_interest = str(normalized.get("raw_interest") or "").lower()
+    path_label_clean = _path_display_name(option).lower()
+    textual_interest_hit = (
+        path_class.replace("_", " ") in clean_raw_interest
+        or path_label_clean in clean_raw_interest
+        or clean_raw_interest in path_label_clean
+        or any(word in path_label_clean for word in clean_raw_interest.split() if len(word) > 3)
+    )
+    interest_aligned = (
+        bool(path_class in explicit_interest_paths)
+        or bool(interest_domain and interest_domain in aligned_domains)
+        or textual_interest_hit
+    )
+    explicit_interest_hit = path_class in explicit_interest_paths or textual_interest_hit
 
     skills_aligned = len(skill_hits) >= 2 or (len(skill_hits) >= 1 and len(user_skills) <= 4)
     projects_aligned = len(project_hits) >= 1 or (project_count >= 1 and len(projects) >= 1)
@@ -663,6 +714,57 @@ def _suggest_projects_for_path(path_class: str) -> list[dict[str, str]]:
                 "impact": "Infrastructure as Code and SRE maturity."
             }
         ]
+    if path_class == "consulting":
+        return [
+            {
+                "title": "Automated NDA Review & Clause Extraction Pipeline",
+                "problem": "Manual contract review is slow, expensive, and risks missing critical indemnity liabilities.",
+                "stack": "Python, spaCy / LegalBERT, FastAPI, PostgreSQL",
+                "impact": "LegalTech / Compliance proof — automated risk clause flagging and SLA reduction."
+            },
+            {
+                "title": "Enterprise GDPR & Data Governance Audit Dashboard",
+                "problem": "Organizations lack continuous auditability over cross-border data transfer compliance.",
+                "stack": "Python, Pandas, Streamlit / React, PDF Reporting",
+                "impact": "Regulatory reporting and compliance automation proof."
+            },
+            {
+                "title": "Regulatory Change Tracker & Compliance Workflow",
+                "problem": "Tracking regulatory amendments across jurisdictions is decentralized.",
+                "stack": "Web scraping, NLP summarization, Airtable / Notion API",
+                "impact": "Compliance workflow management and automated legal monitoring."
+            }
+        ]
+    if path_class == "finance":
+        return [
+            {
+                "title": "DCF & Three-Statement Financial Valuation Model",
+                "problem": "Manual corporate financial forecasting lacks scenario analysis and sensitivity rigor.",
+                "stack": "Excel / VBA, Python, Financial Modeling",
+                "impact": "Investment banking and corporate valuation signal."
+            },
+            {
+                "title": "Portfolio Risk & Volatility Analytics Suite",
+                "problem": "Measuring Value-at-Risk (VaR) and Sharpe ratios across asset classes.",
+                "stack": "Python, NumPy, Pandas, Plotly / Dash",
+                "impact": "Quantitative finance and risk management proof."
+            }
+        ]
+    if path_class == "ui_ux_design":
+        return [
+            {
+                "title": "Enterprise Design System & Component Library",
+                "problem": "Inconsistent UI patterns across web and mobile products slow down engineering velocity.",
+                "stack": "Figma, Design Tokens, Storybook, Accessibility (WCAG 2.1)",
+                "impact": "Senior product design signal and scalable design architecture proof."
+            },
+            {
+                "title": "Mobile Banking Onboarding Redesign & Usability Audit",
+                "problem": "High user drop-off during KYC verification and account setup.",
+                "stack": "Figma, User Interviews, Wireframing, Maze Usability Testing",
+                "impact": "End-to-end product thinking, interaction design, and conversion optimization."
+            }
+        ]
     return [
         {
             "title": "Domain-Specific Evidence Project",
@@ -688,6 +790,21 @@ def _suggest_certifications_for_path(path_class: str) -> list[str]:
         return ["Security+ (entry)", "CEH or equivalent (depending on your target roles)"]
     if path_class == "product_management":
         return ["Product Management certification (foundational)", "Analytics / SQL certification for PM"]
+    if path_class == "consulting":
+        return [
+            "CIPP/E (Certified Information Privacy Professional — Europe)",
+            "ISO 27001 Lead Auditor or Compliance & Risk Management Certification"
+        ]
+    if path_class == "finance":
+        return [
+            "CFA Level 1 or FMVA (Financial Modeling & Valuation Analyst)",
+            "NISM / FINRA Series certification"
+        ]
+    if path_class == "ui_ux_design":
+        return [
+            "Google UX Design Professional Certificate",
+            "Nielsen Norman Group (NN/g) UX Certification"
+        ]
     return ["One role-aligned certification", "One portfolio-backed certificate (project-based)"]
 
 
@@ -1020,15 +1137,34 @@ def parse_career_prompt(message: str) -> dict[str, Any]:
     })
 
 
+def _map_course_group_for_model(course_group: str) -> str:
+    """Map new extended course groups to values the ML model was trained on."""
+    return _COURSE_GROUP_MODEL_MAP.get(course_group, course_group)
+
+
+def _map_interest_for_model(interest_domain: str) -> str:
+    """Map extended interest domains to values the ML model was trained on.
+    The model knows: data, management, technical, ai (or general).
+    For new domains, we map to the closest training category."""
+    interest_map = {
+        "legal": "management",   # Legal work is management/consulting-adjacent
+        "finance": "management", # Finance is management-adjacent
+        "healthcare": "general",
+        "design": "technical",   # Design has technical aspects
+        "consulting": "management",
+    }
+    return interest_map.get(interest_domain, interest_domain)
+
+
 def _career_model_frame(normalized: dict[str, Any]) -> pd.DataFrame:
     return build_runtime_frame("career", {
         "cgpa": normalized["cgpa"],
         "skills_count": normalized["skill_count"],
         "projects_count": normalized["project_count"],
         "certifications_count": normalized["certification_count"],
-        "interest": normalized["interest_domain"],
-        "course_group": normalized["course_group"],
-        "specialization_group": normalized["specialization_group"],
+        "interest": _map_interest_for_model(normalized["interest_domain"]),
+        "course_group": _map_course_group_for_model(normalized["course_group"]),
+        "specialization_group": _map_course_group_for_model(normalized["specialization_group"]),
         "internship_count": len(normalized.get("internships") or []),
         "experience_years": normalized.get("experience_years", 0.0),
         "portfolio_strength": normalized["project_count"] + len(normalized.get("internships") or []) + normalized["certification_count"],
@@ -1059,9 +1195,20 @@ def _comparison_frame(normalized: dict[str, Any], option_text: str = "") -> pd.D
     }])
 
 
+# Map new course groups to ML-model compatible categories
+_COURSE_GROUP_MODEL_MAP = {
+    "legal": "general",
+    "finance": "business",
+    "healthcare": "science",
+    "design": "general",
+}
+
+
 def _get_specialized_display_name(class_name: str, normalized: dict[str, Any]) -> str:
     raw_interest = _clean_token(normalized.get("raw_interest", ""))
     skills_text = " ".join(_clean_token(s) for s in (normalized.get("expanded_skills") or normalized.get("skills", [])))
+    interest_domain = normalized.get("interest_domain", "")
+    course_group = normalized.get("course_group", "")
 
     if class_name == "data_science":
         if any(term in raw_interest or term in skills_text for term in ["ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq"]):
@@ -1088,6 +1235,41 @@ def _get_specialized_display_name(class_name: str, normalized: dict[str, Any]) -
         if any(term in raw_interest or term in skills_text for term in ["big data", "spark", "hadoop", "etl"]):
             return "Big Data & Pipeline Engineer"
         return "Data Engineering"
+
+    if class_name == "consulting":
+        # When the candidate is from a legal background, consulting maps to legal counsel
+        if interest_domain == "legal" or course_group == "legal":
+            if any(term in raw_interest or term in skills_text for term in ["corporate law", "corporate counsel", "in-house", "tech law", "fintech law"]):
+                return "Corporate Legal Counsel (In-House)"
+            if any(term in raw_interest or term in skills_text for term in ["ip", "intellectual property", "patent"]):
+                return "IP & Technology Lawyer"
+            if any(term in raw_interest or term in skills_text for term in ["compliance", "regulatory", "gdpr"]):
+                return "Compliance & Regulatory Manager"
+            return "Corporate Legal Counsel"
+        if interest_domain == "healthcare" or course_group == "healthcare":
+            return "Healthcare & Regulatory Consultant"
+        return "Strategy & Management Consulting"
+
+    if class_name == "finance":
+        if interest_domain == "finance" or course_group == "finance":
+            if any(term in raw_interest or term in skills_text for term in ["investment", "equity", "banking", "ib"]):
+                return "Investment Banking / Equity Research Analyst"
+            if any(term in raw_interest or term in skills_text for term in ["fintech", "digital finance"]):
+                return "FinTech Analyst"
+            return "Financial Analyst"
+        return "Finance & Investment"
+
+    if class_name == "ui_ux_design":
+        if interest_domain == "design" or course_group == "design":
+            if any(term in raw_interest or term in skills_text for term in ["product design", "interaction design"]):
+                return "Product Designer"
+            return "UI/UX Designer"
+        return "UI/UX Design"
+
+    if class_name == "product_management":
+        if interest_domain == "legal":
+            return "LegalTech Product Manager"
+        return "Product Management"
 
     return class_name.replace("_", " ").title()
 
@@ -1914,7 +2096,8 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
         # Case 3: skills+projects+cert align but interest doesn't -> dual-track clarity
         elif snapshot["skills_aligned"] and snapshot["projects_aligned"] and snapshot["certs_aligned"] and not snapshot["interest_aligned"]:
             desired_path = _pick_desired_path_from_interest(normalized)
-            desired_label = desired_path.replace("_", " ").title() if desired_path else "your stated interest"
+            raw_interest = normalized.get("raw_interest") or normalized.get("interest") or ""
+            desired_label = desired_path.replace("_", " ").title() if desired_path else (raw_interest or "your stated interest")
             result["insights"] = [
                 f"Your profile evidence matches {snapshot['path_label']}, but your stated interest points to {desired_label}.",
                 *list(result.get("insights") or []),

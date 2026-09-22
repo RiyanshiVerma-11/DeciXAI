@@ -19,10 +19,14 @@ SECTION_LABELS = (
     "specialization",
     "branch",
     "stream",
+    "education level",
+    "year of study",
+    "year",
     "cgpa",
     "gpa",
     "skills",
     "tech stack",
+    "technologies",
     "key projects",
     "projects",
     "project",
@@ -31,6 +35,7 @@ SECTION_LABELS = (
     "achievements",
     "internships",
     "internship",
+    "experience",
     "interest",
     "target career options",
     "target options",
@@ -54,8 +59,8 @@ NOISE_PATTERNS = (
 
 def _extract_section(text: str, labels: tuple[str, ...]) -> str:
     """Extract the free-text segment following a label until the next known label."""
-    escaped_labels = [re.escape(label) for label in SECTION_LABELS]
-    pattern_boundary = r"(?=\n\s*(?:" + "|".join(escaped_labels) + r")\b|[,;]\s*(?:" + "|".join(escaped_labels) + r")\b|\b(?:" + "|".join(escaped_labels) + r")\s*[:=]|$)"
+    escaped_labels = [re.escape(label) for label in sorted(SECTION_LABELS, key=len, reverse=True)]
+    pattern_boundary = r"(?=\n\s*(?:" + "|".join(escaped_labels) + r")\b|[,;]\s*(?:" + "|".join(escaped_labels) + r")\b|\s+\b(?:" + "|".join(escaped_labels) + r")\b|\b(?:" + "|".join(escaped_labels) + r")\s*[:=]|$)"
     for label in labels:
         match = re.search(
             rf"\b{re.escape(label)}\b[:\s=\-]*(.*?){pattern_boundary}",
@@ -157,6 +162,7 @@ SPECIALIZATION_ALIASES = {
 }
 
 SKILL_ALIASES = {
+    # ── Tech & Engineering Skills ──
     "python": ("python", "py"),
     "java": ("java",),
     "c++": ("c++", "cpp"),
@@ -192,7 +198,7 @@ SKILL_ALIASES = {
     "scikit-learn": ("scikit learn", "sklearn"),
     "tensorflow": ("tensorflow",),
     "pytorch": ("pytorch",),
-    "excel": ("excel",),
+    "excel": ("excel", "advanced excel", "spreadsheets", "vba"),
     "power bi": ("power bi", "powerbi"),
     "tableau": ("tableau",),
     "node.js": ("node", "nodejs", "node.js"),
@@ -209,9 +215,62 @@ SKILL_ALIASES = {
     "pl/sql": ("pl/sql", "plsql", "pl sql"),
     "c#": ("c#", "csharp", "c sharp"),
     "figma": ("figma",),
+
+    # ── Law & Legal Track Skills ──
+    "contract drafting": ("contract drafting", "drafting contracts", "agreement drafting", "contract management", "contracts"),
+    "due diligence": ("due diligence", "legal due diligence", "corporate due diligence"),
+    "gdpr compliance": ("gdpr compliance", "gdpr", "data privacy", "privacy law", "dpdp", "data protection"),
+    "legal research": ("legal research", "case law research", "statutory interpretation", "westlaw", "manupatra", "lexisnexis"),
+    "intellectual property": ("intellectual property", "ip law", "patent drafting", "trademark prosecution", "copyright law", "patents"),
+    "corporate governance": ("corporate governance", "board compliance", "secretarial audit", "compliance"),
+    "litigation": ("litigation", "dispute resolution", "arbitration", "moot court", "court drafting"),
+    "mergers and acquisitions": ("mergers and acquisitions", "m&a", "ma", "joint ventures"),
+    "tax law": ("tax law", "taxation law", "gst", "direct tax", "indirect tax"),
+
+    # ── Finance & Accounting Track Skills ──
+    "financial modeling": ("financial modeling", "financial model", "dcf", "dcf modeling", "lbo", "three statement modeling"),
+    "valuation": ("valuation", "company valuation", "equity valuation", "comparable analysis"),
+    "auditing": ("auditing", "statutory audit", "internal audit", "tax audit", "assurance"),
+    "accounting": ("accounting", "accountancy", "bookkeeping", "ifrs", "gaap", "tally", "quickbooks", "sap"),
+    "financial analysis": ("financial analysis", "ratio analysis", "equity research", "credit analysis"),
+    "portfolio management": ("portfolio management", "asset management", "wealth management", "fund management"),
+    "risk management": ("risk management", "credit risk", "market risk", "basel", "financial risk"),
+    "corporate finance": ("corporate finance", "capital budgeting", "working capital management"),
+    "bloomberg": ("bloomberg", "bloomberg terminal", "factset", "reuters"),
+
+    # ── Healthcare, Biotech & Pharma Skills ──
+    "clinical trials": ("clinical trials", "clinical research", "clinical study", "gcp", "good clinical practice"),
+    "pharmacology": ("pharmacology", "pharmacokinetics", "pharmacodynamics"),
+    "drug discovery": ("drug discovery", "formulation", "medicinal chemistry", "assay development"),
+    "molecular biology": ("molecular biology", "pcr", "gel electrophoresis", "dna sequencing", "western blot"),
+    "bioinformatics": ("bioinformatics", "blast", "genomics", "biopython", "sequence analysis"),
+    "drug safety": ("drug safety", "pharmacovigilance", "pv", "adverse event reporting", "meddra"),
+    "patient care": ("patient care", "clinical care", "diagnostics", "patient assessment"),
+    "biostatistics": ("biostatistics", "clinical biostatistics", "survival analysis", "epidemiology"),
+
+    # ── Design & Creative Track Skills ──
+    "wireframing": ("wireframing", "wireframes", "low fidelity wireframes"),
+    "prototyping": ("prototyping", "interactive prototype", "figma prototype", "high fidelity prototype"),
+    "user research": ("user research", "user interviews", "usability testing", "persona mapping", "heuristic evaluation"),
+    "design systems": ("design systems", "design system", "component library", "atomic design"),
+    "visual design": ("visual design", "typography", "color theory", "graphic design", "layout design"),
+
+    # ── Marketing & Strategy Skills ──
+    "seo": ("seo", "search engine optimization", "sem", "google search console"),
+    "content strategy": ("content strategy", "copywriting", "content writing", "technical writing"),
+    "digital marketing": ("digital marketing", "social media marketing", "performance marketing", "meta ads", "google ads"),
+    "market research": ("market research", "competitor analysis", "market sizing", "tam sam som"),
+    "brand management": ("brand management", "brand strategy", "brand positioning"),
+
+    # ── Management, Consulting & Operations Skills ──
+    "project management": ("project management", "agile", "scrum", "kanban", "jira", "pmp", "sprint planning"),
+    "strategy": ("business strategy", "corporate strategy", "consulting", "management consulting", "case studies"),
+    "operations": ("operations", "supply chain", "logistics", "six sigma", "lean operations"),
+    "human resources": ("human resources", "talent acquisition", "recruitment", "hr", "payroll", "people ops"),
 }
 
 CAREER_OPTION_ALIASES = {
+    # Engineering & Tech Tracks
     "ai engineer": (
         "ai engineer",
         "ai engineering",
@@ -278,22 +337,80 @@ CAREER_OPTION_ALIASES = {
         "ui ux",
         "ux designer",
         "ui designer",
+        "product designer",
+        "product design",
     ),
     "finance": (
         "finance",
         "financial analyst",
+        "corporate finance",
+        "fp&a",
+        "financial planning",
+    ),
+    "investment banking": (
+        "investment banking",
+        "investment banker",
+        "ib analyst",
+        "m&a analyst",
+        "equity research",
     ),
     "marketing": (
         "marketing",
         "digital marketing",
+        "growth marketer",
+        "brand manager",
     ),
     "consulting": (
         "consulting",
         "consultant",
+        "management consulting",
+        "strategy consulting",
+    ),
+    # Legal & Corporate Track Options
+    "corporate legal counsel": (
+        "corporate legal counsel",
+        "corporate lawyer",
+        "in-house counsel",
+        "legal counsel",
+        "corporate law",
+        "company lawyer",
+        "legal advisor",
+    ),
+    "ip tech lawyer": (
+        "ip tech lawyer",
+        "intellectual property lawyer",
+        "tech lawyer",
+        "cyber lawyer",
+        "data privacy counsel",
+        "patent attorney",
+        "ip counsel",
+    ),
+    "compliance regulatory manager": (
+        "compliance regulatory manager",
+        "compliance officer",
+        "regulatory affairs",
+        "legal compliance",
+        "risk and compliance",
+        "compliance manager",
+    ),
+    # Healthcare & Biotech Track Options
+    "clinical research associate": (
+        "clinical research associate",
+        "clinical research",
+        "cra",
+        "clinical trials manager",
+        "clinical trial lead",
+    ),
+    "pharmacovigilance specialist": (
+        "pharmacovigilance specialist",
+        "drug safety officer",
+        "safety specialist",
+        "drug safety associate",
     ),
 }
 
 INTEREST_ALIASES = {
+    # Tech
     "ai engineer": (
         "ai engineering",
         "agentic systems",
@@ -327,6 +444,40 @@ INTEREST_ALIASES = {
     ),
     "cybersecurity": ("cybersecurity", "cyber security", "security"),
     "data engineering": ("data engineering", "data pipelines"),
+    "ui ux design": ("ui/ux", "ui ux", "user experience", "product design", "interaction design"),
+
+    # Legal
+    "corporate legal counsel": (
+        "corporate law",
+        "legal counsel",
+        "corporate counsel",
+        "in-house counsel",
+        "company law",
+        "commercial law",
+        "legal counsel in tech",
+        "legal counsel in fintech",
+        "fintech legal",
+        "contract management",
+    ),
+    "compliance regulatory manager": (
+        "compliance",
+        "regulatory compliance",
+        "regulatory affairs",
+        "legal compliance",
+        "data privacy",
+        "gdpr",
+    ),
+
+    # Finance
+    "finance": ("finance", "banking and finance", "corporate finance", "financial management"),
+    "investment banking": ("investment banking", "equity research", "valuation", "m&a"),
+
+    # Healthcare
+    "clinical research associate": ("clinical research", "clinical trials", "pharmacology", "drug safety", "pharmacovigilance"),
+
+    # Business
+    "marketing": ("marketing", "digital marketing", "growth marketing", "brand strategy"),
+    "consulting": ("consulting", "management consulting", "strategy"),
 }
 
 PROJECT_ENDINGS = (
@@ -409,7 +560,7 @@ def _normalize_text(text: str) -> str:
     """Lowercase and normalize punctuation before extraction."""
     normalized = str(text or "").lower()
     normalized = normalized.replace("&", " and ").replace("%", " percent ")
-    normalized = re.sub(r"[^a-z0-9+.\s/-]", " ", normalized)
+    normalized = re.sub(r"[^a-z0-9+.\s/,;-]", " ", normalized)
     return _collapse_spaces(normalized)
 
 
@@ -664,16 +815,223 @@ def _split_project_phrases(section: str) -> list[str]:
 
 
 def _extract_skills(text: str) -> list[str]:
-    """Scan the full text for skills, even if an explicit skills section exists."""
+    """Scan text and skills section for skills across all professional tracks."""
     section = _extract_section(text, ("skills", "skill", "technologies", "tech stack"))
     search_space = text
     matches = _extract_from_aliases(search_space, SKILL_ALIASES)
 
     if section:
         for item in _split_section_items(section):
-            for skill in _extract_from_aliases(item, SKILL_ALIASES):
-                if skill not in matches:
-                    matches.append(skill)
+            item_clean = _collapse_spaces(item.strip(" .,:;-"))
+            if not item_clean or len(item_clean) < 2 or len(item_clean) > 50:
+                continue
+            sub_matches = _extract_from_aliases(item_clean, SKILL_ALIASES)
+            if sub_matches:
+                for skill in sub_matches:
+                    if skill not in matches:
+                        matches.append(skill)
+            else:
+                # Free-form domain skill fallback: preserve real specialized skills
+                lower_item = item_clean.lower()
+                stop_tokens = ("none", "nothing", "na", "cgpa", "course", "projects", "certifications", "options")
+                if not any(sw in lower_item for sw in stop_tokens):
+                    if lower_item not in {m.lower() for m in matches}:
+                        matches.append(item_clean)
+
+    return matches
+
+
+def _estimate_phrase_count(section: str) -> int:
+    """Estimate project-like phrase count when items are not comma-separated."""
+    if not section:
+        return 0
+
+    phrase_items = _split_project_phrases(section)
+    if phrase_items:
+        return len(phrase_items)
+
+    tokens = section.split()
+    return 1 if tokens else 0
+
+
+def _extract_project_descriptions(text: str) -> list[str]:
+    """Extract project descriptors from explicit project sections."""
+    section = _extract_section(text, ("projects", "project", "proj"))
+    if not section:
+        return []
+
+    project_items = _split_project_phrases(section)
+    return project_items
+
+
+def _score_project_description(project: str) -> int:
+    normalized = project.lower()
+    if any(keyword in normalized for keyword in HIGH_VALUE_PROJECTS):
+        return 3
+    if any(keyword in normalized for keyword in MEDIUM_VALUE_PROJECTS):
+        return 2
+    return 1
+
+
+def extract_project_keywords(text: str) -> int:
+    keywords = ["prediction", "recommendation", "machine learning", "model"]
+    lowered = str(text or "").lower()
+    return sum(1 for keyword in keywords if keyword in lowered)
+
+
+def _calculate_project_quality_score(project_descriptions: list[str], project_count: int) -> int:
+    if not project_descriptions:
+        return project_count
+
+    score = 0
+    for project in project_descriptions:
+        score += _score_project_description(project)
+
+    if project_count > len(project_descriptions):
+        score += project_count - len(project_descriptions)
+
+    return score
+
+
+def _extract_projects_count(text: str, raw_text: str = "") -> int:
+    search_text = f"{text}\n{raw_text}"
+    explicit_count = _extract_number_near_keywords(search_text, ("projects", "project", "proj"))
+    if explicit_count is not None and explicit_count > 0:
+        return explicit_count
+
+    if raw_text:
+        raw_numbered = re.findall(r"(?:^|\n|\b)\d+[\.\)]\s+[A-Za-z0-9]", raw_text)
+        if len(raw_numbered) >= 1:
+            return len(raw_numbered)
+
+    section = _extract_section(search_text, ("key projects", "projects", "project", "proj"))
+    if section:
+        numbered = re.findall(r"(?:^|\n|\b)(?:\d+[\.\)]|•|\*|-)\s*([^\n]+)", section)
+        if len(numbered) >= 1:
+            return len(numbered)
+        estimated = _estimate_phrase_count(section)
+        if estimated > 0:
+            return estimated
+
+    raw_numbered = re.findall(r"\b\d+[\.\)]\s+[A-Za-z0-9]", search_text)
+    if len(raw_numbered) >= 1:
+        return len(raw_numbered)
+
+    return 0
+
+
+def _extract_certifications_count(text: str, raw_text: str = "") -> int:
+    search_text = f"{text}\n{raw_text}"
+    explicit_count = _extract_number_near_keywords(
+        search_text,
+        ("certifications", "certification", "certs", "cert", "achievements"),
+    )
+    if explicit_count is not None and explicit_count > 0:
+        return explicit_count
+
+    if raw_text:
+        ach_keywords = ["rank 1", "promptwars", "diamond league", "rank 30", "winner", "first place", "award", "cup"]
+        raw_lower = raw_text.lower()
+        ach_count = sum(1 for kw in ach_keywords if kw in raw_lower)
+        if ach_count >= 1:
+            ach_items = re.findall(r"(?:^|\n|\b)(?:•|\*|-|\d+[\.\)])\s*([^\n]+)", raw_text)
+            return max(ach_count, len(ach_items) if ach_items else 2)
+
+    section = _extract_section(search_text, ("achievements", "certifications", "certification", "certs", "cert"))
+    if section:
+        items = _clean_certification_items(_split_section_items(section))
+        if items:
+            return len(items)
+        numbered = re.findall(r"(?:^|\n|\b)(?:\d+[\.\)]|•|\*|-)\s*([^\n]+)", section)
+        if numbered:
+            return len(numbered)
+
+    cert_keywords = ["google", "infosys", "coursera", "udemy", "aws", "promptwars", "rank 1", "diamond league", "certificate", "certification"]
+    lowered = search_text.lower()
+    matches = sum(1 for kw in cert_keywords if kw in lowered)
+    return min(matches, 5) if matches > 0 else 0
+
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        key = item.strip().lower()
+        if key and key not in seen:
+            seen.add(key)
+            unique.append(item)
+    return unique
+
+def _clean_certification_items(items: list[str]) -> list[str]:
+    cleaned_items: list[str] = []
+    for item in items:
+        normalized = _collapse_spaces(item.strip(" .,:;-"))
+        if not normalized:
+            continue
+        lower = normalized.lower()
+        if lower in CERTIFICATION_STOP_WORDS:
+            continue
+        if lower.startswith('internship ') or lower.startswith('intern ') or lower.startswith('internships '):
+            continue
+        cleaned_items.append(normalized)
+    return _dedupe_preserve_order(cleaned_items)
+
+
+def _split_project_phrases(section: str) -> list[str]:
+    if not section:
+        return []
+
+    explicit_items = _split_section_items(section)
+    if len(explicit_items) > 1:
+        return explicit_items
+
+    tokens = section.split()
+    if not tokens:
+        return []
+
+    chunks: list[str] = []
+    current: list[str] = []
+    endings = {ending.lower() for ending in PROJECT_ENDINGS}
+    for token in tokens:
+        current.append(token)
+        if token.lower() in endings:
+            chunks.append(" ".join(current).strip())
+            current = []
+
+    if current:
+        chunks.append(" ".join(current).strip())
+
+    cleaned_chunks = [
+        _collapse_spaces(chunk.strip(" .,:;-"))
+        for chunk in chunks
+        if _collapse_spaces(chunk.strip(" .,:;-"))
+    ]
+    return _dedupe_preserve_order(cleaned_chunks)
+
+
+def _extract_skills(text: str) -> list[str]:
+    """Scan text and skills section for skills across all professional tracks."""
+    section = _extract_section(text, ("skills", "skill", "technologies", "tech stack"))
+    search_space = text
+    matches = _extract_from_aliases(search_space, SKILL_ALIASES)
+
+    if section:
+        for item in _split_section_items(section):
+            item_clean = _collapse_spaces(item.strip(" .,:;-"))
+            if not item_clean or len(item_clean) < 2 or len(item_clean) > 50:
+                continue
+            sub_matches = _extract_from_aliases(item_clean, SKILL_ALIASES)
+            if sub_matches:
+                for skill in sub_matches:
+                    if skill not in matches:
+                        matches.append(skill)
+            else:
+                # Free-form domain skill fallback: preserve real specialized skills
+                lower_item = item_clean.lower()
+                stop_tokens = ("none", "nothing", "na", "cgpa", "course", "projects", "certifications", "options")
+                if not any(sw in lower_item for sw in stop_tokens):
+                    if lower_item not in {m.lower() for m in matches}:
+                        matches.append(item_clean)
 
     return matches
 
@@ -840,7 +1198,7 @@ def _extract_options(text: str) -> list[str]:
     all_options = options_from_segment + options_from_interest
     options = _dedupe_preserve_order(all_options)
 
-    return options if len(options) >= 2 else DEFAULT_CAREER_OPTIONS.copy()
+    return options if len(options) >= 2 else []
 
 
 def parse_natural_language_input(text: str) -> dict:
@@ -849,8 +1207,6 @@ def parse_natural_language_input(text: str) -> dict:
     """
     cleaned_text = _clean_input(text)
     options = _extract_options(cleaned_text)
-    if len(set(options)) == 1:
-        options = DEFAULT_CAREER_OPTIONS.copy()
 
     project_descriptions = _extract_project_descriptions(cleaned_text)
     project_count = _extract_projects_count(cleaned_text, raw_text=text)

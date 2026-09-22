@@ -122,32 +122,9 @@ def generate_action_plan(
         {"role": "user", "content": json.dumps(user, ensure_ascii=True)},
     ]
 
-    request = _ollama_request(messages, num_predict=1200)  # more tokens for detailed projects
-    try:
-        with urlopen(request, timeout=timeout_seconds) as response:
-            raw = response.read().decode("utf-8")
-            data = json.loads(raw)
-            content = _extract_content(data).strip()
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError):
-        return None
-
-    if not content:
-        return None
-
-    # Parse JSON response safely.
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError:
-        start = content.find("{")
-        end = content.rfind("}")
-        if start < 0 or end < 0 or end <= start:
-            return None
-        try:
-            parsed = json.loads(content[start : end + 1])
-        except Exception:
-            return None
-
-    if not isinstance(parsed, dict):
+    from services.llm_client import call_llm_json
+    parsed = call_llm_json(messages, timeout_seconds=timeout_seconds)
+    if not parsed or not isinstance(parsed, dict):
         return None
 
     return {
@@ -155,4 +132,5 @@ def generate_action_plan(
         "reality_check": parsed.get("reality_check", "Profile is promising but needs more production-ready evidence."),
         "project_ideas": parsed.get("project_ideas", [])[:3]
     }
+
 

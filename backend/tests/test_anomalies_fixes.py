@@ -169,10 +169,10 @@ def test_7_readiness_vs_path_match():
 def test_8_interest_normalization():
     assert _normalize_interest("consulting", "") == "management"
     assert _normalize_interest("management consulting", "") == "management"
-    assert _normalize_interest("finance", "") == "management"
-    assert _normalize_interest("investment banking", "") == "management"
+    assert _normalize_interest("finance", "") == "finance"
+    assert _normalize_interest("investment banking", "") == "finance"
     assert _normalize_interest("digital marketing", "") == "management"
-    assert _normalize_interest("ui/ux design", "") == "technical"
+    assert _normalize_interest("ui/ux design", "") == "design"
     assert _normalize_interest("data science", "") == "data"
     assert _normalize_interest("software engineering", "") == "technical"
 
@@ -227,6 +227,75 @@ def test_10_delimiter_and_token_parsing():
     assert "pl/sql" in train_items
 
 
+def test_11_cyber_law_course_group_legal():
+    from services.hybrid_decision_service import _normalize_course_group
+    assert _normalize_course_group("BA LLB") == "legal"
+    assert _normalize_course_group("Cyber Law") == "legal"
+    assert _normalize_course_group("Corporate Law") == "legal"
+
+    # Legal input normalization
+    norm = normalize_career_input({
+        "course": "BA LLB",
+        "specialization": "Cyber Law",
+        "interest": "Cyber Law & Compliance",
+        "skills": ["GDPR", "Contract Drafting", "Legal Research"],
+        "projects": ["Data Privacy Regulatory Compliance Framework"],
+        "cgpa": 7.9,
+    })
+    assert norm["course_group"] == "legal"
+    assert norm["specialization_group"] == "legal"
+
+
+def test_12_desired_label_raw_interest_fallback():
+    # User with software skills but specialized interest "Niche Quantum Security"
+    normalized = normalize_career_input({
+        "cgpa": 8.5,
+        "skills": ["python", "react", "sql", "docker", "fastapi"],
+        "projects": ["Web App", "Backend API"],
+        "certifications": ["AWS Developer"],
+        "interest": "Niche Quantum Security",
+    })
+    res = analyze_career_profile(normalized)
+    insights_str = " ".join(res.get("insights") or [])
+    summary_str = res.get("summary") or ""
+    
+    # Should NOT contain bug 2 literal fallback "points to your stated interest"
+    assert "points to your stated interest" not in insights_str
+    assert "points to your stated interest" not in summary_str
+
+
+def test_13_interest_aligned_summary_consistency():
+    from services.hybrid_decision_service import _career_alignment_snapshot
+    normalized = normalize_career_input({
+        "cgpa": 8.0,
+        "skills": ["python", "react", "sql"],
+        "projects": ["Portfolio Website"],
+        "interest": "Software Development",
+    })
+    top_option = {
+        "mapped_class": "software_development",
+        "name": "Software Development",
+        "path_profile": {"top_skills": ["python", "react", "javascript"]},
+    }
+    snapshot = _career_alignment_snapshot(normalized, top_option)
+    assert snapshot["interest_aligned"] is True
+
+
+def test_14_non_tech_role_skill_gaps():
+    normalized = normalize_career_input({
+        "course": "BA LLB",
+        "specialization": "Cyber Law",
+        "skills": ["GDPR", "Legal Research"],
+        "projects": ["SaaS GDPR Compliance Audit"],
+        "interest": "Legal & Compliance",
+    })
+    res = analyze_career_profile(normalized, options=["In-House Legal Counsel & Compliance"])
+    actions_str = " ".join(res.get("action_plan") or [])
+    # Should NOT recommend Flask, Django, or pure software dev stacks for legal roles
+    assert "flask" not in actions_str.lower()
+    assert "django" not in actions_str.lower()
+
+
 if __name__ == "__main__":
     test_1_probability_not_deflated()
     print("[PASS] Test 1: Probability not artificially deflated")
@@ -248,4 +317,13 @@ if __name__ == "__main__":
     print("[PASS] Test 9: Experienced candidates evaluated fairly without campus CGPA penalty")
     test_10_delimiter_and_token_parsing()
     print("[PASS] Test 10: Delimiters preserve CI/CD, UI/UX, C++, PL/SQL")
-    print("\nALL 10 ANOMALY VERIFICATION TESTS PASSED SUCCESSFULLY!")
+    test_11_cyber_law_course_group_legal()
+    print("[PASS] Test 11: Cyber law & BA LLB mapped to legal course group")
+    test_12_desired_label_raw_interest_fallback()
+    print("[PASS] Test 12: desired_label falls back to raw_interest string")
+    test_13_interest_aligned_summary_consistency()
+    print("[PASS] Test 13: interest_aligned snapshot consistency")
+    test_14_non_tech_role_skill_gaps()
+    print("[PASS] Test 14: Non-tech role skill gaps are domain-aware (no Flask/Django)")
+    print("\nALL 14 ANOMALY VERIFICATION TESTS PASSED SUCCESSFULLY!")
+

@@ -22,87 +22,9 @@ from urllib.request import Request, urlopen
 from dotenv import find_dotenv, load_dotenv
 
 from services.hybrid_decision_service import analyze_career_profile, normalize_career_input
+from services.llm_client import call_llm_json as _client_call_llm_json
 
 load_dotenv(find_dotenv())
-
-# ── Primary LLM: Groq ──────────────────────────────────────────────────────
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-RAW_OLLAMA_URL = (
-    os.getenv("GROQ_API_URL")
-    or os.getenv("LLM_API_URL")
-    or os.getenv(
-        "OLLAMA_API_URL",
-        "https://api.groq.com/openai/v1/chat/completions" if GROQ_API_KEY else "http://127.0.0.1:11434/v1/chat/completions",
-    )
-)
-OLLAMA_URL = (
-    RAW_OLLAMA_URL
-    if urlparse(RAW_OLLAMA_URL).path not in {"", "/"}
-    else urljoin(RAW_OLLAMA_URL.rstrip("/") + "/", "v1/chat/completions")
-)
-OLLAMA_MODEL = (
-    os.getenv("GROQ_MODEL")
-    or os.getenv("LLM_MODEL")
-    or os.getenv("OLLAMA_MODEL", "openai/gpt-oss-20b" if GROQ_API_KEY else "llama3.1:8b")
-)
-
-# ── Fallback LLM: Gemini (Google AI Studio) ────────────────────────────────
-GEMINI_API_KEY  = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL    = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
-GEMINI_API_URL  = os.getenv("GEMINI_API_URL", "https://generativelanguage.googleapis.com/v1beta/models")
-
-
-def _extract_json(content: str) -> dict[str, Any] | None:
-    """Safely extract first JSON object from a string."""
-    if not content:
-        return None
-    start = content.find("{")
-    end = content.rfind("}")
-    if start >= 0 and end > start:
-        try:
-            return json.loads(content[start : end + 1])
-        except Exception:
-            pass
-    try:
-        return json.loads(content)
-    except Exception:
-        return None
-
-
-def _call_gemini_json(prompt_text: str, timeout_seconds: int = 20) -> dict[str, Any] | None:
-    """
-    Call Gemini API (Google AI Studio) and parse JSON from response.
-    Used as fallback when Groq is unavailable.
-    """
-    if not GEMINI_API_KEY:
-        return None
-
-    url = f"{GEMINI_API_URL}/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "contents": [{"parts": [{"text": prompt_text}]}],
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 1500,
-        },
-    }
-    req = Request(
-        url,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json", "User-Agent": "DeciXAI/2.0"},
-    )
-    try:
-        with urlopen(req, timeout=timeout_seconds) as response:
-            raw = response.read().decode("utf-8")
-            data = json.loads(raw)
-            parts = (
-                (data.get("candidates") or [{}])[0]
-                .get("content", {})
-                .get("parts", [{}])
-            )
-            content = parts[0].get("text", "") if parts else ""
-            return _extract_json(content)
-    except Exception:
-        return None
 
 
 def _call_llm_json(
@@ -111,53 +33,11 @@ def _call_llm_json(
     gemini_fallback: bool = True,
 ) -> dict[str, Any] | None:
     """
-    Query LLM and safely parse JSON response.
-    Primary: Groq (OpenAI-compatible API).
-    Fallback: Gemini (Google AI Studio) — used when Groq fails/times out.
+    Primary: Gemini Secondary API Key.
+    Rate-limit / failure failover: Groq Secondary API Key.
     """
-    payload = {
-        "model": OLLAMA_MODEL,
-        "messages": messages,
-        "temperature": 0.3,
-        "response_format": {"type": "json_object"} if GROQ_API_KEY else None,
-    }
-    if GROQ_API_KEY:
-        payload["max_tokens"] = 1500
-    else:
-        payload["num_predict"] = 1500
+    return _client_call_llm_json(messages, timeout_seconds=timeout_seconds)
 
-    headers = {"Content-Type": "application/json", "User-Agent": "DeciXAI/2.0"}
-    if GROQ_API_KEY:
-        headers["Authorization"] = f"Bearer {GROQ_API_KEY}"
-
-    req = Request(OLLAMA_URL, data=json.dumps(payload).encode("utf-8"), headers=headers)
-    try:
-        with urlopen(req, timeout=timeout_seconds) as response:
-            raw = response.read().decode("utf-8")
-            data = json.loads(raw)
-            choices = data.get("choices") or []
-            content = ""
-            if choices:
-                content = (choices[0].get("message") or {}).get("content") or ""
-            else:
-                content = data.get("response") or ""
-            result = _extract_json(content)
-            if result is not None:
-                return result
-    except Exception:
-        pass  # Fall through to Gemini
-
-    # ── Gemini fallback ────────────────────────────────────────────────────
-    if gemini_fallback and GEMINI_API_KEY:
-        # Convert messages to a single prompt string for Gemini
-        prompt_parts = []
-        for msg in messages:
-            role = msg.get("role", "user").capitalize()
-            prompt_parts.append(f"[{role}]\n{msg.get('content', '')}")
-        prompt_text = "\n\n".join(prompt_parts)
-        return _call_gemini_json(prompt_text, timeout_seconds=timeout_seconds)
-
-    return None
 
 
 # ===========================================================================
