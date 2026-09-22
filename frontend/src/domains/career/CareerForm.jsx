@@ -529,6 +529,37 @@ export default function CareerForm({
                 </div>
               </div>
 
+              {/* Recommended Prompt Syntax Guide Banner right above textarea */}
+              <div className="bg-slate-900 text-white rounded-xl p-3.5 space-y-2 border border-slate-800 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-cyan-400 flex items-center gap-1">
+                    <span>💡</span>
+                    <span>Recommended Prompt Syntax Guide ({activeDomain.label})</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">Use colons (:) and commas (,) for 100% LLM parsing accuracy</span>
+                </div>
+
+                <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800 font-mono text-[11px] text-emerald-300 leading-relaxed select-all">
+                  cgpa: 8.2, course: {activeDomain.defaultValues?.course || 'Degree'}, specialization: {activeDomain.defaultValues?.specialization || 'Major'}, skills: {activeDomain.skillSuggestions.slice(0, 3).join(', ')}, certifications: CIPP/E, projects: {activeDomain.projectSuggestions[0]}, interest: {activeDomain.defaultValues?.interest}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2 pt-0.5">
+                  <span className="truncate">Key Syntax: <code className="text-amber-300 font-bold">cgpa: X, course: X, skills: S1, S2, projects: P1, interest: X</code></span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const syntaxExample = `cgpa: 8.2, course: ${activeDomain.defaultValues?.course || 'Degree'}, specialization: ${activeDomain.defaultValues?.specialization || 'Major'}, skills: ${activeDomain.skillSuggestions.slice(0, 3).join(', ')}, certifications: CIPP/E, projects: ${activeDomain.projectSuggestions[0]}, interest: ${activeDomain.defaultValues?.interest}`
+                      setPromptText(syntaxExample)
+                      handleParsePromptToForm(syntaxExample)
+                    }}
+                    className="text-xs font-bold text-cyan-300 hover:text-white transition cursor-pointer underline flex items-center gap-1"
+                  >
+                    <span>📋</span>
+                    <span>Insert Template into Box</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Textarea */}
               <div>
                 <textarea
@@ -538,8 +569,8 @@ export default function CareerForm({
                     setPromptText(e.target.value)
                     handleChange('raw_prompt', e.target.value)
                   }}
-                  placeholder={`Example: cgpa 8.2, course ${activeDomain.defaultValues?.course || 'degree'}, specialization ${activeDomain.defaultValues?.specialization || 'major'}, skills ${activeDomain.skillSuggestions.slice(0, 4).join(', ')}, projects ${activeDomain.projectSuggestions[0]}, interest ${activeDomain.defaultValues?.interest}`}
-                  className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900 leading-relaxed"
+                  placeholder={`Example: cgpa: 8.2, course: ${activeDomain.defaultValues?.course || 'degree'}, specialization: ${activeDomain.defaultValues?.specialization || 'major'}, skills: ${activeDomain.skillSuggestions.slice(0, 4).join(', ')}, projects: ${activeDomain.projectSuggestions[0]}, interest: ${activeDomain.defaultValues?.interest}`}
+                  className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900 leading-relaxed font-mono"
                 />
               </div>
 
