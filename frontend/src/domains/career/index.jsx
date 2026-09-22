@@ -426,36 +426,38 @@ export default function CareerDomain() {
       onNewRun={handleNewRun}
       hasResult={Boolean(result)}
     >
-      {/* Topmost Career Intelligence Suite Switcher */}
-      <div className="mb-5 rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-md shadow-slate-200/40 backdrop-blur-md sticky top-16 z-20">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {CAREER_TABS.map((tab) => {
-            const isActive = acceleratorTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setAcceleratorTab(tab.id)}
-                className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900/10'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <span className={isActive ? 'text-cyan-400' : 'text-slate-400'}>{tab.icon}</span>
-                <span>{tab.label}</span>
-                <span
-                  className={`rounded-md px-1.5 py-0.5 text-[9px] font-mono font-extrabold uppercase ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
+      {/* Topmost Career Intelligence Suite Switcher (Visible after Decision Analysis) */}
+      {result && (
+        <div className="mb-5 rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-md shadow-slate-200/40 backdrop-blur-md sticky top-16 z-20">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {CAREER_TABS.map((tab) => {
+              const isActive = acceleratorTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setAcceleratorTab(tab.id)}
+                  className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-slate-900 text-white shadow-sm ring-2 ring-slate-900/10'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                   }`}
                 >
-                  {tab.badge}
-                </span>
-              </button>
-            )
-          })}
+                  <span className={isActive ? 'text-cyan-400' : 'text-slate-400'}>{tab.icon}</span>
+                  <span>{tab.label}</span>
+                  <span
+                    className={`rounded-md px-1.5 py-0.5 text-[9px] font-mono font-extrabold uppercase ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-200/80 text-slate-600'
+                    }`}
+                  >
+                    {tab.badge}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Pinned Baseline Alert Banner */}
       {pinnedResult && (
@@ -491,148 +493,138 @@ export default function CareerDomain() {
         </div>
       )}
 
-      {/* Active Tab View Display */}
-      {acceleratorTab === 'what-if' ? (
-        <WhatIfSimulator
-          candidateProfile={resultInput || input}
-          onApplyToForm={handleApplySimulatedProfile}
-        />
-      ) : acceleratorTab === 'jd-match' ? (
-        <JobDescriptionMatcher
-          candidateProfile={resultInput || input}
-        />
-      ) : acceleratorTab === 'mock-interview' ? (
-        <MockInterviewStudio
-          targetRole={
-            result?.prediction ||
-            result?.details?.career_intelligence?.interest?.path_label ||
-            resultInput?.interest ||
-            input?.interest ||
-            'Software Engineer'
-          }
-          skillGaps={
-            result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
-            result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
-            []
-          }
-          bestFitRole={
-            result?.details?.career_intelligence?.best_fit?.path_label ||
-            result?.prediction ||
-            'AI Systems & Machine Learning Engineer'
-          }
-          bestFitSkillGaps={
-            result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
-            result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
-            []
-          }
-          candidateProfile={resultInput || input}
-          resumeData={resumeData}
-        />
-      ) : acceleratorTab === 'roadmap' ? (
-        <SprintRoadmap
-          targetRole={
-            result?.prediction ||
-            result?.details?.career_intelligence?.interest?.path_label ||
-            resultInput?.interest ||
-            input?.interest ||
-            'Software Engineer'
-          }
-          skillGaps={
-            result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
-            result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
-            []
-          }
-        />
-      ) : acceleratorTab === 'compensation' ? (
-        <CompensationEstimator
-          targetRole={
-            result?.prediction ||
-            result?.details?.career_intelligence?.interest?.path_label ||
-            resultInput?.interest ||
-            input?.interest ||
-            'Software Engineer'
-          }
-          candidateProfile={resultInput || input}
-        />
-      ) : result ? (
-        <>
-          {/* Resume ATS Audit Card */}
-          {resumeData && (
-            <div className="mb-6">
-              <ResumeAuditCard
-                resumeData={resumeData}
-                onTuneInForm={handleTuneInForm}
-                onDownloadReport={() => downloadPdf('career', result)}
-                onReAuditRole={(newRole) => {
-                  setTargetRole(newRole)
-                  handleResumeSubmit(resumeFile, newRole)
-                }}
-              />
-            </div>
-          )}
+      {/* Active View Display */}
+      {result ? (
+        acceleratorTab === 'what-if' ? (
+          <WhatIfSimulator
+            candidateProfile={resultInput || input}
+            onApplyToForm={handleApplySimulatedProfile}
+          />
+        ) : acceleratorTab === 'jd-match' ? (
+          <JobDescriptionMatcher
+            candidateProfile={resultInput || input}
+          />
+        ) : acceleratorTab === 'mock-interview' ? (
+          <MockInterviewStudio
+            targetRole={
+              result?.prediction ||
+              result?.details?.career_intelligence?.interest?.path_label ||
+              resultInput?.interest ||
+              input?.interest ||
+              'Software Engineer'
+            }
+            skillGaps={
+              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
+              result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
+              []
+            }
+            bestFitRole={
+              result?.details?.career_intelligence?.best_fit?.path_label ||
+              result?.prediction ||
+              'AI Systems & Machine Learning Engineer'
+            }
+            bestFitSkillGaps={
+              result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
+              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
+              []
+            }
+            candidateProfile={resultInput || input}
+            resumeData={resumeData}
+          />
+        ) : acceleratorTab === 'roadmap' ? (
+          <SprintRoadmap
+            targetRole={
+              result?.prediction ||
+              result?.details?.career_intelligence?.interest?.path_label ||
+              resultInput?.interest ||
+              input?.interest ||
+              'Software Engineer'
+            }
+            skillGaps={
+              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
+              result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
+              []
+            }
+          />
+        ) : acceleratorTab === 'compensation' ? (
+          <CompensationEstimator
+            targetRole={
+              result?.prediction ||
+              result?.details?.career_intelligence?.interest?.path_label ||
+              resultInput?.interest ||
+              input?.interest ||
+              'Software Engineer'
+            }
+            candidateProfile={resultInput || input}
+          />
+        ) : (
+          <>
+            {/* Resume ATS Audit Card */}
+            {resumeData && (
+              <div className="mb-6">
+                <ResumeAuditCard
+                  resumeData={resumeData}
+                  onTuneInForm={handleTuneInForm}
+                  onDownloadReport={() => downloadPdf('career', result)}
+                  onReAuditRole={(newRole) => {
+                    setTargetRole(newRole)
+                    handleResumeSubmit(resumeFile, newRole)
+                  }}
+                />
+              </div>
+            )}
 
-          {hasComparisonResult ? (
-            <DecisionReport
-              payload={result}
-              interactiveFields={[
-                {
-                  name: 'cgpa',
-                  label: 'Academic Score (CGPA)',
-                  type: 'number',
-                  range: { min: 5.0, max: 10.0, step: 0.1 },
-                  value: interactiveInput?.cgpa || 8.5,
-                },
-              ]}
-              onInteractiveChange={handleInteractiveChange}
-              isLiveUpdating={liveUpdating}
-              onRefresh={handleRecalculate}
-              onDownload={() => downloadPdf('career', result)}
-            />
-          ) : (
-            <InsightPanel
-              result={result}
-              domain="career"
-              title="Career Decision Insight"
-              subtitle={CAREER_CONFIG.subtitle}
-              input={resultInput}
-              interactiveFields={[
-                {
-                  name: 'cgpa',
-                  label: 'Academic Score (CGPA)',
-                  type: 'number',
-                  range: { min: 5.0, max: 10.0, step: 0.1 },
-                  value: interactiveInput?.cgpa || 8.5,
-                },
-              ]}
-              onInteractiveChange={handleInteractiveChange}
-              isLiveUpdating={liveUpdating}
-              onUpdateInput={handleUpdateParsedInput}
-            />
-          )}
-        </>
+            {hasComparisonResult ? (
+              <DecisionReport
+                payload={result}
+                interactiveFields={[
+                  {
+                    name: 'cgpa',
+                    label: 'Academic Score (CGPA)',
+                    type: 'number',
+                    range: { min: 5.0, max: 10.0, step: 0.1 },
+                    value: interactiveInput?.cgpa || 8.5,
+                  },
+                ]}
+                onInteractiveChange={handleInteractiveChange}
+                isLiveUpdating={liveUpdating}
+                onRefresh={handleRecalculate}
+                onDownload={() => downloadPdf('career', result)}
+              />
+            ) : (
+              <InsightPanel
+                result={result}
+                domain="career"
+                title="Career Decision Insight"
+                subtitle={CAREER_CONFIG.subtitle}
+                input={resultInput}
+                interactiveFields={[
+                  {
+                    name: 'cgpa',
+                    label: 'Academic Score (CGPA)',
+                    type: 'number',
+                    range: { min: 5.0, max: 10.0, step: 0.1 },
+                    value: interactiveInput?.cgpa || 8.5,
+                  },
+                ]}
+                onInteractiveChange={handleInteractiveChange}
+                isLiveUpdating={liveUpdating}
+                onUpdateInput={handleUpdateParsedInput}
+              />
+            )}
+          </>
+        )
       ) : (
-        <div className="rounded-2xl border border-slate-200/80 bg-white/90 p-8 text-center shadow-sm backdrop-blur-md">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-50 border border-cyan-200 text-cyan-700 mb-3">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-6 text-center shadow-xs">
+          <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white font-extrabold text-sm mb-2 shadow-xs">
+            ⚡
           </div>
-          <h3 className="text-base font-black text-slate-900">
-            Explainable Decision &amp; Attribution Ready
+          <h3 className="text-sm font-extrabold text-slate-900">
+            Step-by-Step Decision Engine Ready
           </h3>
-          <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
-            Submit your resume or candidate profile in the workbench above to calculate SHAP feature attributions, model confidence, and dual-track career pathways.
+          <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+            Please complete Steps 1 to 5 in the wizard above and click <strong>&quot;Run Decision XAI Engine&quot;</strong> to calculate your SHAP feature attributions and unlock personalized career tools.
           </p>
-          <div className="mt-4 flex items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => handleStructuredSubmit()}
-              disabled={loading}
-              className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 shadow-sm transition cursor-pointer"
-            >
-              {loading ? 'Evaluating Profile...' : 'Run Quick Evaluation on Preset'}
-            </button>
-          </div>
         </div>
       )}
 
