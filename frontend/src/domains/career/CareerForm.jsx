@@ -487,13 +487,11 @@ export default function CareerForm({
 
               {/* Sample Prompt Pills */}
               <div className="space-y-1">
-                <span className="text-[11px] font-bold text-slate-500 block">Sample Prompts (Click to Fill):</span>
+                <span className="text-[11px] font-bold text-slate-500 block">Sample Prompts for {activeDomain.label} (Click to Fill):</span>
                 <div className="flex flex-wrap gap-1.5">
-                  {[
-                    'CGPA 8.2, BTech CSE, skills Python SQL React, projects chatbot and dashboard, interest software engineering',
-                    'Meri CGPA 7.8 hai, skills Python SQL, degree B.Com, interest financial risk analyst',
-                    'GPA 3.8/4.0, BS Computer Science, skills PyTorch Docker Kubernetes, projects ML pipeline, interest AI Systems',
-                  ].map((sample, idx) => (
+                  {(activeDomain.samplePrompts || [
+                    `CGPA 8.2, ${activeDomain.defaultValues?.course || 'Degree'}, skills ${activeDomain.skillSuggestions.slice(0, 3).join(', ')}, projects ${activeDomain.projectSuggestions[0]}, interest ${activeDomain.defaultValues?.interest || 'Track'}`,
+                  ]).map((sample, idx) => (
                     <button
                       key={idx}
                       type="button"
@@ -503,7 +501,7 @@ export default function CareerForm({
                       }}
                       className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-slate-400 hover:bg-slate-100 text-left transition cursor-pointer"
                     >
-                      💡 {sample.slice(0, 50)}...
+                      💡 {sample.slice(0, 55)}...
                     </button>
                   ))}
                 </div>
@@ -518,7 +516,7 @@ export default function CareerForm({
                     setPromptText(e.target.value)
                     handleChange('raw_prompt', e.target.value)
                   }}
-                  placeholder="Example: cgpa 8.4, course btech cse, specialization ai and ml, skills python sql react, certifications aws cloud practitioner, projects fraud detector dashboard, interest software development"
+                  placeholder={`Example: cgpa 8.2, course ${activeDomain.defaultValues?.course || 'degree'}, specialization ${activeDomain.defaultValues?.specialization || 'major'}, skills ${activeDomain.skillSuggestions.slice(0, 4).join(', ')}, projects ${activeDomain.projectSuggestions[0]}, interest ${activeDomain.defaultValues?.interest}`}
                   className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900 leading-relaxed"
                 />
               </div>

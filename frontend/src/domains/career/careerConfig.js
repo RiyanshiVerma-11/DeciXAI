@@ -70,6 +70,11 @@ export const CAREER_PARENT_DOMAINS = [
       projects: ['Full-Stack Collaborative Whiteboard', 'LLM RAG Pipeline'],
       interest: 'AI & Software Engineering',
     },
+    samplePrompts: [
+      'CGPA 8.4, BTech CSE, skills Python SQL React Docker FastAPI, projects LLM RAG Pipeline, interest AI & Software Engineering',
+      'GPA 3.8/4.0, BS Computer Science, skills PyTorch Docker Kubernetes, projects ML Pipeline, interest AI Systems',
+      'Meri CGPA 7.8 hai, skills Python SQL React, degree BTech, interest full-stack software development',
+    ],
   },
   {
     id: 'legal',
@@ -88,6 +93,11 @@ export const CAREER_PARENT_DOMAINS = [
       projects: ['SaaS Data Privacy & Compliance Framework', 'M&A Legal Due Diligence Audit'],
       interest: 'Corporate & Cyber Law',
     },
+    samplePrompts: [
+      'CGPA 8.2, BA LLB, specialization Cyber Law & Corporate Governance, skills GDPR & Data Privacy, Contract Drafting, CIPP/E, projects SaaS Data Privacy Audit, interest Corporate & Cyber Law',
+      'Meri CGPA 7.8 hai, BA LLB in Cyber Law, skills Contract Drafting Regulatory Compliance Legal Research, interest In-House Legal Counsel',
+      'GPA 3.9/4.0, LLM Corporate Law, skills GDPR Compliance IP Cyber Law, projects Cross-Border Contract Audit, interest Cyber Law Specialist',
+    ],
   },
   {
     id: 'finance',
@@ -106,6 +116,11 @@ export const CAREER_PARENT_DOMAINS = [
       projects: ['DCF & M&A Valuation Model', 'Fintech Credit Risk Assessment Engine'],
       interest: 'Investment Banking & Corporate Finance',
     },
+    samplePrompts: [
+      'CGPA 8.5, B.Com, specialization Finance & Financial Analytics, skills Financial Modeling, Valuation, Excel VBA, CFA Level 1, projects DCF & M&A Valuation Model, interest Investment Banking',
+      'GPA 3.7/4.0, MBA Finance, skills Python for Finance SQL Risk Analysis, projects Fintech Credit Risk Assessment Engine, interest Corporate Finance',
+      'Meri CGPA 8.0 hai, B.Com, skills Valuation Financial Modeling Excel, interest Financial Risk Analyst',
+    ],
   },
   {
     id: 'strategy',
@@ -124,6 +139,11 @@ export const CAREER_PARENT_DOMAINS = [
       projects: ['B2B SaaS Growth PRD', 'Market Entry Strategy Case Study'],
       interest: 'Product Management & Business Strategy',
     },
+    samplePrompts: [
+      'CGPA 8.3, MBA, specialization Product Management & Strategy, skills PRDs & Specs, Product Analytics (GA4), Agile Scrum, projects B2B SaaS Growth PRD Case Study, interest Product Management',
+      'BTech + MBA, skills Market Entry Strategy, Financial Modeling, Stakeholder Management, projects Market Entry Strategy Case Study, interest Management Consulting',
+      'Meri CGPA 8.1 hai, MBA, skills User Research PRDs Agile, interest Product Strategy Lead',
+    ],
   },
   {
     id: 'design',
@@ -142,6 +162,11 @@ export const CAREER_PARENT_DOMAINS = [
       projects: ['Design System Library in Figma', 'Fintech Mobile App Redesign'],
       interest: 'Product Design & User Experience',
     },
+    samplePrompts: [
+      'CGPA 8.6, B.Des, specialization Interaction Design & UX Research, skills Figma, UI Design, UX Research, Design Systems, Wireframing, projects Design System Library in Figma, interest Product Design',
+      'B.Des graduate, skills Prototyping User Testing Micro-interactions Figma, projects Fintech Mobile App Redesign, interest UX Research Lead',
+      'Meri CGPA 8.2 hai, B.Des, skills Figma UI Design User Research, interest Product UI/UX Designer',
+    ],
   },
   {
     id: 'marketing',
@@ -160,6 +185,11 @@ export const CAREER_PARENT_DOMAINS = [
       projects: ['SaaS Organic Growth Audit & SEO Overhaul', 'Conversion Rate Optimization Campaign'],
       interest: 'Digital Marketing & Growth Strategy',
     },
+    samplePrompts: [
+      'CGPA 8.1, BBA Digital Marketing, skills SEO/SEM, Google Analytics 4, Content Strategy, HubSpot, Copywriting, projects SaaS Organic Growth Audit & SEO Overhaul, interest Digital Marketing & Growth Strategy',
+      'MBA Marketing, skills Growth Hacking A/B Testing Funnel Analytics, projects Conversion Rate Optimization Campaign, interest Performance Marketing Lead',
+      'Meri CGPA 7.9 hai, BBA, skills SEO GA4 Content Strategy, interest Digital Growth Manager',
+    ],
   },
 ]
 
