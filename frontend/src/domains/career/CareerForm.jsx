@@ -917,6 +917,20 @@ export default function CareerForm({
             </div>
           </div>
 
+          {/* Field Errors Alert in Step 5 */}
+          {Object.keys(fieldErrors).length > 0 && (
+            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold text-rose-800 flex items-center justify-between">
+              <span>⚠️ Validation Alert: {Object.values(fieldErrors).join(' ')}</span>
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                className="text-xs font-extrabold underline text-rose-950 hover:text-rose-700 cursor-pointer"
+              >
+                Edit Step 3 Inputs &rarr;
+              </button>
+            </div>
+          )}
+
           {/* Primary Submit Action */}
           <div className="flex justify-end pt-3">
             <button

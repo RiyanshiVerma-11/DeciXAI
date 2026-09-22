@@ -462,8 +462,8 @@ export const validateCareerPayload = (payload) => {
 
   if (!payload.course?.trim?.()) errors.course = 'Course/Degree is required.'
   if (!payload.interest?.trim?.()) errors.interest = 'Interest/Track is required.'
-  if (!payload.skills || payload.skills.length < 2) errors.skills = 'Add at least 2 skills.'
-  if (!payload.projects || payload.projects.length < 1) errors.projects = 'Add at least 1 project.'
+  if (!payload.skills || payload.skills.length < 1) errors.skills = 'Please add at least 1 skill.'
+  if (!payload.projects || payload.projects.length < 1) errors.projects = 'Please add at least 1 project.'
 
   return errors
 }

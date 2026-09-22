@@ -187,7 +187,10 @@ export default function CareerDomain() {
     const normalized = normalizeCareerPayload(input)
     const errors = validateCareerPayload(normalized)
     setFieldErrors(errors)
-    if (Object.keys(errors).length > 0) return
+    if (Object.keys(errors).length > 0) {
+      setError('Validation Alert: ' + Object.values(errors).join(' '))
+      return
+    }
 
     setLoading(true)
     try {
