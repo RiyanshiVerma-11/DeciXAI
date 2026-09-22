@@ -149,16 +149,19 @@ export default function CareerForm({
 
   // STEP 2: DOMAIN SELECTOR
   const handleSelectDomain = (domain) => {
-    setInput((prev) => {
-      const isFormEmpty = !prev.course && (!prev.skills || (Array.isArray(prev.skills) && prev.skills.length === 0))
-      const prefill = isFormEmpty && domain.defaultValues ? domain.defaultValues : {}
-      return {
-        ...prev,
-        parent_domain: domain.id,
-        domain: domain.id,
-        ...prefill,
-      }
-    })
+    const defaults = domain.defaultValues || {}
+    setInput((prev) => ({
+      ...prev,
+      parent_domain: domain.id,
+      domain: domain.id,
+      course: defaults.course || '',
+      specialization: defaults.specialization || '',
+      skills: defaults.skills ? [...defaults.skills] : [],
+      projects: defaults.projects ? [...defaults.projects] : [],
+      interest: defaults.interest || '',
+      certifications: [],
+      target_role: domain.roleSuggestions?.[0] || 'auto',
+    }))
     setStep(3)
   }
 
@@ -559,22 +562,29 @@ export default function CareerForm({
           {/* MODE 2: STUDIO FORM (MANUAL QUICK-FILL FORM) */}
           {(intakeMode === 'form' || intakeMode === 'manual') && (
             <div className="space-y-3 pt-1">
-              {/* Quick Presets */}
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="font-bold text-slate-500">Quick Presets:</span>
-                <div className="flex flex-wrap items-center gap-1">
-                  {CAREER_PRESETS.map((preset, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => onApplyPreset(preset)}
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition cursor-pointer"
-                    >
-                      <span className="text-[10px] text-slate-400 uppercase">{preset.badge}</span>
-                      <span>{preset.label}</span>
-                    </button>
-                  ))}
+              {/* Domain-Aware Preset Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-50 border border-slate-200 p-2.5 rounded-xl">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-slate-500">Selected Track:</span>
+                  <span className="font-extrabold text-slate-900 bg-white px-2.5 py-0.5 rounded-md border border-slate-200">
+                    {activeDomain.label}
+                  </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeDomain.defaultValues) {
+                      setInput((prev) => ({
+                        ...prev,
+                        ...activeDomain.defaultValues,
+                      }))
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1 font-bold text-slate-800 hover:bg-slate-100 transition cursor-pointer shadow-xs"
+                >
+                  <span>⚡</span>
+                  <span>Populate {activeDomain.label} Benchmarks</span>
+                </button>
               </div>
 
               {/* Landscape Fields Grid */}
