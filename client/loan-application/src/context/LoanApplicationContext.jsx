@@ -3,7 +3,8 @@ import axios from 'axios';
 
 const LoanApplicationContext = createContext(null);
 
-const api = axios.create({ baseURL: 'http://localhost:8000/loan-application' });
+const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8002`;
+const api = axios.create({ baseURL: `${API_BASE}/loan-application` });
 
 export const LoanApplicationProvider = ({ children }) => {
   const [formData, setFormData] = useState({

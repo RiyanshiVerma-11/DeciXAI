@@ -2,7 +2,8 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useLoanApplication } from '../context/LoanApplicationContext';
 
-const api = axios.create({ baseURL: 'http://localhost:8000/loan-application' });
+const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8002`;
+const api = axios.create({ baseURL: `${API_BASE}/loan-application` });
 
 export default function StepVerification({ data, onChange }) {
   const { applicationId } = useLoanApplication();

@@ -94,6 +94,7 @@ app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit Trail"])
 app.include_router(loan_application.router, prefix="/loan-application", tags=["Finance Application"])
 
 # Backward-compatible routes (no /api/v1 prefix) — keeps existing clients working.
+app.include_router(auth.router, prefix="/auth", tags=["Authentication (legacy)"], include_in_schema=False)
 app.include_router(career.router, prefix="/career", tags=["Career (legacy)"], include_in_schema=False)
 app.include_router(finance.router, prefix="/finance", tags=["Finance (legacy)"], include_in_schema=False)
 app.include_router(startup.router, prefix="/startup", tags=["Startup (legacy)"], include_in_schema=False)

@@ -1,7 +1,7 @@
 import React from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import CareerDomain from '../domains/career'
-import FinanceDomain from '../domains/finance'
+import FinanceDomain from './LoanApplicationPage'
 import StartupDomain from '../domains/startup'
 import PolicyDomain from '../domains/policy'
 

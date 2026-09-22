@@ -55,6 +55,12 @@ export function AuthProvider({ children }) {
     }
   }, [token])
 
+  const loginWithToken = useCallback((newToken, newUser) => {
+    localStorage.setItem('decixai_token', newToken)
+    setToken(newToken)
+    setUser(newUser)
+  }, [])
+
   const logout = useCallback(() => {
     localStorage.removeItem('decixai_token')
     setToken(null)
@@ -68,6 +74,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!user && !!token,
     loading,
     login,
+    loginWithToken,
     register,
     logout,
     refreshUser,

@@ -136,7 +136,7 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 overflow-x-hidden font-sans selection:bg-blue-100 selection:text-blue-800">
+    <div className="min-h-screen bg-slate-50 text-slate-900 overflow-x-clip font-sans selection:bg-blue-100 selection:text-blue-800">
       {/* Google Ambient Animated floating lights */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-blue-500/12 rounded-full animate-blob-1" />
@@ -144,32 +144,32 @@ export default function LandingPage() {
         <div className="absolute top-1/2 left-1/3 w-[450px] h-[450px] bg-amber-500/8 rounded-full animate-blob-3" />
       </div>
 
-      {/* Header / Navbar - Pinned & Sticky */}
-      <nav className="relative z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-md sticky top-0 shadow-sm">
+      {/* Header / Navbar - Pinned & Sticky (Dark Background) */}
+      <nav className="sticky top-0 z-50 border-b border-slate-800/90 bg-[#0B0F19]/95 backdrop-blur-xl shadow-lg shadow-black/20 transition-all">
         <div className="mx-auto max-w-7xl px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
             <img
               src="/logo.jpeg"
               alt="DeciXAI Logo"
-              className="h-9 w-9 rounded-lg border border-slate-200 object-cover shadow-sm"
+              className="h-9 w-9 rounded-lg border border-slate-700 object-cover shadow-sm"
             />
-            <span className="text-lg font-bold tracking-tight text-slate-950 font-sans">DeciXAI</span>
+            <span className="text-lg font-bold tracking-tight text-white font-sans">DeciXAI</span>
           </div>
           
           {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
-            <a href="#demo" className="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors">Demo</a>
-            <a href="#features" className="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors">Features</a>
-            <a href="#domains" className="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors">Domains</a>
-            <a href="#pricing" className="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors">Pricing</a>
-            <a href="#faq" className="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors">FAQ</a>
+            <a href="#demo" className="text-sm font-bold text-slate-300 hover:text-cyan-400 transition-colors">Demo</a>
+            <a href="#features" className="text-sm font-bold text-slate-300 hover:text-cyan-400 transition-colors">Features</a>
+            <a href="#domains" className="text-sm font-bold text-slate-300 hover:text-cyan-400 transition-colors">Domains</a>
+            <a href="#pricing" className="text-sm font-bold text-slate-300 hover:text-cyan-400 transition-colors">Pricing</a>
+            <a href="#faq" className="text-sm font-bold text-slate-300 hover:text-cyan-400 transition-colors">FAQ</a>
           </div>
 
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-bold text-white transition-all shadow-sm shadow-blue-500/10 hover:shadow-md"
+                className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-bold text-white transition-all shadow-sm shadow-blue-500/20 hover:shadow-md"
               >
                 Dashboard
               </button>
@@ -177,13 +177,13 @@ export default function LandingPage() {
               <>
                 <button
                   onClick={() => navigate('/auth')}
-                  className="text-sm font-bold text-slate-800 hover:text-blue-600 transition-colors"
+                  className="text-sm font-bold text-slate-300 hover:text-white transition-colors"
                 >
                   Sign In
                 </button>
                 <button
                   onClick={() => navigate('/auth?mode=register')}
-                  className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-bold text-white transition-all shadow-sm shadow-blue-500/10 hover:shadow-md"
+                  className="rounded-full bg-blue-600 hover:bg-blue-700 px-5 py-2 text-sm font-bold text-white transition-all shadow-sm shadow-blue-500/20 hover:shadow-md"
                 >
                   Get Started
                 </button>

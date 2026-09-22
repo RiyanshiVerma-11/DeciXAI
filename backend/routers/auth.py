@@ -1,12 +1,14 @@
 """
 Authentication API router for DeciXAI.
 
-Provides register, login, and user profile endpoints
+Provides register, login, OTP-based passwordless login, and user profile endpoints
 with JWT-based authentication.
 """
 from __future__ import annotations
 
 import re
+import time
+import uuid
 
 from fastapi import APIRouter, Header, HTTPException
 
@@ -17,9 +19,15 @@ from services.auth_service import (
     create_token,
     decode_token,
     get_user_by_id,
+    get_user_by_email,
 )
+from routers.loan_application import _send_otp_email
 
 router = APIRouter()
+
+# In-memory OTP store: { email: { otp, expires_at } }
+# Keyed by lowercase email. TTL = 10 minutes.
+_LOGIN_OTP_STORE: dict[str, dict] = {}
 
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
@@ -118,4 +126,81 @@ async def change_tier(body: dict, authorization: str | None = Header(None)):
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return UserResponse(**user)
+
+
+# ---------------------------------------------------------------------------
+# OTP-based passwordless login (Forgot Password / Login with OTP)
+# ---------------------------------------------------------------------------
+
+@router.post("/send-login-otp")
+async def send_login_otp(body: dict):
+    """Send a one-time login OTP to the user's registered email."""
+    email = (body.get("email") or "").strip().lower()
+
+    if not EMAIL_REGEX.match(email):
+        raise HTTPException(status_code=422, detail="Invalid email address.")
+
+    user = get_user_by_email(email)
+    if user is None:
+        # Don't leak whether email exists — same message either way
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with this email address. Please register first.",
+        )
+
+    otp_code = str(100000 + (uuid.uuid4().int % 900000))
+    _LOGIN_OTP_STORE[email] = {
+        "otp": otp_code,
+        "expires_at": time.time() + 600,  # 10 minutes
+    }
+
+    sent = _send_otp_email(
+        recipient_email=user["email"],
+        otp_code=otp_code,
+        applicant_name=user.get("name", "User"),
+    )
+
+    if sent:
+        return {"success": True, "message": f"OTP sent to {email}. Check your inbox."}
+    else:
+        return {
+            "success": True,
+            "message": "OTP generated but email delivery failed. Please retry.",
+            "_debug_otp": otp_code,  # Remove in production
+        }
+
+
+@router.post("/verify-login-otp", response_model=TokenResponse)
+async def verify_login_otp(body: dict):
+    """Verify the OTP and issue a JWT token for passwordless login."""
+    email = (body.get("email") or "").strip().lower()
+    submitted_otp = str(body.get("otp") or "").strip()
+
+    if not email or not submitted_otp:
+        raise HTTPException(status_code=422, detail="Email and OTP are required.")
+
+    entry = _LOGIN_OTP_STORE.get(email)
+    if not entry:
+        raise HTTPException(status_code=400, detail="No OTP was requested for this email. Please request a new one.")
+
+    if time.time() > entry["expires_at"]:
+        _LOGIN_OTP_STORE.pop(email, None)
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+
+    if submitted_otp != entry["otp"]:
+        raise HTTPException(status_code=400, detail="Incorrect OTP. Please check your email and try again.")
+
+    # OTP valid — consume it
+    _LOGIN_OTP_STORE.pop(email, None)
+
+    user = get_user_by_email(email)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    token = create_token(user["id"], user["email"])
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user=UserResponse(**user),
+    )
 

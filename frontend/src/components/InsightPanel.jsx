@@ -601,11 +601,53 @@ function RoadmapBlock({ title, items, tone = 'slate' }) {
   )
 }
 
-function DualRoadmapCard({ intel }) {
+const BENCHMARK_ROLES = [
+  'AI Systems & Machine Learning Engineer',
+  'Full-Stack Software Engineer',
+  'Cloud & DevOps Architect',
+  'Data Scientist & Analytics Engineer',
+  'Cybersecurity Engineer',
+  'Product Manager – Tech',
+  'Blockchain & Web3 Developer',
+]
+
+function DualRoadmapCard({ intel, input }) {
+  const [compareRole, setCompareRole] = React.useState('')
+  const [customRole, setCustomRole] = React.useState('')
+  const [compareIntel, setCompareIntel] = React.useState(null)
+  const [comparing, setComparing] = React.useState(false)
+  const [compareError, setCompareError] = React.useState('')
+
   if (!intel || typeof intel !== 'object') return null
   const best = intel.best_fit
   const interest = intel.interest
   if (!best || !interest) return null
+
+  const activeCompare = compareIntel?.interest || interest
+
+  const handleCompare = async () => {
+    const role = compareRole === '__custom__' ? customRole.trim() : compareRole
+    if (!role) return
+    setComparing(true)
+    setCompareError('')
+    try {
+      const payload = { ...(input || {}), interest: role, options: [role] }
+      const res = await fetch('/api/v1/career', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('Comparison failed')
+      const data = await res.json()
+      const ci = data?.details?.career_intelligence
+      if (ci?.interest) setCompareIntel(ci)
+      else setCompareError('No roadmap data returned for this role.')
+    } catch (err) {
+      setCompareError(err.message || 'Could not fetch comparison.')
+    } finally {
+      setComparing(false)
+    }
+  }
 
   return (
     <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm col-span-1 lg:col-span-3">
@@ -644,19 +686,57 @@ function DualRoadmapCard({ intel }) {
           </div>
         </div>
 
-        {/* Interest Track */}
+        {/* Interest / Comparison Track */}
         <div className="rounded-xl border border-rose-100 bg-rose-50/20 p-3">
-          <span className="text-[12px] font-bold uppercase tracking-wider text-rose-600">Interest Track (Target)</span>
-          <h4 className="text-base font-bold text-slate-800 mt-0.5">{interest.path_label}</h4>
+          {/* Role selector header */}
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <span className="text-[12px] font-bold uppercase tracking-wider text-rose-600">Compare Against</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <select
+                value={compareRole}
+                onChange={e => { setCompareRole(e.target.value); setCompareError('') }}
+                className="text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-2 py-1 cursor-pointer focus:outline-none focus:border-rose-400"
+              >
+                <option value="">— Pick a role —</option>
+                {BENCHMARK_ROLES.map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+                <option value="__custom__">✏️ Custom role…</option>
+              </select>
+              <button
+                onClick={handleCompare}
+                disabled={comparing || (!compareRole || (compareRole === '__custom__' && !customRole.trim()))}
+                className="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                {comparing ? '...' : 'Compare'}
+              </button>
+            </div>
+          </div>
+
+          {compareRole === '__custom__' && (
+            <input
+              value={customRole}
+              onChange={e => setCustomRole(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCompare()}
+              placeholder="e.g. Quantitative Analyst"
+              className="w-full mb-2 text-[12px] border border-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-rose-400 text-slate-700"
+            />
+          )}
+
+          {compareError && (
+            <p className="text-[11px] text-rose-500 font-semibold mb-1">{compareError}</p>
+          )}
+
+          <h4 className="text-base font-bold text-slate-800 mt-0.5">{activeCompare.path_label}</h4>
           <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <VisualAlignmentBar label="Skills" value={interest.alignment?.skills} />
-            <VisualAlignmentBar label="Projects" value={interest.alignment?.projects} />
-            <VisualAlignmentBar label="Certs" value={interest.alignment?.certifications} />
-            <VisualAlignmentBar label="Interest" value={interest.alignment?.interest} />
+            <VisualAlignmentBar label="Skills" value={activeCompare.alignment?.skills} />
+            <VisualAlignmentBar label="Projects" value={activeCompare.alignment?.projects} />
+            <VisualAlignmentBar label="Certs" value={activeCompare.alignment?.certifications} />
+            <VisualAlignmentBar label="Interest" value={activeCompare.alignment?.interest} />
           </div>
           <div className="mt-3 grid gap-2">
-            <RoadmapBlock title="Skills to add" items={interest.roadmap?.skills_to_add || []} tone="amber" />
-            <RoadmapBlock title="Project ideas" items={interest.roadmap?.project_ideas || []} tone="emerald" />
+            <RoadmapBlock title="Skills to add" items={activeCompare.roadmap?.skills_to_add || []} tone="amber" />
+            <RoadmapBlock title="Project ideas" items={activeCompare.roadmap?.project_ideas || []} tone="emerald" />
           </div>
         </div>
       </div>
@@ -705,6 +785,14 @@ function EvidenceCard({ sources }) {
   )
 }
 
+function truncateList(value, max = 3) {
+  const items = Array.isArray(value)
+    ? value
+    : String(value).split(',').map(s => s.trim()).filter(Boolean)
+  if (items.length <= max) return { display: items.join(', '), extra: 0 }
+  return { display: items.slice(0, max).join(', '), extra: items.length - max }
+}
+
 function InputSnapshot({ input }) {
   if (!input || typeof input !== 'object') return null
 
@@ -712,23 +800,29 @@ function InputSnapshot({ input }) {
   if (!entries.length) return null
 
   return (
-    <div className="rounded-xl border border-slate-200/60 bg-white p-4 shadow-sm col-span-1">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
-        <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-slate-500" />
+    <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2 shadow-sm col-span-full">
+      <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-2">
+        <h3 className="text-[12px] font-bold text-slate-600 flex items-center gap-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
           Detected Inputs
         </h3>
-        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wider">Metadata</span>
+        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Metadata</span>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        {entries.map(([key, value]) => (
-          <div key={key} className="bg-slate-50 border border-slate-100 rounded-lg p-2">
-            <span className="text-[14px] font-bold uppercase tracking-wider text-slate-400 block">{prettifyKey(key)}</span>
-            <span className="text-[14px] font-bold text-slate-700 block mt-0.5">
-              {Array.isArray(value) ? value.join(', ') : formatNumericValue(value)}
-            </span>
-          </div>
-        ))}
+      <div className="flex flex-wrap gap-1.5">
+        {entries.map(([key, value]) => {
+          const { display, extra } = truncateList(value)
+          return (
+            <div key={key} className="bg-slate-50 border border-slate-100 rounded px-2 py-1 min-w-[80px] max-w-[180px] flex-1">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block leading-none">{prettifyKey(key)}</span>
+              <div className="flex items-center gap-1 mt-0.5">
+                <span className="text-[11px] font-semibold text-slate-700 truncate">{display}</span>
+                {extra > 0 && (
+                  <span className="shrink-0 text-[9px] font-bold text-slate-400 bg-slate-200 rounded px-1 leading-tight">+{extra}</span>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -861,7 +955,7 @@ export default function InsightPanel({
         <InputSnapshot input={input} />
 
         {/* Roadmap (Career only) */}
-        {domain === 'career' && careerIntel && <DualRoadmapCard intel={careerIntel} />}
+        {domain === 'career' && careerIntel && <DualRoadmapCard intel={careerIntel} input={input} />}
 
         {/* Evidence (Career only) */}
         {domain === 'career' && evidenceSources.length > 0 && <EvidenceCard sources={evidenceSources} />}

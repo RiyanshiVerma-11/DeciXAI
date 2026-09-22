@@ -121,7 +121,30 @@ def authenticate_user(email: str, password: str) -> dict | None:
     }
 
 
+def get_user_by_email(email: str) -> dict | None:
+    """Fetch a user by their email address."""
+    with get_db() as db:
+        cursor = db.execute(
+            "SELECT id, email, name, created_at, tier, credits_used FROM users WHERE email = ?",
+            (email.strip().lower(),),
+        )
+        row = cursor.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "id": row[0],
+        "email": row[1],
+        "name": row[2],
+        "created_at": row[3],
+        "tier": row[4] if len(row) > 4 and row[4] else "free",
+        "credits_used": row[5] if len(row) > 5 and row[5] is not None else 0,
+    }
+
+
 def get_user_by_id(user_id: int) -> dict | None:
+
     """Fetch a user by their ID."""
     with get_db() as db:
         cursor = db.execute(
