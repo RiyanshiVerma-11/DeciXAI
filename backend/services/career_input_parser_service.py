@@ -12,15 +12,22 @@ DEFAULT_CAREER_OPTIONS = [
 
 SECTION_LABELS = (
     "degree",
+    "course",
+    "program",
+    "field",
+    "major",
     "specialization",
     "branch",
+    "stream",
     "cgpa",
     "gpa",
     "skills",
     "tech stack",
     "key projects",
     "projects",
+    "project",
     "certifications",
+    "certification",
     "achievements",
     "internships",
     "internship",
@@ -48,7 +55,7 @@ NOISE_PATTERNS = (
 def _extract_section(text: str, labels: tuple[str, ...]) -> str:
     """Extract the free-text segment following a label until the next known label."""
     escaped_labels = [re.escape(label) for label in SECTION_LABELS]
-    pattern_boundary = r"(?=\n\s*(?:" + "|".join(escaped_labels) + r")\b|\b(?:" + "|".join(escaped_labels) + r")\s*[:=]|$)"
+    pattern_boundary = r"(?=\n\s*(?:" + "|".join(escaped_labels) + r")\b|[,;]\s*(?:" + "|".join(escaped_labels) + r")\b|\b(?:" + "|".join(escaped_labels) + r")\s*[:=]|$)"
     for label in labels:
         match = re.search(
             rf"\b{re.escape(label)}\b[:\s=\-]*(.*?){pattern_boundary}",
@@ -79,19 +86,42 @@ SPELLING_CORRECTIONS = {
 }
 
 DEGREE_ALIASES = {
+    "BA LLB": ("ba llb", "b.a. ll.b", "b.a.ll.b", "ballb", "ba-llb", "bachelor of arts and bachelor of legislative law", "bachelor of arts and bachelor of laws"),
+    "BBA LLB": ("bba llb", "b.b.a. ll.b", "b.b.a.ll.b", "bballb", "bba-llb"),
+    "BCom LLB": ("bcom llb", "b.com. ll.b", "bcomllb"),
+    "LLB": ("llb", "ll.b", "bachelor of laws", "bachelor of legislative law"),
+    "LLM": ("llm", "ll.m", "master of laws"),
     "BTech": ("btech", "b tech", "b.tech", "bachelor of technology"),
     "BE": ("be", "b e", "b.e", "bachelor of engineering"),
     "BCA": ("bca", "bachelor of computer applications"),
     "MCA": ("mca", "master of computer applications"),
     "BSc": ("bsc", "b sc", "b.sc", "bachelor of science"),
+    "MSc": ("msc", "m sc", "m.sc", "master of science"),
     "MTech": ("mtech", "m tech", "m.tech", "master of technology"),
     "BBA": ("bba", "bachelor of business administration"),
     "MBA": ("mba", "master of business administration"),
     "BCom": ("bcom", "b com", "b.com", "bachelor of commerce"),
+    "MCom": ("mcom", "m com", "m.com", "master of commerce"),
+    "CA": ("ca", "chartered accountant", "chartered accountancy"),
+    "CFA": ("cfa", "chartered financial analyst"),
+    "BA": ("ba", "b.a", "bachelor of arts"),
+    "MA": ("ma", "m.a", "master of arts"),
+    "MBBS": ("mbbs", "m.b.b.s", "bachelor of medicine"),
+    "BDS": ("bds", "b.d.s", "dental"),
+    "BPharm": ("bpharm", "b.pharm", "b pharm", "bachelor of pharmacy"),
+    "MPharm": ("mpharm", "m.pharm", "m pharm", "master of pharmacy"),
+    "BDes": ("bdes", "b.des", "b des", "bachelor of design"),
+    "MDes": ("mdes", "m.des", "m des", "master of design"),
     "Diploma": ("diploma",),
 }
 
 SPECIALIZATION_ALIASES = {
+    "Corporate Law": ("corporate law", "company law", "commercial law", "business law", "corporate governance"),
+    "Intellectual Property Law": ("intellectual property", "ip law", "patent law", "trademark law", "copyright law"),
+    "Cyber Law": ("cyber law", "technology law", "tech law", "data privacy law", "privacy law", "information technology law"),
+    "Criminal Law": ("criminal law", "penal law", "criminal justice"),
+    "Constitutional Law": ("constitutional law", "public law"),
+    "Taxation Law": ("taxation law", "tax law", "indirect tax", "direct tax"),
     "Computer Science Engineering": (
         "computer science engineering",
         "computer science",
@@ -114,8 +144,16 @@ SPECIALIZATION_ALIASES = {
     "Electrical Engineering": ("electrical engineering", "eee", "ee"),
     "Mechanical Engineering": ("mechanical engineering", "me"),
     "Civil Engineering": ("civil engineering", "ce"),
-    "Business Administration": ("business administration", "management"),
-    "Commerce": ("commerce",),
+    "Business Administration": ("business administration", "management", "general management"),
+    "Finance": ("finance", "banking and finance", "financial management", "corporate finance", "investment banking"),
+    "Fintech": ("fintech", "financial technology"),
+    "Marketing": ("marketing", "digital marketing", "growth marketing", "brand management"),
+    "Human Resources": ("human resources", "hr", "people operations", "talent acquisition"),
+    "Operations": ("operations", "supply chain", "logistics"),
+    "Biotechnology": ("biotechnology", "biotech"),
+    "Clinical Research": ("clinical research", "clinical"),
+    "UI/UX Design": ("ui/ux", "ui ux", "user experience", "product design", "interaction design"),
+    "Commerce": ("commerce", "accounting", "accountancy"),
 }
 
 SKILL_ALIASES = {

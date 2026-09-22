@@ -1076,86 +1076,535 @@ def generate_90_day_sprint_roadmap(target_role: str, skill_gaps: list[str] | Non
 # 5. Market Compensation & Skill ROI Estimator
 # ===========================================================================
 
+COUNTRY_CONFIGS = {
+    "in": {
+        "code": "in",
+        "name": "India",
+        "flag": "🇮🇳",
+        "currency_symbol": "₹",
+        "currency_code": "INR",
+        "unit": "LPA",
+        "label": "₹ INR (LPA)",
+        "is_lpa": True,
+    },
+    "us": {
+        "code": "us",
+        "name": "United States",
+        "flag": "🇺🇸",
+        "currency_symbol": "$",
+        "currency_code": "USD",
+        "unit": "k/Yr",
+        "label": "$ USD (/Yr)",
+        "is_lpa": False,
+    },
+    "uk": {
+        "code": "uk",
+        "name": "United Kingdom",
+        "flag": "🇬🇧",
+        "currency_symbol": "£",
+        "currency_code": "GBP",
+        "unit": "k/Yr",
+        "label": "£ GBP (/Yr)",
+        "is_lpa": False,
+    },
+    "eu": {
+        "code": "eu",
+        "name": "Germany (EU)",
+        "flag": "🇪🇺",
+        "currency_symbol": "€",
+        "currency_code": "EUR",
+        "unit": "k/Yr",
+        "label": "€ EUR (/Yr)",
+        "is_lpa": False,
+    },
+    "ca": {
+        "code": "ca",
+        "name": "Canada",
+        "flag": "🇨🇦",
+        "currency_symbol": "C$",
+        "currency_code": "CAD",
+        "unit": "k/Yr",
+        "label": "C$ CAD (/Yr)",
+        "is_lpa": False,
+    },
+    "sg": {
+        "code": "sg",
+        "name": "Singapore",
+        "flag": "🇸🇬",
+        "currency_symbol": "S$",
+        "currency_code": "SGD",
+        "unit": "k/Yr",
+        "label": "S$ SGD (/Yr)",
+        "is_lpa": False,
+    },
+    "ae": {
+        "code": "ae",
+        "name": "UAE (Dubai)",
+        "flag": "🇦🇪",
+        "currency_symbol": "AED ",
+        "currency_code": "AED",
+        "unit": "k/Yr",
+        "label": "AED (/Yr)",
+        "is_lpa": False,
+    },
+}
+
 _SALARY_DATABASE = {
     "software_engineer": {
         "title": "Software Development Engineer (SDE)",
-        "inr": {"entry": 8.5, "median": 16.0, "top": 35.0},
-        "usd": {"entry": 85, "median": 130, "top": 210},
+        "brackets": {
+            "in": {
+                "entry": {"min": 4.2, "median": 6.8, "max": 12.0},
+                "mid": {"min": 9.0, "median": 14.5, "max": 22.0},
+                "senior": {"min": 18.0, "median": 26.0, "max": 38.0},
+                "staff": {"min": 35.0, "median": 48.0, "max": 70.0},
+            },
+            "us": {
+                "entry": {"min": 85, "median": 115, "max": 145},
+                "mid": {"min": 125, "median": 155, "max": 190},
+                "senior": {"min": 165, "median": 205, "max": 260},
+                "staff": {"min": 230, "median": 295, "max": 390},
+            },
+            "uk": {
+                "entry": {"min": 38, "median": 50, "max": 65},
+                "mid": {"min": 58, "median": 75, "max": 98},
+                "senior": {"min": 85, "median": 110, "max": 145},
+                "staff": {"min": 125, "median": 160, "max": 215},
+            },
+            "eu": {
+                "entry": {"min": 46, "median": 58, "max": 72},
+                "mid": {"min": 65, "median": 80, "max": 100},
+                "senior": {"min": 88, "median": 112, "max": 140},
+                "staff": {"min": 120, "median": 150, "max": 195},
+            },
+            "ca": {
+                "entry": {"min": 72, "median": 95, "max": 120},
+                "mid": {"min": 105, "median": 135, "max": 165},
+                "senior": {"min": 140, "median": 175, "max": 220},
+                "staff": {"min": 190, "median": 245, "max": 315},
+            },
+            "sg": {
+                "entry": {"min": 58, "median": 75, "max": 98},
+                "mid": {"min": 85, "median": 112, "max": 145},
+                "senior": {"min": 125, "median": 165, "max": 215},
+                "staff": {"min": 180, "median": 235, "max": 300},
+            },
+            "ae": {
+                "entry": {"min": 150, "median": 210, "max": 280},
+                "mid": {"min": 250, "median": 340, "max": 450},
+                "senior": {"min": 380, "median": 500, "max": 640},
+                "staff": {"min": 550, "median": 720, "max": 920},
+            },
+        },
     },
     "ai_engineer": {
         "title": "AI / Machine Learning Engineer",
-        "inr": {"entry": 10.5, "median": 20.0, "top": 45.0},
-        "usd": {"entry": 105, "median": 155, "top": 250},
+        "brackets": {
+            "in": {
+                "entry": {"min": 4.8, "median": 8.0, "max": 14.5},
+                "mid": {"min": 11.0, "median": 17.0, "max": 26.0},
+                "senior": {"min": 22.0, "median": 32.0, "max": 46.0},
+                "staff": {"min": 40.0, "median": 58.0, "max": 82.0},
+            },
+            "us": {
+                "entry": {"min": 95, "median": 125, "max": 155},
+                "mid": {"min": 135, "median": 165, "max": 205},
+                "senior": {"min": 180, "median": 225, "max": 285},
+                "staff": {"min": 250, "median": 320, "max": 420},
+            },
+            "uk": {
+                "entry": {"min": 42, "median": 55, "max": 70},
+                "mid": {"min": 65, "median": 85, "max": 110},
+                "senior": {"min": 95, "median": 125, "max": 160},
+                "staff": {"min": 140, "median": 180, "max": 240},
+            },
+            "eu": {
+                "entry": {"min": 50, "median": 64, "max": 78},
+                "mid": {"min": 72, "median": 88, "max": 112},
+                "senior": {"min": 98, "median": 125, "max": 155},
+                "staff": {"min": 135, "median": 170, "max": 220},
+            },
+            "ca": {
+                "entry": {"min": 80, "median": 105, "max": 130},
+                "mid": {"min": 115, "median": 145, "max": 180},
+                "senior": {"min": 155, "median": 195, "max": 245},
+                "staff": {"min": 210, "median": 270, "max": 350},
+            },
+            "sg": {
+                "entry": {"min": 65, "median": 84, "max": 110},
+                "mid": {"min": 95, "median": 125, "max": 165},
+                "senior": {"min": 140, "median": 185, "max": 240},
+                "staff": {"min": 200, "median": 260, "max": 340},
+            },
+            "ae": {
+                "entry": {"min": 180, "median": 240, "max": 320},
+                "mid": {"min": 280, "median": 380, "max": 500},
+                "senior": {"min": 420, "median": 560, "max": 720},
+                "staff": {"min": 620, "median": 820, "max": 1050},
+            },
+        },
     },
     "data_science": {
         "title": "Data Scientist",
-        "inr": {"entry": 9.0, "median": 17.5, "top": 38.0},
-        "usd": {"entry": 95, "median": 140, "top": 220},
+        "brackets": {
+            "in": {
+                "entry": {"min": 4.5, "median": 7.5, "max": 13.5},
+                "mid": {"min": 10.0, "median": 15.5, "max": 24.0},
+                "senior": {"min": 20.0, "median": 29.0, "max": 42.0},
+                "staff": {"min": 36.0, "median": 52.0, "max": 75.0},
+            },
+            "us": {
+                "entry": {"min": 90, "median": 120, "max": 150},
+                "mid": {"min": 130, "median": 160, "max": 195},
+                "senior": {"min": 170, "median": 215, "max": 270},
+                "staff": {"min": 240, "median": 305, "max": 400},
+            },
+            "uk": {
+                "entry": {"min": 40, "median": 52, "max": 68},
+                "mid": {"min": 62, "median": 80, "max": 105},
+                "senior": {"min": 90, "median": 118, "max": 150},
+                "staff": {"min": 130, "median": 170, "max": 225},
+            },
+            "eu": {
+                "entry": {"min": 48, "median": 60, "max": 75},
+                "mid": {"min": 68, "median": 84, "max": 108},
+                "senior": {"min": 92, "median": 118, "max": 148},
+                "staff": {"min": 128, "median": 162, "max": 210},
+            },
+            "ca": {
+                "entry": {"min": 75, "median": 100, "max": 125},
+                "mid": {"min": 110, "median": 138, "max": 172},
+                "senior": {"min": 148, "median": 185, "max": 235},
+                "staff": {"min": 200, "median": 255, "max": 330},
+            },
+            "sg": {
+                "entry": {"min": 60, "median": 78, "max": 102},
+                "mid": {"min": 90, "median": 118, "max": 155},
+                "senior": {"min": 130, "median": 172, "max": 225},
+                "staff": {"min": 190, "median": 245, "max": 320},
+            },
+            "ae": {
+                "entry": {"min": 165, "median": 225, "max": 300},
+                "mid": {"min": 265, "median": 360, "max": 475},
+                "senior": {"min": 400, "median": 530, "max": 680},
+                "staff": {"min": 580, "median": 770, "max": 980},
+            },
+        },
     },
     "data_engineering": {
         "title": "Data Engineer",
-        "inr": {"entry": 9.5, "median": 18.0, "top": 40.0},
-        "usd": {"entry": 100, "median": 145, "top": 230},
+        "brackets": {
+            "in": {
+                "entry": {"min": 4.5, "median": 7.5, "max": 13.5},
+                "mid": {"min": 10.0, "median": 16.0, "max": 24.5},
+                "senior": {"min": 20.5, "median": 30.0, "max": 44.0},
+                "staff": {"min": 38.0, "median": 54.0, "max": 78.0},
+            },
+            "us": {
+                "entry": {"min": 92, "median": 122, "max": 152},
+                "mid": {"min": 132, "median": 162, "max": 200},
+                "senior": {"min": 175, "median": 220, "max": 275},
+                "staff": {"min": 245, "median": 310, "max": 405},
+            },
+            "uk": {
+                "entry": {"min": 40, "median": 53, "max": 68},
+                "mid": {"min": 63, "median": 82, "max": 106},
+                "senior": {"min": 92, "median": 120, "max": 155},
+                "staff": {"min": 132, "median": 172, "max": 230},
+            },
+            "eu": {
+                "entry": {"min": 48, "median": 62, "max": 76},
+                "mid": {"min": 70, "median": 85, "max": 110},
+                "senior": {"min": 95, "median": 120, "max": 150},
+                "staff": {"min": 130, "median": 165, "max": 215},
+            },
+            "ca": {
+                "entry": {"min": 76, "median": 102, "max": 126},
+                "mid": {"min": 112, "median": 140, "max": 175},
+                "senior": {"min": 150, "median": 188, "max": 238},
+                "staff": {"min": 205, "median": 260, "max": 335},
+            },
+            "sg": {
+                "entry": {"min": 62, "median": 80, "max": 105},
+                "mid": {"min": 92, "median": 120, "max": 158},
+                "senior": {"min": 135, "median": 175, "max": 230},
+                "staff": {"min": 195, "median": 250, "max": 325},
+            },
+            "ae": {
+                "entry": {"min": 170, "median": 230, "max": 310},
+                "mid": {"min": 270, "median": 370, "max": 485},
+                "senior": {"min": 410, "median": 540, "max": 700},
+                "staff": {"min": 600, "median": 790, "max": 1000},
+            },
+        },
     },
     "cloud_devops": {
         "title": "Cloud / DevOps Engineer",
-        "inr": {"entry": 9.0, "median": 17.0, "top": 38.0},
-        "usd": {"entry": 95, "median": 140, "top": 225},
+        "brackets": {
+            "in": {
+                "entry": {"min": 4.0, "median": 7.0, "max": 12.5},
+                "mid": {"min": 9.0, "median": 14.5, "max": 22.5},
+                "senior": {"min": 18.5, "median": 27.0, "max": 40.0},
+                "staff": {"min": 35.0, "median": 48.0, "max": 70.0},
+            },
+            "us": {
+                "entry": {"min": 88, "median": 118, "max": 148},
+                "mid": {"min": 128, "median": 158, "max": 195},
+                "senior": {"min": 170, "median": 212, "max": 268},
+                "staff": {"min": 238, "median": 300, "max": 395},
+            },
+            "uk": {
+                "entry": {"min": 39, "median": 51, "max": 66},
+                "mid": {"min": 60, "median": 78, "max": 102},
+                "senior": {"min": 88, "median": 115, "max": 148},
+                "staff": {"min": 128, "median": 165, "max": 220},
+            },
+            "eu": {
+                "entry": {"min": 47, "median": 60, "max": 74},
+                "mid": {"min": 66, "median": 82, "max": 105},
+                "senior": {"min": 90, "median": 115, "max": 145},
+                "staff": {"min": 125, "median": 158, "max": 205},
+            },
+            "ca": {
+                "entry": {"min": 74, "median": 98, "max": 122},
+                "mid": {"min": 108, "median": 136, "max": 170},
+                "senior": {"min": 145, "median": 180, "max": 230},
+                "staff": {"min": 198, "median": 250, "max": 325},
+            },
+            "sg": {
+                "entry": {"min": 60, "median": 76, "max": 100},
+                "mid": {"min": 88, "median": 115, "max": 150},
+                "senior": {"min": 128, "median": 168, "max": 220},
+                "staff": {"min": 188, "median": 240, "max": 310},
+            },
+            "ae": {
+                "entry": {"min": 160, "median": 220, "max": 295},
+                "mid": {"min": 260, "median": 350, "max": 465},
+                "senior": {"min": 390, "median": 520, "max": 665},
+                "staff": {"min": 570, "median": 750, "max": 950},
+            },
+        },
     },
     "cybersecurity": {
         "title": "Cybersecurity Specialist",
-        "inr": {"entry": 8.0, "median": 15.5, "top": 36.0},
-        "usd": {"entry": 90, "median": 135, "top": 215},
+        "brackets": {
+            "in": {
+                "entry": {"min": 4.0, "median": 6.5, "max": 12.0},
+                "mid": {"min": 8.5, "median": 14.0, "max": 21.0},
+                "senior": {"min": 18.0, "median": 26.0, "max": 38.0},
+                "staff": {"min": 33.0, "median": 46.0, "max": 68.0},
+            },
+            "us": {
+                "entry": {"min": 85, "median": 115, "max": 145},
+                "mid": {"min": 125, "median": 155, "max": 190},
+                "senior": {"min": 165, "median": 208, "max": 262},
+                "staff": {"min": 232, "median": 292, "max": 385},
+            },
+            "uk": {
+                "entry": {"min": 37, "median": 49, "max": 64},
+                "mid": {"min": 57, "median": 74, "max": 96},
+                "senior": {"min": 84, "median": 108, "max": 142},
+                "staff": {"min": 122, "median": 158, "max": 210},
+            },
+            "eu": {
+                "entry": {"min": 45, "median": 57, "max": 71},
+                "mid": {"min": 64, "median": 79, "max": 100},
+                "senior": {"min": 87, "median": 110, "max": 138},
+                "staff": {"min": 118, "median": 148, "max": 195},
+            },
+            "ca": {
+                "entry": {"min": 72, "median": 95, "max": 118},
+                "mid": {"min": 105, "median": 132, "max": 165},
+                "senior": {"min": 140, "median": 175, "max": 222},
+                "staff": {"min": 192, "median": 242, "max": 315},
+            },
+            "sg": {
+                "entry": {"min": 57, "median": 74, "max": 96},
+                "mid": {"min": 84, "median": 110, "max": 142},
+                "senior": {"min": 124, "median": 162, "max": 210},
+                "staff": {"min": 182, "median": 232, "max": 298},
+            },
+            "ae": {
+                "entry": {"min": 155, "median": 215, "max": 288},
+                "mid": {"min": 252, "median": 342, "max": 452},
+                "senior": {"min": 382, "median": 505, "max": 648},
+                "staff": {"min": 555, "median": 730, "max": 925},
+            },
+        },
     },
     "product_management": {
         "title": "Product Manager",
-        "inr": {"entry": 11.0, "median": 22.0, "top": 48.0},
-        "usd": {"entry": 110, "median": 160, "top": 260},
+        "brackets": {
+            "in": {
+                "entry": {"min": 6.0, "median": 9.5, "max": 15.5},
+                "mid": {"min": 13.5, "median": 20.0, "max": 30.0},
+                "senior": {"min": 24.0, "median": 36.0, "max": 52.0},
+                "staff": {"min": 44.0, "median": 62.0, "max": 90.0},
+            },
+            "us": {
+                "entry": {"min": 98, "median": 130, "max": 165},
+                "mid": {"min": 142, "median": 178, "max": 220},
+                "senior": {"min": 190, "median": 240, "max": 305},
+                "staff": {"min": 265, "median": 340, "max": 440},
+            },
+            "uk": {
+                "entry": {"min": 44, "median": 58, "max": 75},
+                "mid": {"min": 68, "median": 90, "max": 118},
+                "senior": {"min": 100, "median": 132, "max": 172},
+                "staff": {"min": 148, "median": 192, "max": 255},
+            },
+            "eu": {
+                "entry": {"min": 52, "median": 66, "max": 82},
+                "mid": {"min": 75, "median": 94, "max": 120},
+                "senior": {"min": 102, "median": 132, "max": 165},
+                "staff": {"min": 142, "median": 182, "max": 235},
+            },
+            "ca": {
+                "entry": {"min": 82, "median": 108, "max": 135},
+                "mid": {"min": 120, "median": 152, "max": 190},
+                "senior": {"min": 162, "median": 205, "max": 258},
+                "staff": {"min": 220, "median": 282, "max": 365},
+            },
+            "sg": {
+                "entry": {"min": 68, "median": 88, "max": 115},
+                "mid": {"min": 100, "median": 132, "max": 172},
+                "senior": {"min": 148, "median": 195, "max": 252},
+                "staff": {"min": 210, "median": 275, "max": 355},
+            },
+            "ae": {
+                "entry": {"min": 190, "median": 255, "max": 340},
+                "mid": {"min": 300, "median": 410, "max": 540},
+                "senior": {"min": 450, "median": 600, "max": 780},
+                "staff": {"min": 660, "median": 880, "max": 1120},
+            },
+        },
     },
 }
 
 _SKILL_ROI_PREMIUMS = [
     {
         "skill": "Kubernetes & Cloud Orchestration",
-        "uplift_pct": "+22%",
-        "uplift_inr": "+₹3.5 - 5.5 LPA",
-        "uplift_usd": "+$20k - 30k",
+        "uplift_pct": "+16%",
+        "uplifts": {
+            "in": "+₹1.2 - 2.5 LPA",
+            "us": "+$16k - 26k",
+            "uk": "+£8k - 15k",
+            "eu": "+€9k - 16k",
+            "ca": "+C$14k - 24k",
+            "sg": "+S$15k - 26k",
+            "ae": "+AED 35k - 60k",
+        },
         "demand_score": 96,
         "reasoning": "High enterprise shortage for engineers who can containerize and manage autoscaling clusters.",
     },
     {
         "skill": "System Design & Distributed Systems",
-        "uplift_pct": "+26%",
-        "uplift_inr": "+₹4.5 - 7.0 LPA",
-        "uplift_usd": "+$28k - 40k",
+        "uplift_pct": "+20%",
+        "uplifts": {
+            "in": "+₹1.8 - 3.2 LPA",
+            "us": "+$22k - 35k",
+            "uk": "+£12k - 20k",
+            "eu": "+€13k - 22k",
+            "ca": "+C$18k - 30k",
+            "sg": "+S$20k - 34k",
+            "ae": "+AED 45k - 80k",
+        },
         "demand_score": 98,
         "reasoning": "The single most decisive factor distinguishing Mid-level from Senior/Staff compensation brackets.",
     },
     {
         "skill": "Generative AI & LLM Engineering (RAG / Agentic)",
-        "uplift_pct": "+24%",
-        "uplift_inr": "+₹4.0 - 6.5 LPA",
-        "uplift_usd": "+$25k - 38k",
+        "uplift_pct": "+18%",
+        "uplifts": {
+            "in": "+₹1.5 - 3.0 LPA",
+            "us": "+$20k - 32k",
+            "uk": "+£10k - 18k",
+            "eu": "+€11k - 20k",
+            "ca": "+C$16k - 28k",
+            "sg": "+S$18k - 30k",
+            "ae": "+AED 40k - 75k",
+        },
         "demand_score": 95,
         "reasoning": "Premium budget allocation across startups and tech enterprises building intelligent automation.",
     },
     {
         "skill": "FastAPI & Asynchronous Python High-Throughput APIs",
-        "uplift_pct": "+16%",
-        "uplift_inr": "+₹2.5 - 4.0 LPA",
-        "uplift_usd": "+$14k - 22k",
+        "uplift_pct": "+12%",
+        "uplifts": {
+            "in": "+₹0.8 - 1.8 LPA",
+            "us": "+$10k - 18k",
+            "uk": "+£6k - 11k",
+            "eu": "+€7k - 12k",
+            "ca": "+C$9k - 16k",
+            "sg": "+S$10k - 18k",
+            "ae": "+AED 22k - 40k",
+        },
         "demand_score": 91,
         "reasoning": "Replacing legacy synchronous stacks in modern microservice architectures.",
     },
     {
         "skill": "CI/CD Automation & Infrastructure as Code (Terraform)",
-        "uplift_pct": "+18%",
-        "uplift_inr": "+₹3.0 - 4.8 LPA",
-        "uplift_usd": "+$16k - 25k",
+        "uplift_pct": "+14%",
+        "uplifts": {
+            "in": "+₹1.0 - 2.2 LPA",
+            "us": "+$12k - 22k",
+            "uk": "+£7k - 13k",
+            "eu": "+€8k - 14k",
+            "ca": "+C$11k - 20k",
+            "sg": "+S$12k - 22k",
+            "ae": "+AED 26k - 48k",
+        },
         "demand_score": 92,
         "reasoning": "Eliminates deployment friction; engineering organizations pay a premium for self-sufficient builders.",
     },
 ]
+
+
+def _calc_stage_percentiles(b: dict[str, dict[str, float]], exp: float, skill_mult: float, is_lpa: bool):
+    """Interpolates salary percentiles cleanly across career stages without overfluff."""
+    entry_b = b["entry"]
+    mid_b = b["mid"]
+    senior_b = b["senior"]
+    staff_b = b["staff"]
+
+    if exp <= 2.0:
+        t = min(1.0, max(0.0, exp / 2.0))
+        min_v = entry_b["min"] + t * 0.25 * (entry_b["median"] - entry_b["min"])
+        med_v = entry_b["min"] + t * (entry_b["median"] - entry_b["min"])
+        p75_v = entry_b["median"] + t * 0.5 * (entry_b["max"] - entry_b["median"])
+        p90_v = entry_b["max"]
+    elif exp <= 5.0:
+        t = min(1.0, max(0.0, (exp - 2.0) / 3.0))
+        min_v = mid_b["min"] + t * 0.25 * (mid_b["median"] - mid_b["min"])
+        med_v = mid_b["min"] + t * (mid_b["median"] - mid_b["min"])
+        p75_v = mid_b["median"] + t * 0.5 * (mid_b["max"] - mid_b["median"])
+        p90_v = mid_b["max"]
+    elif exp <= 8.0:
+        t = min(1.0, max(0.0, (exp - 5.0) / 3.0))
+        min_v = senior_b["min"] + t * 0.25 * (senior_b["median"] - senior_b["min"])
+        med_v = senior_b["min"] + t * (senior_b["median"] - senior_b["min"])
+        p75_v = senior_b["median"] + t * 0.5 * (senior_b["max"] - senior_b["median"])
+        p90_v = senior_b["max"]
+    else:
+        t = min(1.0, max(0.0, (exp - 8.0) / 4.0))
+        min_v = staff_b["min"] + t * 0.25 * (staff_b["median"] - staff_b["min"])
+        med_v = staff_b["min"] + t * (staff_b["median"] - staff_b["min"])
+        p75_v = staff_b["median"] + t * 0.5 * (staff_b["max"] - staff_b["median"])
+        p90_v = staff_b["max"]
+
+    if is_lpa:
+        return (
+            round(min_v * skill_mult, 1),
+            round(med_v * skill_mult, 1),
+            round(p75_v * skill_mult, 1),
+            round(p90_v * skill_mult, 1),
+        )
+    return (
+        int(round(min_v * skill_mult)),
+        int(round(med_v * skill_mult)),
+        int(round(p75_v * skill_mult)),
+        int(round(p90_v * skill_mult)),
+    )
 
 
 def estimate_career_compensation(
@@ -1163,8 +1612,9 @@ def estimate_career_compensation(
     experience_years: float = 1.0,
     skills: list[str] | None = None,
     academic_score: float = 8.5,
+    country: str = "in",
 ) -> dict[str, Any]:
-    """Estimates market compensation brackets and skill ROI premiums."""
+    """Estimates realistic market compensation brackets and skill ROI premiums."""
     role_key = "software_engineer"
     role_lower = (target_role or "").lower()
 
@@ -1182,10 +1632,14 @@ def estimate_career_compensation(
         role_key = "product_management"
 
     base_data = _SALARY_DATABASE.get(role_key, _SALARY_DATABASE["software_engineer"])
+    exp = max(0.0, float(experience_years if experience_years is not None else 1.0))
 
-    exp = max(0.0, float(experience_years or 1.0))
-    exp_mult = 1.0 + (exp * 0.18) if exp <= 3 else 1.54 + ((exp - 3) * 0.12)
+    country_key = (country or "in").lower()
+    if country_key not in COUNTRY_CONFIGS:
+        country_key = "in"
+    c_cfg = COUNTRY_CONFIGS[country_key]
 
+    # Evaluate candidate verified skills match against premium list
     candidate_skills = [s.lower() for s in (skills or [])]
     matched_premiums = 0
     for item in _SKILL_ROI_PREMIUMS:
@@ -1193,35 +1647,119 @@ def estimate_career_compensation(
         if any(w in candidate_skills for w in skill_name.split() if len(w) > 3):
             matched_premiums += 1
 
-    skill_mult = 1.0 + (matched_premiums * 0.06)
+    skill_mult = 1.0 + min(0.15, matched_premiums * 0.03)
 
-    inr_entry = round(base_data["inr"]["entry"] * skill_mult, 1)
-    inr_median = round(base_data["inr"]["median"] * exp_mult * skill_mult, 1)
-    inr_top = round(base_data["inr"]["top"] * exp_mult * skill_mult, 1)
+    # 1. Selected Country values
+    p25, p50, p75, p90 = _calc_stage_percentiles(
+        base_data["brackets"][country_key], exp, skill_mult, c_cfg["is_lpa"]
+    )
 
-    usd_entry = int(base_data["usd"]["entry"] * skill_mult)
-    usd_median = int(base_data["usd"]["median"] * exp_mult * skill_mult)
-    usd_top = int(base_data["usd"]["top"] * exp_mult * skill_mult)
+    # 2. INR and USD values (for backward compatibility and dual-view toggling)
+    inr_p25, inr_p50, inr_p75, inr_p90 = _calc_stage_percentiles(
+        base_data["brackets"]["in"], exp, skill_mult, True
+    )
+    usd_p25, usd_p50, usd_p75, usd_p90 = _calc_stage_percentiles(
+        base_data["brackets"]["us"], exp, skill_mult, False
+    )
 
-    ladder = [
-        {"level": "Entry / Associate (0-2 Yrs)", "inr": f"₹{inr_entry} - {round(inr_entry * 1.4, 1)} LPA", "usd": f"${usd_entry}k - ${int(usd_entry * 1.35)}k"},
-        {"level": "Mid-Level Engineer (2-5 Yrs)", "inr": f"₹{inr_median} - {round(inr_median * 1.3, 1)} LPA", "usd": f"${usd_median}k - ${int(usd_median * 1.3)}k"},
-        {"level": "Senior Engineer (5-8 Yrs)", "inr": f"₹{round(inr_median * 1.45, 1)} - {inr_top} LPA", "usd": f"${int(usd_median * 1.4)}k - ${usd_top}k"},
-        {"level": "Staff / Principal (8+ Yrs)", "inr": f"₹{round(inr_top * 1.15, 1)} - {round(inr_top * 1.7, 1)} LPA", "usd": f"${int(usd_top * 1.15)}k - ${int(usd_top * 1.6)}k"},
+    sym = c_cfg["currency_symbol"]
+    unit = c_cfg["unit"]
+
+    # Format career ladder stages for selected country, inr, and usd
+    ladder_levels = [
+        ("Entry / Associate (0-2 Yrs)", "entry"),
+        ("Mid-Level Engineer (2-5 Yrs)", "mid"),
+        ("Senior Engineer (5-8 Yrs)", "senior"),
+        ("Staff / Principal (8+ Yrs)", "staff"),
     ]
+
+    ladder = []
+    for title, stage_k in ladder_levels:
+        cur_b = base_data["brackets"][country_key][stage_k]
+        inr_b = base_data["brackets"]["in"][stage_k]
+        usd_b = base_data["brackets"]["us"][stage_k]
+
+        if c_cfg["is_lpa"]:
+            loc_str = f"{sym}{cur_b['min']} - {cur_b['max']} {unit}"
+        else:
+            loc_str = f"{sym}{cur_b['min']}k - {cur_b['max']}k/Yr"
+
+        ladder.append({
+            "level": title,
+            "range": loc_str,
+            "inr": f"₹{inr_b['min']} - {inr_b['max']} LPA",
+            "usd": f"${usd_b['min']}k - ${usd_b['max']}k",
+        })
+
+    # Prepare localized skill premiums
+    skill_premiums = []
+    for item in _SKILL_ROI_PREMIUMS:
+        uplift_loc = item["uplifts"].get(country_key, item["uplifts"]["in"])
+        skill_premiums.append({
+            "skill": item["skill"],
+            "uplift_pct": item["uplift_pct"],
+            "uplift_inr": item["uplifts"]["in"],
+            "uplift_usd": item["uplifts"]["us"],
+            "uplift_display": uplift_loc,
+            "demand_score": item["demand_score"],
+            "reasoning": item["reasoning"],
+        })
+
+    # Available countries list for frontend selector
+    countries_list = [
+        {
+            "code": cfg["code"],
+            "name": cfg["name"],
+            "flag": cfg["flag"],
+            "currency_code": cfg["currency_code"],
+            "currency_symbol": cfg["currency_symbol"],
+            "label": cfg["label"],
+            "unit": cfg["unit"],
+        }
+        for cfg in COUNTRY_CONFIGS.values()
+    ]
+
+    selected_range_display = (
+        f"{sym}{p25} - {p75} {unit}" if c_cfg["is_lpa"] else f"{sym}{p25}k - {sym}{p75}k/yr"
+    )
 
     return {
         "success": True,
         "target_role": base_data["title"],
         "experience_years": exp,
-        "predicted_range_inr": f"₹{inr_entry} - {inr_median} LPA",
-        "predicted_range_usd": f"${usd_entry}k - ${usd_median}k",
+        "country": country_key,
+        "country_name": c_cfg["name"],
+        "country_flag": c_cfg["flag"],
+        "currency_symbol": sym,
+        "currency_code": c_cfg["currency_code"],
+        "unit": unit,
+        "predicted_range": selected_range_display,
+        "predicted_range_inr": f"₹{inr_p25} - {inr_p75} LPA",
+        "predicted_range_usd": f"${usd_p25}k - ${usd_p75}k",
         "brackets": {
-            "entry_25th": {"inr": f"₹{inr_entry} LPA", "usd": f"${usd_entry}k/yr"},
-            "median_50th": {"inr": f"₹{inr_median} LPA", "usd": f"${usd_median}k/yr"},
-            "top_75th": {"inr": f"₹{round(inr_median * 1.28, 1)} LPA", "usd": f"${int(usd_median * 1.25)}k/yr"},
-            "top_tier_90th": {"inr": f"₹{inr_top} LPA", "usd": f"${usd_top}k/yr"},
+            "entry_25th": {
+                "display": f"{sym}{p25} {unit}" if c_cfg["is_lpa"] else f"{sym}{p25}k/yr",
+                "inr": f"₹{inr_p25} LPA",
+                "usd": f"${usd_p25}k/yr",
+            },
+            "median_50th": {
+                "display": f"{sym}{p50} {unit}" if c_cfg["is_lpa"] else f"{sym}{p50}k/yr",
+                "inr": f"₹{inr_p50} LPA",
+                "usd": f"${usd_p50}k/yr",
+            },
+            "top_75th": {
+                "display": f"{sym}{p75} {unit}" if c_cfg["is_lpa"] else f"{sym}{p75}k/yr",
+                "inr": f"₹{inr_p75} LPA",
+                "usd": f"${usd_p75}k/yr",
+            },
+            "top_tier_90th": {
+                "display": f"{sym}{p90} {unit}" if c_cfg["is_lpa"] else f"{sym}{p90}k/yr",
+                "inr": f"₹{inr_p90} LPA",
+                "usd": f"${usd_p90}k/yr",
+            },
         },
-        "skill_roi_premiums": _SKILL_ROI_PREMIUMS,
+        "skill_roi_premiums": skill_premiums,
         "career_ladder": ladder,
+        "available_countries": countries_list,
     }
+

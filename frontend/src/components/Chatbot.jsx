@@ -71,6 +71,43 @@ const DOMAIN_CONFIG = {
       { label: '📜 ROI Evaluation', prompt: 'What metrics best measure the return on investment for rural solar power subsidies?' },
     ],
   },
+  landing: {
+    domain: 'product',
+    title: 'DeciXAI Product Guide',
+    badge: '💡 Have Questions? Ask here',
+    badgeColor: 'bg-cyan-950/80 text-cyan-300 border-cyan-700/80',
+    launcherLabel: 'Have questions? Ask AI',
+    subtitle: 'Have any questions? Ask them here!',
+    greetingTitle: 'Have any questions? Ask them here!',
+    greeting: 'Welcome to DeciXAI! I can help you understand our Explainable AI platform, explore our 4 Decision Studios, learn how What-If simulations work, or guide you on getting started.',
+    starters: [
+      {
+        label: '✨ What is DeciXAI?',
+        prompt: 'What is DeciXAI and how does Explainable AI (XAI) work?',
+        detail: 'Learn about our transparent ML models & live SHAP attribution',
+      },
+      {
+        label: '🎯 4 Decision Studios',
+        prompt: 'What are the 4 Decision Studios (Career, Finance, Startup, Policy) and what can they do?',
+        detail: 'Explore features across Talent, Credit, Venture & Policy',
+      },
+      {
+        label: '⚡ What-If Simulator',
+        prompt: 'How does the Counterfactual What-If Simulator work in DeciXAI?',
+        detail: 'Simulate probability changes by testing skills or capstones',
+      },
+      {
+        label: '💳 Finance & DigiLocker eKYC',
+        prompt: 'How does automated DigiLocker eKYC and bank verification work in Finance Studio?',
+        detail: 'Instant paperless verification & risk radar explainability',
+      },
+      {
+        label: '🚀 Free Workspace & Access',
+        prompt: 'Is DeciXAI free to use and how do I get started with a workspace?',
+        detail: 'Zero-friction access, instant insights, and developer APIs',
+      },
+    ],
+  },
   default: {
     domain: 'general',
     title: 'DeciXAI Copilot',
@@ -90,6 +127,7 @@ const DOMAIN_CONFIG = {
 
 const detectDomainFromPath = (pathname = '') => {
   const p = (pathname || '').toLowerCase()
+  if (p === '/' || p === '') return 'landing'
   if (p.includes('career')) return 'career'
   if (p.includes('finance') || p.includes('loan')) return 'finance'
   if (p.includes('startup')) return 'startup'
@@ -203,7 +241,8 @@ export function FormattedMessage({ content }) {
 export default function Chatbot() {
   const location = useLocation()
   const detectedDomain = detectDomainFromPath(location.pathname)
-  const activeConfig = DOMAIN_CONFIG[detectedDomain] || DOMAIN_CONFIG.default
+  const isLandingPage = detectedDomain === 'landing' || location.pathname === '/'
+  const activeConfig = DOMAIN_CONFIG[detectedDomain] || DOMAIN_CONFIG.landing || DOMAIN_CONFIG.default
 
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
@@ -467,18 +506,20 @@ export default function Chatbot() {
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Link to Saved Workspace Chatbot tab */}
-              <Link
-                to={`/dashboard/workspace?tab=chatbot&domain=${detectedDomain || 'all'}`}
-                onClick={() => setOpen(false)}
-                title="Open Saved Workspace Chatbot Folder"
-                className="h-7 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white text-[11px] font-medium flex items-center gap-1 transition cursor-pointer border border-slate-700"
-              >
-                <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                </svg>
-                <span className="hidden sm:inline">Workspace</span>
-              </Link>
+              {/* Link to Saved Workspace Chatbot tab (only for dashboard domains) */}
+              {!isLandingPage && (
+                <Link
+                  to={`/dashboard/workspace?tab=chatbot&domain=${detectedDomain || 'all'}`}
+                  onClick={() => setOpen(false)}
+                  title="Open Saved Workspace Chatbot Folder"
+                  className="h-7 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white text-[11px] font-medium flex items-center gap-1 transition cursor-pointer border border-slate-700"
+                >
+                  <svg className="h-3.5 w-3.5 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
+                  <span className="hidden sm:inline">Workspace</span>
+                </Link>
+              )}
 
               {/* Reset/Clear Chat Button */}
               {messages.length > 0 && (
@@ -534,24 +575,30 @@ export default function Chatbot() {
           <div ref={listRef} className="flex-1 space-y-3.5 overflow-y-auto bg-slate-50/60 p-3 sm:p-4 text-xs sm:text-sm">
             {messages.length === 0 && (
               <div className="space-y-3 py-2">
-                {/* Domain-specific Welcome Greeting */}
-                <div className="rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50 to-white p-3.5 shadow-2xs">
-                  <div className="font-bold text-slate-800 text-xs flex items-center gap-1.5 mb-1">
-                    <span className="text-base">👋</span>
-                    <span>Namaste! {activeConfig.title} at your service.</span>
+                {/* Domain or Product Welcome Greeting */}
+                <div
+                  className={`rounded-2xl border p-4 shadow-2xs ${
+                    isLandingPage
+                      ? 'border-cyan-200/90 bg-gradient-to-br from-cyan-50/80 via-sky-50/40 to-white'
+                      : 'border-slate-200/80 bg-gradient-to-br from-slate-50 to-white'
+                  }`}
+                >
+                  <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-2 mb-1.5">
+                    <span className="text-base sm:text-lg">💬</span>
+                    <span>{activeConfig.greetingTitle || `Namaste! ${activeConfig.title} at your service.`}</span>
                   </div>
-                  <p className="text-slate-600 text-[11px] leading-relaxed">
+                  <p className="text-slate-600 text-[11px] sm:text-xs leading-relaxed">
                     {activeConfig.greeting}
                   </p>
                 </div>
 
-                {/* Domain Specific Header Label */}
+                {/* Section Header Label */}
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1 flex items-center justify-between">
-                  <span>Example Prompts ({activeConfig.badge})</span>
-                  <span className="text-[10px] text-cyan-600 font-semibold lowercase">click to ask</span>
+                  <span>{isLandingPage ? 'Common Questions About DeciXAI' : `Example Prompts (${activeConfig.badge})`}</span>
+                  <span className="text-[10px] text-cyan-600 font-semibold lowercase">tap to ask</span>
                 </div>
 
-                {/* ONLY Domain-Specific Starters */}
+                {/* Starters List */}
                 <div className="grid gap-1.5">
                   {activeConfig.starters.map((item, idx) => (
                     <button
@@ -560,12 +607,22 @@ export default function Chatbot() {
                       onClick={() => sendMessage(item.prompt)}
                       className="group flex flex-col text-left rounded-xl border border-slate-200 bg-white p-2.5 transition hover:border-cyan-400 hover:bg-cyan-50/40 cursor-pointer shadow-2xs"
                     >
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 group-hover:text-cyan-800">
-                        {item.label}
-                      </span>
-                      <span className="text-xs text-slate-700 group-hover:text-slate-900 mt-0.5 leading-snug">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 group-hover:text-cyan-800">
+                          {item.label}
+                        </span>
+                        <span className="text-[10px] text-slate-400 group-hover:text-cyan-600 font-semibold">
+                          Ask →
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold text-slate-800 group-hover:text-slate-950 mt-0.5 leading-snug">
                         {item.prompt}
                       </span>
+                      {item.detail && (
+                        <span className="text-[10px] text-slate-400 group-hover:text-slate-500 mt-0.5 leading-tight">
+                          {item.detail}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -681,7 +738,13 @@ export default function Chatbot() {
                 rows={2}
                 disabled={loading}
                 className="w-full resize-none bg-transparent px-3 py-2 text-xs sm:text-sm text-slate-800 outline-none disabled:opacity-60 placeholder:text-slate-400 max-h-28"
-                placeholder={loading ? 'Generating response...' : `Ask ${activeConfig.title} in English or Hindi (Enter to send)...`}
+                placeholder={
+                  loading
+                    ? 'Generating response...'
+                    : isLandingPage
+                    ? 'Have a question about DeciXAI? Ask here (e.g. features, 4 studios, What-If)...'
+                    : `Ask ${activeConfig.title} in English or Hindi (Enter to send)...`
+                }
               />
 
               <div className="m-1.5 shrink-0 flex items-center gap-1">

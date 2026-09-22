@@ -93,6 +93,95 @@ def _smalltalk_reply(message: str) -> str | None:
     return None
 
 
+def _product_knowledge_reply(message: str) -> str | None:
+    text = str(message or '').strip().lower()
+    if not text:
+        return None
+
+    # 1. What is DeciXAI / Explainable AI Overview
+    if any(q in text for q in [
+        'what is decixai', 'about decixai', 'tell me about decixai', 'what does decixai do',
+        'what does this app do', 'how does explainable ai work', 'explainable ai (xai)',
+        'what is xai', 'why decixai', 'product ke baare', 'about the product', 'product information'
+    ]):
+        return (
+            "### What is DeciXAI?\n\n"
+            "**DeciXAI** is an AI-powered **Explainable Decision Intelligence (XAI)** platform. "
+            "Unlike traditional 'black-box' AI that outputs scores with zero reasoning, DeciXAI combines trained machine learning models "
+            "(XGBoost, Scikit-learn, Neural Networks) with **live SHAP feature attributions**, counterfactual simulations, and anti-hallucination copilots.\n\n"
+            "**Why it matters:**\n"
+            "- **Zero Black-Box Mystery:** Every decision displays a mathematical waterfall of positive and negative factors.\n"
+            "- **Counterfactual Simulations:** Test 'What-If' pivots before taking action.\n"
+            "- **4 Dedicated Enterprise Studios:** Career & Talent, Finance & Credit, Startup & Venture, and Government Policy."
+        )
+
+    # 2. 4 Decision Studios
+    if any(q in text for q in [
+        '4 decision studios', 'four decision studios', 'tell me about the 4', 'tell me about the four',
+        'what are the 4', 'what are the four', 'studios in decixai', 'career finance startup policy',
+        'decision studios', 'what studios'
+    ]):
+        return (
+            "### The 4 Enterprise Decision Studios in DeciXAI\n\n"
+            "DeciXAI provides specialized decision engines across 4 key domains:\n\n"
+            "1. **🎓 Career & Talent Studio:**\n"
+            "   - ATS 2.0 Resume intelligence & Google X-Y-Z bullet point rewriter.\n"
+            "   - Counterfactual What-If simulator with live acceptance probability tracking.\n"
+            "   - Realistic multi-country compensation estimator (LPA & USD).\n\n"
+            "2. **💳 Finance & Credit Studio:**\n"
+            "   - Instant paperless DigiLocker eKYC & Aadhaar identity verification.\n"
+            "   - Bank account penny-drop checks via IMPS protocol.\n"
+            "   - Debt-to-Income (DTI) stress testing and loan viability radar.\n\n"
+            "3. **🚀 Startup & Venture Studio:**\n"
+            "   - B2B SaaS and venture valuation modeling.\n"
+            "   - Burn rate & runway extension simulator.\n"
+            "   - Investor pitch readiness radar.\n\n"
+            "4. **📜 Government Policy Studio:**\n"
+            "   - Public budget allocation and subsidy ROI comparisons.\n"
+            "   - Demographic outreach modeling and algorithmic bias compliance."
+        )
+
+    # 3. What-If Simulator
+    if any(q in text for q in [
+        'what-if simulator', 'what if simulator', 'counterfactual', 'how does what-if work', 'what if pivot',
+        'simulator work'
+    ]):
+        return (
+            "### Counterfactual What-If Simulator\n\n"
+            "The **What-If Simulator** allows candidates, founders, and credit underwriters to test hypothetical profile changes before committing:\n\n"
+            "- **Live Attribution Waterfall:** See the exact percentage boost each modification provides (e.g., +28% for high-demand cloud/system skills, +14% for 2 production capstones).\n"
+            "- **Empirical Proof:** Proves mathematically that practical competencies and capstone deployments outweigh academic CGPA by over 15x.\n"
+            "- **Optimal Pivot Roadmap:** Computes the fastest path to achieve a 90%+ acceptance probability."
+        )
+
+    # 4. Finance Studio & DigiLocker eKYC
+    if any(q in text for q in [
+        'digilocker', 'ekyc', 'penny drop', 'bank verification', 'finance studio', 'loan verification'
+    ]):
+        return (
+            "### Finance Studio & Automated DigiLocker eKYC\n\n"
+            "DeciXAI's Finance Studio eliminates lending friction with an automated 7-step wizard:\n\n"
+            "- **DigiLocker eKYC:** Instant Aadhaar masked verification without physical documents.\n"
+            "- **Penny-Drop Verification:** Live bank account and IFSC authentication via IMPS protocol.\n"
+            "- **Risk Radar Explainability:** Pinpoints exact credit risk factors (DTI ratio, bureau history, existing liabilities) so applicants know how to qualify for prime interest rates."
+        )
+
+    # 5. Free Access, Pricing, Getting Started
+    if any(q in text for q in [
+        'is it free', 'is decixai free', 'pricing', 'cost', 'how do i get started', 'free workspace', 'api access',
+        'free to use', 'get started'
+    ]):
+        return (
+            "### Getting Started with DeciXAI\n\n"
+            "**Yes! DeciXAI is 100% free to explore.**\n\n"
+            "- **No Credit Card Required:** Click **'Launch Free Workspace'** to immediately access the interactive decision studios.\n"
+            "- **Saved Workspaces:** Store your XAI insights, What-If scenarios, and chatbot roadmap suggestions.\n"
+            "- **Developer APIs:** Generate live API keys in the dashboard for REST microservice integration."
+        )
+
+    return None
+
+
 def _project_scope_reply(message: str) -> str | None:
     text = str(message or '').strip().lower()
     if not text:
@@ -680,7 +769,8 @@ def get_chatbot_response(payload: dict[str, Any], stream: bool = True):
             }
 
     direct_reply = (
-        _smalltalk_reply(latest_message)
+        _product_knowledge_reply(latest_message)
+        or _smalltalk_reply(latest_message)
         or _project_scope_reply(latest_message)
         or _general_scope_reply(latest_message)
         or _grounded_domain_reply(latest_message)

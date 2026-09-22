@@ -229,33 +229,33 @@ export default function LandingPage() {
         <div className="absolute top-[50%] -right-40 w-[600px] h-[600px] bg-emerald-100/25 rounded-full blur-3xl" />
       </div>
 
-      {/* ── 1. Modern Crisp Light Navbar ─────────────────────────────────── */}
-      <nav className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/85 backdrop-blur-xl shadow-xs transition-all">
+      {/* ── 1. Dark Navbar Matching App Sidebar (#0B1120) ──────────────────── */}
+      <nav className="sticky top-0 z-50 border-b border-slate-800/80 bg-[#0B1120]/95 backdrop-blur-xl shadow-lg shadow-black/20 transition-all">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
             <img
               src="/logo.jpeg"
               alt="DeciXAI Logo"
-              className="h-9 w-9 rounded-xl border border-slate-200 object-cover shadow-2xs"
+              className="h-9 w-9 rounded-xl border border-slate-700/80 object-cover shadow-xs"
             />
             <div className="flex items-center gap-2">
-              <span className="text-lg font-black tracking-tight text-slate-950 font-sans">
+              <span className="text-lg font-black tracking-tight text-white font-sans">
                 DeciXAI
               </span>
-              <span className="hidden sm:inline-block rounded-full bg-cyan-50 border border-cyan-200 px-2 py-0.5 text-[10px] font-bold text-cyan-700">
+              <span className="hidden sm:inline-block rounded-full bg-cyan-950/70 border border-cyan-800/70 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
                 v2.4 Live
               </span>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden lg:flex items-center gap-7 text-xs font-bold text-slate-600">
-            <a href="#studios" className="hover:text-cyan-700 transition">Decision Studios</a>
-            <a href="#what-if" className="hover:text-cyan-700 transition">What-If Simulator</a>
-            <a href="#features" className="hover:text-cyan-700 transition">Feature Matrix</a>
-            <a href="#copilot" className="hover:text-cyan-700 transition">AI Copilot</a>
-            <a href="#developer" className="hover:text-cyan-700 transition">API Hub</a>
-            <a href="#faq" className="hover:text-cyan-700 transition">FAQ</a>
+          <div className="hidden lg:flex items-center gap-7 text-xs font-bold text-slate-300">
+            <a href="#studios" className="hover:text-cyan-400 transition">Decision Studios</a>
+            <a href="#what-if" className="hover:text-cyan-400 transition">What-If Simulator</a>
+            <a href="#features" className="hover:text-cyan-400 transition">Feature Matrix</a>
+            <a href="#copilot" className="hover:text-cyan-400 transition">AI Copilot</a>
+            <a href="#developer" className="hover:text-cyan-400 transition">API Hub</a>
+            <a href="#faq" className="hover:text-cyan-400 transition">FAQ</a>
           </div>
 
           {/* User Auth CTAs */}
@@ -263,21 +263,22 @@ export default function LandingPage() {
             {isAuthenticated ? (
               <button
                 onClick={() => navigate('/dashboard')}
-                className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 text-xs font-bold transition shadow-sm cursor-pointer"
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2 text-xs font-bold transition shadow-md shadow-blue-500/25 cursor-pointer flex items-center gap-1.5"
               >
-                Go to Dashboard →
+                <span>Go to Dashboard</span>
+                <span>→</span>
               </button>
             ) : (
               <>
                 <button
                   onClick={() => navigate('/auth')}
-                  className="text-xs font-bold text-slate-600 hover:text-slate-950 transition cursor-pointer px-2"
+                  className="text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer px-3 py-1.5 rounded-lg hover:bg-slate-800/70"
                 >
                   Sign In
                 </button>
                 <button
                   onClick={() => navigate('/auth?mode=register')}
-                  className="rounded-xl bg-slate-950 hover:bg-slate-800 text-white px-4 py-2 text-xs font-bold transition shadow-sm hover:shadow-md cursor-pointer flex items-center gap-1.5"
+                  className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2 text-xs font-bold transition shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 cursor-pointer flex items-center gap-1.5"
                 >
                   <span>Launch Free Workspace</span>
                   <span>→</span>
@@ -293,7 +294,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl">
           
           {/* Hero Top Eyebrow */}
-          <div className="text-center max-w-3xl mx-auto mb-8">
+          <div className="text-center max-w-4xl lg:max-w-5xl mx-auto mb-8">
             <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50/80 px-3.5 py-1 text-xs font-bold text-cyan-800 shadow-2xs mb-5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
@@ -302,9 +303,11 @@ export default function LandingPage() {
               <span>Next-Gen Explainable AI (XAI) Intelligence Platform</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-[1.12]">
-              Stop Guessing with Black-Box AI.{' '}
-              <span className="bg-gradient-to-r from-cyan-600 via-sky-600 to-indigo-600 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-tight">
+              <span className="block sm:whitespace-nowrap">
+                Stop Guessing with Black-Box AI.
+              </span>
+              <span className="block mt-1 sm:mt-2 bg-gradient-to-r from-cyan-600 via-sky-600 to-indigo-600 bg-clip-text text-transparent">
                 Explain Every Decision.
               </span>
             </h1>

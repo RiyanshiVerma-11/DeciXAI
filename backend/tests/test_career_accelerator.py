@@ -132,3 +132,25 @@ def test_estimate_career_compensation():
     assert "predicted_range_usd" in res
     assert len(res["skill_roi_premiums"]) > 0
     assert len(res["career_ladder"]) == 4
+
+    # Verify India realistic calibration for 1.5 yrs
+    res_in = estimate_career_compensation("AI Engineer", experience_years=1.5, skills=["Python"], country="in")
+    assert res_in["country"] == "in"
+    assert res_in["currency_code"] == "INR"
+    assert res_in["unit"] == "LPA"
+    # Ensure no overfluff: median must be between 6.0 and 10.0 LPA for 1.5 yrs
+    med_display = res_in["brackets"]["median_50th"]["display"]
+    med_val = float(med_display.replace("₹", "").replace("LPA", "").strip())
+    assert 6.0 <= med_val <= 10.0, f"Indian 1.5 yr median {med_val} LPA is unrealistic!"
+
+    # Verify other country support (US, UK, Germany/EU, Singapore, UAE, Canada)
+    assert len(res_in["available_countries"]) >= 7
+    res_us = estimate_career_compensation("AI Engineer", experience_years=2.0, country="us")
+    assert res_us["country"] == "us"
+    assert res_us["currency_code"] == "USD"
+    assert "$125k" in res_us["brackets"]["median_50th"]["display"] or "k/yr" in res_us["brackets"]["median_50th"]["display"]
+
+    res_uk = estimate_career_compensation("Software Engineer", experience_years=3.0, country="uk")
+    assert res_uk["country"] == "uk"
+    assert res_uk["currency_code"] == "GBP"
+

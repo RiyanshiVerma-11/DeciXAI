@@ -124,10 +124,12 @@ async def compensation_estimate(payload: dict):
     exp = payload.get('experience_years', 1.0)
     skills = payload.get('skills')
     academic_score = payload.get('academic_score', 8.5)
+    country = payload.get('country', 'in')
     return estimate_career_compensation(
         target_role=role,
         experience_years=exp,
         skills=skills,
         academic_score=academic_score,
+        country=country,
     )
 
