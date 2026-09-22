@@ -1,10 +1,33 @@
 const defaultApiBase = `${window.location.protocol}//${window.location.hostname}:8002`
 const API_BASE = import.meta.env.VITE_API_BASE_URL || defaultApiBase
 
+const formatErrorMessage = (errJson, status) => {
+  if (!errJson) return `API error ${status}`
+  const detail = errJson.detail ?? errJson.message ?? errJson.error
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === 'string') return item
+        if (item?.msg) return item.loc ? `${item.loc.slice(-1)[0]}: ${item.msg}` : item.msg
+        if (item?.message) return item.message
+        return JSON.stringify(item)
+      })
+      .join('; ')
+  }
+  if (typeof detail === 'object' && detail !== null) {
+    if (detail.msg) return detail.msg
+    if (detail.message) return detail.message
+    return JSON.stringify(detail)
+  }
+  return `API error ${status}`
+}
+
 const postJson = async (path, body, token) => {
+  const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('decixai_token') : null)
   const headers = { 'Content-Type': 'application/json' }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  if (effectiveToken) {
+    headers['Authorization'] = `Bearer ${effectiveToken}`
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -17,9 +40,9 @@ const postJson = async (path, body, token) => {
   if (!res.ok) {
     try {
       const errJson = JSON.parse(rawText)
-      throw new Error(errJson.detail || `API error ${res.status}`)
+      throw new Error(formatErrorMessage(errJson, res.status))
     } catch (e) {
-      if (e.message && !e.message.startsWith('API error')) throw e
+      if (e.message && !e.message.startsWith('API error') && e.message !== '[object Object]') throw e
       throw new Error(`API error ${res.status}: ${rawText || res.statusText || 'Request failed'}`)
     }
   }
@@ -36,9 +59,10 @@ const postJson = async (path, body, token) => {
 }
 
 const getJson = async (path, token) => {
+  const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('decixai_token') : null)
   const headers = {}
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  if (effectiveToken) {
+    headers['Authorization'] = `Bearer ${effectiveToken}`
   }
 
   const res = await fetch(`${API_BASE}${path}`, { headers })
@@ -47,9 +71,9 @@ const getJson = async (path, token) => {
   if (!res.ok) {
     try {
       const errJson = JSON.parse(rawText)
-      throw new Error(errJson.detail || `API error ${res.status}`)
+      throw new Error(formatErrorMessage(errJson, res.status))
     } catch (e) {
-      if (e.message && !e.message.startsWith('API error')) throw e
+      if (e.message && !e.message.startsWith('API error') && e.message !== '[object Object]') throw e
       throw new Error(`API error ${res.status}: ${rawText || res.statusText || 'Request failed'}`)
     }
   }
@@ -58,9 +82,10 @@ const getJson = async (path, token) => {
 }
 
 const deleteJson = async (path, token) => {
+  const effectiveToken = token || (typeof localStorage !== 'undefined' ? localStorage.getItem('decixai_token') : null)
   const headers = {}
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  if (effectiveToken) {
+    headers['Authorization'] = `Bearer ${effectiveToken}`
   }
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'DELETE',
@@ -70,9 +95,9 @@ const deleteJson = async (path, token) => {
   if (!res.ok) {
     try {
       const errJson = JSON.parse(rawText)
-      throw new Error(errJson.detail || `API error ${res.status}`)
+      throw new Error(formatErrorMessage(errJson, res.status))
     } catch (e) {
-      if (e.message && !e.message.startsWith('API error')) throw e
+      if (e.message && !e.message.startsWith('API error') && e.message !== '[object Object]') throw e
       throw new Error(`API error ${res.status}: ${rawText || res.statusText || 'Request failed'}`)
     }
   }
@@ -120,6 +145,18 @@ export const submitStartup = (payload) => postJson('/api/v1/startup/', payload)
 export const submitStartupPrompt = (payload) => postJson('/api/v1/startup/parse', payload)
 export const submitPolicy = (payload) => postJson('/api/v1/policy/', payload)
 export const submitChatbot = (payload) => postJson('/api/v1/chatbot/', payload)
+
+// ---------------------------------------------------------------------------
+// Career Accelerator Suite APIs
+// ---------------------------------------------------------------------------
+
+export const simulateCareerWhatIf = (payload) => postJson('/api/v1/career/what-if', payload)
+export const matchJobDescription = (payload) => postJson('/api/v1/career/jd-match', payload)
+export const fetchMockInterviewQuestions = (payload) => postJson('/api/v1/career/mock-interview/questions', payload)
+export const evaluateInterviewResponse = (payload) => postJson('/api/v1/career/mock-interview/evaluate', payload)
+export const fetchSprintRoadmap = (payload) => postJson('/api/v1/career/sprint-roadmap', payload)
+export const estimateCompensation = (payload) => postJson('/api/v1/career/compensation-estimate', payload)
+
 
 export const downloadPdf = async (domain, resultData) => {
   const res = await fetch(`${API_BASE}/api/v1/export/${domain}/report`, {

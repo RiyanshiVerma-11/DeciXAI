@@ -32,18 +32,25 @@ _LOGIN_OTP_STORE: dict[str, dict] = {}
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
 
-def _get_current_user_id(authorization: str | None) -> int:
-    """Extract user ID from Authorization header."""
+def _get_current_user_id(authorization: str | None, allow_guest: bool = False) -> int:
+    """Extract user ID from Authorization header, with optional guest fallback."""
     if not authorization or not authorization.startswith("Bearer "):
+        if allow_guest:
+            from services.auth_service import get_or_create_guest_user
+            return get_or_create_guest_user()
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     token = authorization.split(" ", 1)[1]
     payload = decode_token(token)
 
     if payload is None:
+        if allow_guest:
+            from services.auth_service import get_or_create_guest_user
+            return get_or_create_guest_user()
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     return int(payload["sub"])
+
 
 
 @router.post("/register", response_model=TokenResponse)

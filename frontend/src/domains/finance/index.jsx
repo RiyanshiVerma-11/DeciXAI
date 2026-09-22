@@ -26,7 +26,7 @@ const INITIAL_FINANCE_INPUT = {
 }
 
 export default function FinanceDomain() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const [mode, setMode] = useState('structured')
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
@@ -130,19 +130,28 @@ export default function FinanceDomain() {
   }
 
   const handleSaveProject = async () => {
-    if (!user) {
-      alert('Please sign in to save your decision workspace.')
-      return
-    }
+    const effectiveToken = token || user?.token || localStorage.getItem('decixai_token')
     try {
+      const activeInput = resultInput || input || {}
+      const effectiveScore =
+        result?.metrics?.score ??
+        (result?.probability ? Math.round(result.probability * 100) : 75.0)
+      const effectiveVerdict =
+        result?.prediction || result?.decision || result?.verdict || 'Underwriting Complete'
       const payload = {
         title: `Finance Underwriting - ${new Date().toLocaleDateString()}`,
         domain: 'finance',
-        summary: `Credit risk evaluation for income $${input.income} and loan $${input.loan}`,
-        input: resultInput || input,
-        result,
+        notes: `Credit risk evaluation for income $${activeInput.income} and loan $${activeInput.loan}`,
+        tags: 'Finance,Underwriting,Credit',
+        input_payload: activeInput,
+        output_payload: result || {},
+        score: effectiveScore,
+        verdict: effectiveVerdict,
+        input: activeInput,
+        result: result || {},
+        summary: `Credit risk evaluation for income $${activeInput.income} and loan $${activeInput.loan}`,
       }
-      await saveDecision(payload, user.token)
+      await saveDecision(payload, effectiveToken)
       alert('Project saved successfully to your Workspace.')
     } catch (err) {
       alert(err.message || 'Failed to save project.')

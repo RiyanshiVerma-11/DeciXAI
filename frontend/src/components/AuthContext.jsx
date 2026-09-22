@@ -15,7 +15,7 @@ export function AuthProvider({ children }) {
       if (savedToken) {
         try {
           const userData = await fetchCurrentUser(savedToken)
-          setUser(userData)
+          setUser(userData ? { ...userData, token: savedToken } : null)
           setToken(savedToken)
         } catch {
           localStorage.removeItem('decixai_token')
@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
     const data = await loginUser({ email, password })
     localStorage.setItem('decixai_token', data.access_token)
     setToken(data.access_token)
-    setUser(data.user)
+    setUser(data.user ? { ...data.user, token: data.access_token } : null)
     return data
   }, [])
 
@@ -40,7 +40,7 @@ export function AuthProvider({ children }) {
     const data = await registerUser({ email, name, password })
     localStorage.setItem('decixai_token', data.access_token)
     setToken(data.access_token)
-    setUser(data.user)
+    setUser(data.user ? { ...data.user, token: data.access_token } : null)
     return data
   }, [])
 
@@ -48,7 +48,7 @@ export function AuthProvider({ children }) {
     if (!token) return
     try {
       const userData = await fetchCurrentUser(token)
-      setUser(userData)
+      setUser(userData ? { ...userData, token } : null)
       return userData
     } catch (e) {
       console.error('Failed to refresh user profile:', e)
@@ -58,7 +58,7 @@ export function AuthProvider({ children }) {
   const loginWithToken = useCallback((newToken, newUser) => {
     localStorage.setItem('decixai_token', newToken)
     setToken(newToken)
-    setUser(newUser)
+    setUser(newUser ? { ...newUser, token: newToken } : null)
   }, [])
 
   const logout = useCallback(() => {

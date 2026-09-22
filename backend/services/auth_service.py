@@ -183,3 +183,26 @@ def increment_user_credits(user_id: int) -> int:
         row = cursor.fetchone()
         return row[0] if row else 0
 
+
+def get_or_create_guest_user() -> int:
+    """Return user_id of the default guest/demo workspace user, creating if necessary."""
+    with get_db() as db:
+        cursor = db.execute("SELECT id FROM users WHERE email = 'guest@decixai.com'")
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        # Check if any user exists at all
+        cursor = db.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        # Create guest user
+        hashed = hash_password("Guest@DeciXAI2025")
+        cursor = db.execute(
+            "INSERT INTO users (email, name, password_hash, tier, credits_used) VALUES (?, ?, ?, ?, ?)",
+            ("guest@decixai.com", "Guest User", hashed, "free", 0),
+        )
+        db.commit()
+        return cursor.lastrowid
+
+

@@ -27,7 +27,7 @@ const INITIAL_STARTUP_INPUT = {
 }
 
 export default function StartupDomain() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const [mode, setMode] = useState('structured')
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
@@ -132,19 +132,28 @@ export default function StartupDomain() {
   }
 
   const handleSaveProject = async () => {
-    if (!user) {
-      alert('Please sign in to save your decision workspace.')
-      return
-    }
+    const effectiveToken = token || user?.token || localStorage.getItem('decixai_token')
     try {
+      const activeInput = resultInput || input || {}
+      const effectiveScore =
+        result?.metrics?.score ??
+        (result?.probability ? Math.round(result.probability * 100) : 80.0)
+      const effectiveVerdict =
+        result?.prediction || result?.decision || result?.verdict || 'Viability Evaluated'
       const payload = {
         title: `Startup Evaluation - ${new Date().toLocaleDateString()}`,
         domain: 'startup',
-        summary: `Venture viability for ${input.market} ($${input.funding} funding, team of ${input.team_size})`,
-        input: resultInput || input,
-        result,
+        notes: `Venture viability for ${activeInput.market} ($${activeInput.funding} funding, team of ${activeInput.team_size})`,
+        tags: 'Startup,Venture,Evaluation',
+        input_payload: activeInput,
+        output_payload: result || {},
+        score: effectiveScore,
+        verdict: effectiveVerdict,
+        input: activeInput,
+        result: result || {},
+        summary: `Venture viability for ${activeInput.market} ($${activeInput.funding} funding, team of ${activeInput.team_size})`,
       }
-      await saveDecision(payload, user.token)
+      await saveDecision(payload, effectiveToken)
       alert('Project saved successfully to your Workspace.')
     } catch (err) {
       alert(err.message || 'Failed to save project.')

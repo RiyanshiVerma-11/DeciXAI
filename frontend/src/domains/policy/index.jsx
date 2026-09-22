@@ -25,7 +25,7 @@ const INITIAL_POLICY_INPUT = {
 }
 
 export default function PolicyDomain() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const [mode, setMode] = useState('structured')
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
@@ -129,19 +129,28 @@ export default function PolicyDomain() {
   }
 
   const handleSaveProject = async () => {
-    if (!user) {
-      alert('Please sign in to save your decision workspace.')
-      return
-    }
+    const effectiveToken = token || user?.token || localStorage.getItem('decixai_token')
     try {
+      const activeInput = resultInput || input || {}
+      const effectiveScore =
+        result?.metrics?.score ??
+        (result?.probability ? Math.round(result.probability * 100) : 78.0)
+      const effectiveVerdict =
+        result?.prediction || result?.decision || result?.verdict || 'Feasibility Evaluated'
       const payload = {
         title: `Policy Feasibility - ${new Date().toLocaleDateString()}`,
         domain: 'policy',
-        summary: `Public feasibility for ${input.sector} ($${input.budget} budget, ${input.population} population)`,
-        input: resultInput || input,
-        result,
+        notes: `Public feasibility for ${activeInput.sector} ($${activeInput.budget} budget, ${activeInput.population} population)`,
+        tags: 'Policy,Governance,Feasibility',
+        input_payload: activeInput,
+        output_payload: result || {},
+        score: effectiveScore,
+        verdict: effectiveVerdict,
+        input: activeInput,
+        result: result || {},
+        summary: `Public feasibility for ${activeInput.sector} ($${activeInput.budget} budget, ${activeInput.population} population)`,
       }
-      await saveDecision(payload, user.token)
+      await saveDecision(payload, effectiveToken)
       alert('Project saved successfully to your Workspace.')
     } catch (err) {
       alert(err.message || 'Failed to save project.')

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import codecs
 import json
 import os
 import re
@@ -460,12 +461,14 @@ def _augment_career_followup_with_context(payload: dict[str, Any], latest_messag
 
 
 def _read_streamed_response(response):
+    decoder = codecs.getincrementaldecoder('utf-8')(errors='replace')
     buffer = ''
     while True:
         chunk = response.read(1024)
         if not chunk:
+            buffer += decoder.decode(b'', final=True)
             break
-        buffer += chunk.decode('utf-8')
+        buffer += decoder.decode(chunk, final=False)
         while '\n' in buffer:
             line, buffer = buffer.split('\n', 1)
             line = line.strip()

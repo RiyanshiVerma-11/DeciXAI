@@ -47,6 +47,9 @@ export default function CareerResumeSection({
     }
     setLocalError(null)
     setResumeFile(file)
+    if (onSubmitResume) {
+      onSubmitResume(file)
+    }
   }
 
   const currentRoleObj = CAREER_TARGET_ROLES.find((r) => r.id === targetRole)

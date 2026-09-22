@@ -1,3 +1,6 @@
+import React, { useState } from 'react'
+import { submitCareer } from '../api'
+
 const DOMAIN_STYLES = {
   career: {
     accent: 'from-cyan-500 via-sky-500 to-blue-600',
@@ -612,11 +615,11 @@ const BENCHMARK_ROLES = [
 ]
 
 function DualRoadmapCard({ intel, input }) {
-  const [compareRole, setCompareRole] = React.useState('')
-  const [customRole, setCustomRole] = React.useState('')
-  const [compareIntel, setCompareIntel] = React.useState(null)
-  const [comparing, setComparing] = React.useState(false)
-  const [compareError, setCompareError] = React.useState('')
+  const [compareRole, setCompareRole] = useState('')
+  const [customRole, setCustomRole] = useState('')
+  const [compareIntel, setCompareIntel] = useState(null)
+  const [comparing, setComparing] = useState(false)
+  const [compareError, setCompareError] = useState('')
 
   if (!intel || typeof intel !== 'object') return null
   const best = intel.best_fit
@@ -632,13 +635,7 @@ function DualRoadmapCard({ intel, input }) {
     setCompareError('')
     try {
       const payload = { ...(input || {}), interest: role, options: [role] }
-      const res = await fetch('/api/v1/career', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error('Comparison failed')
-      const data = await res.json()
+      const data = await submitCareer(payload)
       const ci = data?.details?.career_intelligence
       if (ci?.interest) setCompareIntel(ci)
       else setCompareError('No roadmap data returned for this role.')
@@ -793,37 +790,301 @@ function truncateList(value, max = 3) {
   return { display: items.slice(0, max).join(', '), extra: items.length - max }
 }
 
-function InputSnapshot({ input }) {
+function InputSnapshot({ input, onUpdateInput, isLiveUpdating }) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [formValues, setFormValues] = useState({})
+
   if (!input || typeof input !== 'object') return null
 
-  const entries = Object.entries(input).filter(([, value]) => value !== undefined && value !== null && `${value}` !== '')
+  const entries = Object.entries(input).filter(
+    ([, value]) => value !== undefined && value !== null && `${value}` !== ''
+  )
   if (!entries.length) return null
 
+  const handleStartEdit = () => {
+    const initial = {}
+    for (const [k, v] of Object.entries(input)) {
+      if (Array.isArray(v)) {
+        initial[k] = v.join(', ')
+      } else {
+        initial[k] = v !== null && v !== undefined ? String(v) : ''
+      }
+    }
+    setFormValues(initial)
+    setIsEditing(true)
+    setIsExpanded(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+  }
+
+  const handleFieldChange = (key, value) => {
+    setFormValues((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleApplyChanges = (e) => {
+    if (e) e.preventDefault()
+    if (!onUpdateInput) return
+
+    const updated = { ...input }
+    for (const [k, v] of Object.entries(formValues)) {
+      const original = input[k]
+      if (Array.isArray(original)) {
+        updated[k] = v
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      } else if (typeof original === 'number') {
+        const num = Number(v)
+        updated[k] = Number.isFinite(num) ? num : original
+      } else if (typeof original === 'boolean') {
+        updated[k] = v === 'true' || v === true
+      } else {
+        updated[k] = v
+      }
+    }
+
+    onUpdateInput(updated)
+    setIsEditing(false)
+  }
+
+  // Extract common candidate fields for rich presentation
+  const skillsList = Array.isArray(input.skills)
+    ? input.skills
+    : typeof input.skills === 'string' && input.skills.includes(',')
+    ? input.skills.split(',').map((s) => s.trim()).filter(Boolean)
+    : input.skills ? [input.skills] : []
+
+  const projectsList = Array.isArray(input.projects)
+    ? input.projects
+    : typeof input.projects === 'string' && input.projects.includes(',')
+    ? input.projects.split(',').map((s) => s.trim()).filter(Boolean)
+    : input.projects ? [input.projects] : []
+
+  const projectDescriptions = Array.isArray(input.project_descriptions)
+    ? input.project_descriptions
+    : []
+
+  const certsList = Array.isArray(input.certifications)
+    ? input.certifications
+    : typeof input.certifications === 'string' && input.certifications.includes(',')
+    ? input.certifications.split(',').map((s) => s.trim()).filter(Boolean)
+    : input.certifications ? [input.certifications] : []
+
   return (
-    <div className="rounded-xl border border-slate-200/60 bg-white px-3 py-2 shadow-sm col-span-full">
-      <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-2">
-        <h3 className="text-[12px] font-bold text-slate-600 flex items-center gap-1">
-          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-          Detected Inputs
-        </h3>
-        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Metadata</span>
+    <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm col-span-full overflow-hidden transition-all duration-200">
+      {/* Header bar with expand toggle and edit button */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-100">
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex items-center gap-2 text-left text-slate-700 hover:text-slate-900 transition cursor-pointer group"
+          aria-expanded={isExpanded}
+        >
+          <span className={`text-[12px] font-bold transition-transform duration-200 text-slate-500 group-hover:text-blue-600 ${isExpanded ? 'rotate-90' : 'rotate-0'}`}>
+            ▶
+          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-cyan-500" />
+            <h3 className="text-[13px] font-bold text-slate-800">
+              Detected Inputs &amp; Profile Metadata
+            </h3>
+            <span className="text-[11px] font-semibold text-slate-400">
+              ({entries.length} fields detected)
+            </span>
+          </div>
+        </button>
+
+        <div className="flex items-center gap-2">
+          {onUpdateInput && !isEditing && (
+            <button
+              type="button"
+              onClick={handleStartEdit}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100 hover:text-blue-600 transition shadow-xs cursor-pointer"
+            >
+              <span>✏️</span> Edit Inputs
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-[11px] font-bold text-blue-600 hover:text-blue-700 underline decoration-blue-300 underline-offset-2 cursor-pointer"
+          >
+            {isExpanded ? 'Collapse' : 'Expand All'}
+          </button>
+        </div>
       </div>
-      <div className="flex flex-wrap gap-1.5">
-        {entries.map(([key, value]) => {
-          const { display, extra } = truncateList(value)
-          return (
-            <div key={key} className="bg-slate-50 border border-slate-100 rounded px-2 py-1 min-w-[80px] max-w-[180px] flex-1">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block leading-none">{prettifyKey(key)}</span>
-              <div className="flex items-center gap-1 mt-0.5">
-                <span className="text-[11px] font-semibold text-slate-700 truncate">{display}</span>
-                {extra > 0 && (
-                  <span className="shrink-0 text-[9px] font-bold text-slate-400 bg-slate-200 rounded px-1 leading-tight">+{extra}</span>
-                )}
+
+      {/* Editing Mode */}
+      {isEditing ? (
+        <form onSubmit={handleApplyChanges} className="p-4 space-y-4 bg-slate-50/40">
+          <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+            <span className="text-xs font-bold text-slate-700">
+              Modify parsed inputs below and re-evaluate the decision models:
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCancelEdit}
+                className="px-2.5 py-1 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isLiveUpdating}
+                className="px-3 py-1 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              >
+                <span>💾</span> {isLiveUpdating ? 'Re-evaluating...' : 'Apply Changes & Re-evaluate'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 max-h-[380px] overflow-y-auto pr-1">
+            {Object.keys(input).map((key) => {
+              const origVal = input[key]
+              const isArray = Array.isArray(origVal)
+              const isLongText = isArray || String(origVal || '').length > 40 || key.includes('description') || key.includes('project')
+              return (
+                <div key={key} className={`space-y-1 ${isLongText ? 'col-span-1 sm:col-span-2' : ''}`}>
+                  <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                    {prettifyKey(key)} {isArray && <span className="text-slate-400 font-normal lowercase">(comma-separated)</span>}
+                  </label>
+                  {isLongText ? (
+                    <textarea
+                      rows={2}
+                      value={formValues[key] ?? ''}
+                      onChange={(e) => handleFieldChange(key, e.target.value)}
+                      className="w-full text-xs rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+                    />
+                  ) : (
+                    <input
+                      type={typeof origVal === 'number' ? 'number' : 'text'}
+                      step={typeof origVal === 'number' ? '0.1' : undefined}
+                      value={formValues[key] ?? ''}
+                      onChange={(e) => handleFieldChange(key, e.target.value)}
+                      className="w-full text-xs rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </form>
+      ) : isExpanded ? (
+        /* Expanded Full View - Nothing Truncated */
+        <div className="p-4 space-y-4 bg-white text-xs">
+          {/* Key Academic / Overview Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {entries
+              .filter(([k]) => !['skills', 'projects', 'project_descriptions', 'certifications', 'text'].includes(k))
+              .map(([key, val]) => (
+                <div key={key} className="bg-slate-50/80 border border-slate-100 rounded-lg p-2.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                    {prettifyKey(key)}
+                  </span>
+                  <span className="text-xs font-bold text-slate-800">
+                    {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+                  </span>
+                </div>
+              ))}
+          </div>
+
+          {/* All Skills Un-truncated */}
+          {skillsList.length > 0 && (
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
+                  <span>🛠️</span> Parsed Skills ({skillsList.length})
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">Complete Verified Set</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {skillsList.map((skill, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center rounded-md bg-white border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-2xs"
+                  >
+                    {skill}
+                  </span>
+                ))}
               </div>
             </div>
-          )
-        })}
-      </div>
+          )}
+
+          {/* Projects & Descriptions */}
+          {projectsList.length > 0 && (
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
+                <span>🚀</span> Candidate Projects ({projectsList.length})
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {projectsList.map((proj, idx) => (
+                  <div key={idx} className="bg-white border border-slate-200 rounded-lg p-2.5 shadow-2xs">
+                    <div className="font-bold text-slate-800 text-[12px] flex items-center gap-1.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                      {proj}
+                    </div>
+                    {projectDescriptions[idx] && (
+                      <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                        {projectDescriptions[idx]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Certifications */}
+          {certsList.length > 0 && (
+            <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 space-y-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
+                <span>🏆</span> Certifications &amp; Achievements ({certsList.length})
+              </span>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {certsList.map((cert, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
+                  >
+                    ✓ {cert}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Collapsed Compact View */
+        <div className="p-3">
+          <div className="flex flex-wrap gap-1.5">
+            {entries.map(([key, value]) => {
+              const { display, extra } = truncateList(value, 3)
+              return (
+                <div
+                  key={key}
+                  className="bg-slate-50 border border-slate-100 rounded px-2 py-1 min-w-[80px] max-w-[200px] flex-1"
+                >
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block leading-none">
+                    {prettifyKey(key)}
+                  </span>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <span className="text-[11px] font-semibold text-slate-700 truncate">{display}</span>
+                    {extra > 0 && (
+                      <span className="shrink-0 text-[9px] font-bold text-slate-500 bg-slate-200 rounded px-1 leading-tight">
+                        +{extra}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -879,6 +1140,7 @@ export default function InsightPanel({
   onInteractiveChange,
   isLiveUpdating,
   footerAction,
+  onUpdateInput,
 }) {
   if (!result) return null
 
@@ -952,7 +1214,7 @@ export default function InsightPanel({
         <ImpactMix factors={factors} domain={domain} />
 
         {/* Input Snapshot */}
-        <InputSnapshot input={input} />
+        <InputSnapshot input={input} onUpdateInput={onUpdateInput} isLiveUpdating={isLiveUpdating} />
 
         {/* Roadmap (Career only) */}
         {domain === 'career' && careerIntel && <DualRoadmapCard intel={careerIntel} input={input} />}

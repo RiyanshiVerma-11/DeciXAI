@@ -91,6 +91,36 @@ def test_decisions_workspace_crud_and_share():
     assert get_del.status_code == 404
 
 
+def test_resilient_decision_saving_guest_and_legacy_payloads():
+    # Test 1: Save decision with NO auth token (guest session fallback)
+    guest_payload = {
+        "domain": "career",
+        "input": {"course": "B.Tech", "skills": ["python", "react"]},
+        "result": {"prediction": "Software Engineer", "probability": 0.85},
+        "summary": "Guest career analysis run",
+        "tags": ["Demo", "Guest"],
+    }
+    res = client.post("/api/v1/decisions", json=guest_payload)
+    assert res.status_code == 200, res.text
+    saved = res.json()
+    assert saved["id"] > 0
+    assert saved["domain"] == "career"
+    assert saved["score"] == 85.0
+    assert saved["verdict"] == "Software Engineer"
+    assert "Demo, Guest" in saved["tags"]
+
+    # Test 2: Save decision with empty fields (schema normalization must fill defaults)
+    empty_payload = {
+        "domain": "finance",
+    }
+    res_empty = client.post("/api/v1/decisions", json=empty_payload)
+    assert res_empty.status_code == 200, res_empty.text
+    saved_empty = res_empty.json()
+    assert saved_empty["id"] > 0
+    assert saved_empty["domain"] == "finance"
+    assert saved_empty["title"] == "Finance Decision Analysis"
+
+
 def test_api_keys_management_and_usage():
     token, user = _register_user()
     auth_header = {"Authorization": f"Bearer {token}"}
