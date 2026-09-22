@@ -107,7 +107,7 @@ const INITIAL_CAREER_INPUT = {
 
 export default function CareerDomain() {
   const { user, token } = useAuth()
-  const [mode, setMode] = useState('resume')
+  const [mode, setMode] = useState('structured')
   const [isWorkbenchOpen, setIsWorkbenchOpen] = useState(true)
 
   // Input states
@@ -392,19 +392,6 @@ export default function CareerDomain() {
 
   const workbenchContent = (
     <div className="space-y-3">
-      {/* Compact Horizontal Mode Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
-        <span className="text-sm font-black uppercase tracking-wider text-slate-900">
-          Evaluation Intake
-        </span>
-
-        <DomainModeTabs
-          mode={mode}
-          setMode={setMode}
-          supportsResume={true}
-        />
-      </div>
-
       {error && (
         <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
           <span className="font-bold block mb-0.5">Notice:</span>
@@ -412,49 +399,14 @@ export default function CareerDomain() {
         </div>
       )}
 
-      {mode === 'resume' ? (
-        <CareerResumeSection
-          resumeFile={resumeFile}
-          setResumeFile={setResumeFile}
-          targetRole={targetRole}
-          setTargetRole={setTargetRole}
-          customTargetRole={customTargetRole}
-          setCustomTargetRole={setCustomTargetRole}
-          resumeLoading={resumeLoading}
-          resumeStep={resumeStep}
-          onSubmitResume={(fileToSubmit) => handleResumeSubmit(fileToSubmit || resumeFile)}
-          onSampleResumeTest={handleSampleResumeTest}
-        />
-      ) : mode === 'free' ? (
-        <div className="space-y-4">
-          <FreePromptInput
-            textPrompt={textPrompt}
-            setTextPrompt={setTextPrompt}
-            examples={CAREER_CONFIG.examples}
-            placeholder={CAREER_CONFIG.freeTextExample}
-            onApplyExample={(ex) => setTextPrompt(ex)}
-          />
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={handlePromptSubmit}
-              disabled={loading}
-              className="w-full sm:w-auto min-w-[260px] rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              {loading ? 'Evaluating Prompt...' : 'Evaluate Career Prompt'}
-            </button>
-          </div>
-        </div>
-      ) : (
-        <CareerForm
-          input={input}
-          setInput={setInput}
-          fieldErrors={fieldErrors}
-          onSubmit={handleStructuredSubmit}
-          loading={loading}
-          onApplyPreset={handleApplyPreset}
-        />
-      )}
+      <CareerForm
+        input={input}
+        setInput={setInput}
+        fieldErrors={fieldErrors}
+        onSubmit={handleStructuredSubmit}
+        loading={loading}
+        onApplyPreset={handleApplyPreset}
+      />
     </div>
   )
 
