@@ -377,7 +377,7 @@ export const splitItems = (value) => {
     .filter(Boolean)
 }
 
-const sectionBreaks = '(?=(?:cgpa|course|specialization|skills|certifications|projects|interest|education level|year of study|$))'
+const sectionBreaks = '(?=\\s*(?:cgpa|gpa|course|degree|specialization|major|skills|skill|certifications|certification|projects|project|interest|target|education level|year of study|$))'
 
 const extractSection = (text, keys) => {
   for (const key of keys) {

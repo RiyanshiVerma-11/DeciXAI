@@ -87,36 +87,58 @@ export default function CareerForm({
     const text = overrideText || promptText
     if (!text.trim()) return
 
+    const extractSection = (txt, keys) => {
+      const allKeys = ['cgpa', 'gpa', 'score', 'course', 'degree', 'specialization', 'major', 'skills', 'skill', 'certifications', 'certification', 'projects', 'project', 'interest', 'target']
+      const otherKeys = allKeys.filter((k) => !keys.includes(k)).join('|')
+      for (const key of keys) {
+        const regex = new RegExp(`(?:\\b${key}s?\\b)\\s*[:=]?\\s*(.*?)(?=\\s*(?:${otherKeys})\\s*[:=]|$)`, 'is')
+        const match = txt.match(regex)
+        if (match?.[1]?.trim()) return match[1].trim().replace(/^[:\-\s]+|[:\-\s]+$/g, '')
+      }
+      return ''
+    }
+
     const cgpaMatch = text.match(/(?:cgpa|gpa|score|marks)\s*[:=]?\s*([\d.]+)/i)
-    const courseMatch = text.match(/(?:course|degree|graduated in)\s*[:=]?\s*([a-zA-Z\s.]+?)(?:,|$|specialization|skills|projects|certifications|interest)/i) || text.match(/\b(b\.?tech|btech|bs|ba llb|llb|b\.?com|bcom|mba|bba|msc|bdes|bpharm)\b/i)
-    const specMatch = text.match(/(?:specialization|major|in)\s*[:=]?\s*([a-zA-Z\s&]+?)(?:,|$|skills|projects|certifications|interest)/i)
-    const skillsMatch = text.match(/skills\s*[:=]?\s*([^,\n.]+?(?:,[^,\n.]+)*)/i)
-    const projectsMatch = text.match(/projects?\s*[:=]?\s*([^,\n.]+?(?:,[^,\n.]+)*)/i)
-    const certsMatch = text.match(/certifications?\s*[:=]?\s*([^,\n.]+?(?:,[^,\n.]+)*)/i)
-    const interestMatch = text.match(/interest\s*[:=]?\s*([^\n,.]+)/i)
+    const courseStr = extractSection(text, ['course', 'degree']) || (text.match(/\b(b\.?tech|btech|bs|ba llb|llb|b\.?com|bcom|mba|bba|msc|bdes|bpharm)\b/i)?.[0] || '')
+    const specStr = extractSection(text, ['specialization', 'major'])
+    const skillsStr = extractSection(text, ['skills', 'skill', 'expertise'])
+    const projectsStr = extractSection(text, ['projects', 'project'])
+    const certsStr = extractSection(text, ['certifications', 'certification'])
+    const interestStr = extractSection(text, ['interest', 'target'])
 
     const parsedScore = cgpaMatch ? parseFloat(cgpaMatch[1]) : (input.cgpa || 8.0)
-    const parsedCourse = courseMatch ? (courseMatch[1] || courseMatch[0]).trim() : (input.course || '')
-    const parsedSpec = specMatch ? specMatch[1].trim() : (input.specialization || '')
-    const parsedSkills = skillsMatch ? skillsMatch[1].split(',').map(s => s.trim()).filter(Boolean) : input.skills
-    const parsedProjects = projectsMatch ? projectsMatch[1].split(',').map(p => p.trim()).filter(Boolean) : input.projects
-    const parsedCerts = certsMatch ? certsMatch[1].split(',').map(c => c.trim()).filter(Boolean) : input.certifications
-    const parsedInterest = interestMatch ? interestMatch[1].trim() : input.interest
+    const parsedSkills = skillsStr ? skillsStr.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean) : null
+    const parsedProjects = projectsStr ? projectsStr.split(/[,;\n]+/).map((p) => p.trim()).filter(Boolean) : null
+    const parsedCerts = certsStr ? certsStr.split(/[,;\n]+/).map((c) => c.trim()).filter(Boolean) : null
+
+    const finalSkills = parsedSkills && parsedSkills.length > 0
+      ? parsedSkills
+      : (prevInputSkills(input.skills) || activeDomain.defaultValues?.skills || ['GDPR Compliance', 'Contract Drafting'])
+    const finalProjects = parsedProjects && parsedProjects.length > 0
+      ? parsedProjects
+      : (prevInputSkills(input.projects) || activeDomain.defaultValues?.projects || ['Automated NDA Review Pipeline'])
 
     setInput((prev) => ({
       ...prev,
       cgpa: parsedScore,
       raw_score: parsedScore,
-      course: parsedCourse || prev.course || 'B.Tech',
-      specialization: parsedSpec || prev.specialization,
-      skills: parsedSkills && parsedSkills.length > 0 ? parsedSkills : prev.skills,
-      projects: parsedProjects && parsedProjects.length > 0 ? parsedProjects : prev.projects,
-      certifications: parsedCerts && parsedCerts.length > 0 ? parsedCerts : prev.certifications,
-      interest: parsedInterest || prev.interest,
+      course: courseStr || prev.course || activeDomain.defaultValues?.course || 'BA LLB',
+      specialization: specStr || prev.specialization || activeDomain.defaultValues?.specialization || 'Cyber Law',
+      skills: finalSkills,
+      projects: finalProjects,
+      certifications: parsedCerts || prev.certifications || [],
+      interest: interestStr || prev.interest || activeDomain.defaultValues?.interest || 'Legal Compliance',
+      target_role: interestStr || prev.target_role || 'auto',
       raw_prompt: text,
     }))
 
-    setPromptParseSuccess('Prompt parsed successfully! Skills, CGPA, projects & course extracted into form state.')
+    setPromptParseSuccess(`Prompt parsed! Extracted ${finalSkills.length} skills (${finalSkills.join(', ')}) & ${finalProjects.length} projects into form state.`)
+  }
+
+  const prevInputSkills = (val) => {
+    if (Array.isArray(val) && val.length > 0) return val
+    if (typeof val === 'string' && val.trim()) return val.split(',').map((s) => s.trim()).filter(Boolean)
+    return null
   }
 
   const handleChange = (field, value) => {
