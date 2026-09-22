@@ -147,26 +147,77 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
     if delta_prob >= 0 and sim_prob >= 0.70:
         sim_pred = "Accepted"
 
-    # Recommended Optimal Pivot (the fastest combination to hit >= 90%)
+    # Recommended Optimal Pivot (domain-tailored combination to hit >= 90%)
     optimal_recommendations = []
     if sim_prob < 0.90:
-        optimal_recommendations = [
-            {
-                "action": "Build & Deploy 1 Full-Stack / End-to-End Capstone with Docker & Cloud Hosting",
-                "estimated_uplift": "+8% to +12%",
-                "priority": "Critical",
-            },
-            {
-                "action": "Attain 1 Foundational Cloud/Domain Certification (e.g., AWS SAA, GCP PCA, or CKA)",
-                "estimated_uplift": "+4% to +7%",
-                "priority": "High",
-            },
-            {
-                "action": "Add Distributed Systems & Asynchronous Processing (Redis, Kafka, or FastAPI)",
-                "estimated_uplift": "+5% to +8%",
-                "priority": "High",
-            },
-        ]
+        interest_text = (modified_input.get("raw_interest") or modified_input.get("interest_domain") or "").lower()
+        if any(k in interest_text for k in ["legal", "law", "compliance", "regulatory", "gdpr", "counsel"]):
+            optimal_recommendations = [
+                {
+                    "action": "Attain CIPP/E (Certified Information Privacy Professional) or ISO 27001 Lead Auditor Credential",
+                    "estimated_uplift": "+12% to +18%",
+                    "priority": "Critical",
+                },
+                {
+                    "action": "Publish Corporate GDPR & Contract Audit Protocol Case Study Portfolio",
+                    "estimated_uplift": "+8% to +12%",
+                    "priority": "High",
+                },
+                {
+                    "action": "Add Regulatory Compliance Change Tracking & Due Diligence Automation Proof",
+                    "estimated_uplift": "+6% to +10%",
+                    "priority": "High",
+                },
+            ]
+        elif any(k in interest_text for k in ["finance", "banking", "valuation", "equity"]):
+            optimal_recommendations = [
+                {
+                    "action": "Complete CFA Level 1 or FMVA (Financial Modeling & Valuation Analyst) Certification",
+                    "estimated_uplift": "+14% to +20%",
+                    "priority": "Critical",
+                },
+                {
+                    "action": "Build 3-Statement DCF & LBO Financial Valuation Model Suite",
+                    "estimated_uplift": "+8% to +14%",
+                    "priority": "High",
+                },
+                {
+                    "action": "Add Python / SQL Financial Risk Analytics & Portfolio Optimization Proof",
+                    "estimated_uplift": "+5% to +9%",
+                    "priority": "High",
+                },
+            ]
+        elif any(k in interest_text for k in ["design", "ui", "ux", "figma"]):
+            optimal_recommendations = [
+                {
+                    "action": "Publish Figma Enterprise Design System & Component Library (WCAG 2.1 Compliant)",
+                    "estimated_uplift": "+12% to +16%",
+                    "priority": "Critical",
+                },
+                {
+                    "action": "Conduct Usability Audit & Interactive Prototype Test Case Study",
+                    "estimated_uplift": "+8% to +12%",
+                    "priority": "High",
+                },
+            ]
+        else:
+            optimal_recommendations = [
+                {
+                    "action": "Build & Deploy 1 Full-Stack / End-to-End Capstone with Cloud Hosting",
+                    "estimated_uplift": "+8% to +12%",
+                    "priority": "Critical",
+                },
+                {
+                    "action": "Attain 1 Foundational Cloud/Domain Certification (e.g. AWS SAA or CIPP/E)",
+                    "estimated_uplift": "+4% to +7%",
+                    "priority": "High",
+                },
+                {
+                    "action": "Add Distributed Systems & API Architecture Proof",
+                    "estimated_uplift": "+5% to +8%",
+                    "priority": "High",
+                },
+            ]
 
     return {
         "success": True,
@@ -187,11 +238,25 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
 # ===========================================================================
 
 _TECH_KEYWORDS_SET = {
+    # Tech & AI
     "python", "javascript", "typescript", "react", "node", "nodejs", "fastapi", "django", "flask",
     "docker", "kubernetes", "aws", "azure", "gcp", "sql", "postgresql", "mongodb", "redis",
     "kafka", "spark", "pytorch", "tensorflow", "scikit-learn", "ci/cd", "git", "linux",
     "rest", "graphql", "microservices", "system design", "data structures", "algorithms",
     "terraform", "airflow", "devops", "mlops", "nlp", "llm", "rag", "langchain", "prompt engineering",
+    # Legal, Risk & Governance
+    "gdpr", "data privacy", "cipp/e", "cipp", "contract drafting", "regulatory compliance",
+    "corporate law", "cyber law", "intellectual property", "ip law", "due diligence",
+    "arbitration", "litigation", "nda review", "barrister", "solicitor", "privacy law", "compliance audit",
+    # Finance & Accounting
+    "financial modeling", "dcf", "valuation", "lbo", "equity research", "corporate finance",
+    "accounting", "auditing", "risk management", "excel", "vba", "cfa", "nism", "portfolio management",
+    # Design & Creative Tech
+    "figma", "ui/ux", "ui design", "ux research", "wireframing", "prototyping", "design systems",
+    # Marketing & Growth
+    "seo", "sem", "google analytics", "ga4", "content strategy", "growth marketing", "copywriting", "a/b testing",
+    # Healthcare & Biotech
+    "clinical trials", "pharmacovigilance", "gcp", "fda compliance", "drug safety", "regulatory affairs",
 }
 
 
@@ -1359,9 +1424,180 @@ _SALARY_DATABASE = {
             },
         },
     },
+    "legal": {
+        "title": "In-House Legal Counsel / Compliance Manager",
+        "brackets": {
+            "in": {
+                "entry": {"min": 5.0, "median": 8.5, "max": 14.0},
+                "mid": {"min": 11.0, "median": 18.0, "max": 28.0},
+                "senior": {"min": 22.0, "median": 35.0, "max": 50.0},
+                "staff": {"min": 40.0, "median": 65.0, "max": 95.0},
+            },
+            "us": {
+                "entry": {"min": 85, "median": 120, "max": 150},
+                "mid": {"min": 130, "median": 170, "max": 215},
+                "senior": {"min": 185, "median": 240, "max": 310},
+                "staff": {"min": 260, "median": 350, "max": 480},
+            },
+            "uk": {
+                "entry": {"min": 40, "median": 55, "max": 72},
+                "mid": {"min": 65, "median": 85, "max": 115},
+                "senior": {"min": 95, "median": 125, "max": 165},
+                "staff": {"min": 140, "median": 185, "max": 250},
+            },
+            "eu": {
+                "entry": {"min": 45, "median": 60, "max": 78},
+                "mid": {"min": 70, "median": 90, "max": 118},
+                "senior": {"min": 98, "median": 128, "max": 160},
+                "staff": {"min": 135, "median": 175, "max": 230},
+            },
+            "ca": {
+                "entry": {"min": 75, "median": 100, "max": 125},
+                "mid": {"min": 110, "median": 140, "max": 180},
+                "senior": {"min": 150, "median": 190, "max": 245},
+                "staff": {"min": 210, "median": 270, "max": 350},
+            },
+            "sg": {
+                "entry": {"min": 62, "median": 82, "max": 108},
+                "mid": {"min": 92, "median": 122, "max": 160},
+                "senior": {"min": 135, "median": 178, "max": 230},
+                "staff": {"min": 195, "median": 255, "max": 330},
+            },
+            "ae": {
+                "entry": {"min": 170, "median": 235, "max": 310},
+                "mid": {"min": 275, "median": 375, "max": 490},
+                "senior": {"min": 410, "median": 550, "max": 710},
+                "staff": {"min": 600, "median": 800, "max": 1020},
+            },
+        },
+    },
+    "finance": {
+        "title": "Financial Risk / Investment Analyst",
+        "brackets": {
+            "in": {
+                "entry": {"min": 5.5, "median": 9.0, "max": 15.0},
+                "mid": {"min": 12.0, "median": 19.5, "max": 30.0},
+                "senior": {"min": 24.0, "median": 38.0, "max": 55.0},
+                "staff": {"min": 42.0, "median": 68.0, "max": 100.0},
+            },
+            "us": {
+                "entry": {"min": 90, "median": 125, "max": 160},
+                "mid": {"min": 135, "median": 175, "max": 225},
+                "senior": {"min": 190, "median": 250, "max": 325},
+                "staff": {"min": 270, "median": 365, "max": 500},
+            },
+            "uk": {
+                "entry": {"min": 42, "median": 58, "max": 76},
+                "mid": {"min": 68, "median": 92, "max": 122},
+                "senior": {"min": 100, "median": 135, "max": 178},
+                "staff": {"min": 150, "median": 200, "max": 270},
+            },
+            "eu": {
+                "entry": {"min": 48, "median": 64, "max": 82},
+                "mid": {"min": 72, "median": 94, "max": 124},
+                "senior": {"min": 102, "median": 135, "max": 170},
+                "staff": {"min": 145, "median": 190, "max": 250},
+            },
+            "ca": {
+                "entry": {"min": 80, "median": 106, "max": 132},
+                "mid": {"min": 118, "median": 148, "max": 188},
+                "senior": {"min": 158, "median": 200, "max": 258},
+                "staff": {"min": 225, "median": 288, "max": 370},
+            },
+            "sg": {
+                "entry": {"min": 65, "median": 86, "max": 112},
+                "mid": {"min": 98, "median": 128, "max": 168},
+                "senior": {"min": 142, "median": 188, "max": 242},
+                "staff": {"min": 205, "median": 268, "max": 348},
+            },
+            "ae": {
+                "entry": {"min": 180, "median": 248, "max": 328},
+                "mid": {"min": 290, "median": 395, "max": 515},
+                "senior": {"min": 435, "median": 580, "max": 750},
+                "staff": {"min": 640, "median": 850, "max": 1080},
+            },
+        },
+    },
+    "design": {
+        "title": "Product UI/UX & Interaction Designer",
+        "brackets": {
+            "in": {
+                "entry": {"min": 4.5, "median": 7.5, "max": 13.0},
+                "mid": {"min": 10.0, "median": 16.0, "max": 25.0},
+                "senior": {"min": 20.0, "median": 30.0, "max": 44.0},
+                "staff": {"min": 35.0, "median": 50.0, "max": 75.0},
+            },
+            "us": {
+                "entry": {"min": 80, "median": 110, "max": 140},
+                "mid": {"min": 120, "median": 150, "max": 185},
+                "senior": {"min": 160, "median": 205, "max": 260},
+                "staff": {"min": 225, "median": 290, "max": 380},
+            },
+            "uk": {
+                "entry": {"min": 36, "median": 48, "max": 62},
+                "mid": {"min": 56, "median": 74, "max": 96},
+                "senior": {"min": 82, "median": 108, "max": 140},
+                "staff": {"min": 120, "median": 155, "max": 210},
+            },
+            "eu": {
+                "entry": {"min": 44, "median": 56, "max": 70},
+                "mid": {"min": 62, "median": 78, "max": 98},
+                "senior": {"min": 85, "median": 108, "max": 135},
+                "staff": {"min": 115, "median": 145, "max": 190},
+            },
+            "ca": {
+                "entry": {"min": 70, "median": 92, "max": 115},
+                "mid": {"min": 102, "median": 130, "max": 162},
+                "senior": {"min": 138, "median": 172, "max": 218},
+                "staff": {"min": 188, "median": 238, "max": 308},
+            },
+            "sg": {
+                "entry": {"min": 56, "median": 72, "max": 94},
+                "mid": {"min": 82, "median": 108, "max": 140},
+                "senior": {"min": 122, "median": 160, "max": 208},
+                "staff": {"min": 178, "median": 228, "max": 292},
+            },
+            "ae": {
+                "entry": {"min": 150, "median": 210, "max": 280},
+                "mid": {"min": 245, "median": 335, "max": 440},
+                "senior": {"min": 370, "median": 490, "max": 630},
+                "staff": {"min": 540, "median": 710, "max": 900},
+            },
+        },
+    },
 }
 
 _SKILL_ROI_PREMIUMS = [
+    {
+        "skill": "CIPP/E & GDPR Privacy Governance (Legal)",
+        "uplift_pct": "+18%",
+        "uplifts": {
+            "in": "+₹1.5 - 3.2 LPA",
+            "us": "+$18k - 30k",
+            "uk": "+£10k - 18k",
+            "eu": "+€12k - 20k",
+            "ca": "+C$15k - 26k",
+            "sg": "+S$16k - 28k",
+            "ae": "+AED 40k - 70k",
+        },
+        "demand_score": 95,
+        "reasoning": "High international corporate demand for data privacy certification across EU/US tech regulation.",
+    },
+    {
+        "skill": "Financial Modeling & Valuation (DCF / LBO)",
+        "uplift_pct": "+22%",
+        "uplifts": {
+            "in": "+₹2.0 - 4.0 LPA",
+            "us": "+$25k - 40k",
+            "uk": "+£14k - 24k",
+            "eu": "+€15k - 25k",
+            "ca": "+C$20k - 32k",
+            "sg": "+S$22k - 36k",
+            "ae": "+AED 50k - 85k",
+        },
+        "demand_score": 97,
+        "reasoning": "Core technical requirement for high-tier Investment Banking, M&A, and Private Equity recruitment.",
+    },
     {
         "skill": "Kubernetes & Cloud Orchestration",
         "uplift_pct": "+16%",
@@ -1498,7 +1734,13 @@ def estimate_career_compensation(
     role_key = "software_engineer"
     role_lower = (target_role or "").lower()
 
-    if any(k in role_lower for k in ["ai", "machine learning", "ml"]):
+    if any(k in role_lower for k in ["legal", "law", "compliance", "regulatory", "gdpr", "counsel"]):
+        role_key = "legal"
+    elif any(k in role_lower for k in ["finance", "banking", "valuation", "equity", "accounting"]):
+        role_key = "finance"
+    elif any(k in role_lower for k in ["design", "ui", "ux", "figma"]):
+        role_key = "design"
+    elif any(k in role_lower for k in ["ai", "machine learning", "ml"]):
         role_key = "ai_engineer"
     elif "data scientist" in role_lower or "science" in role_lower:
         role_key = "data_science"

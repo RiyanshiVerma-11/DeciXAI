@@ -605,13 +605,26 @@ function RoadmapBlock({ title, items, tone = 'slate' }) {
 }
 
 const BENCHMARK_ROLES = [
+  // Legal, Risk & Governance
+  'In-House Legal Counsel & Compliance',
+  'Corporate Regulatory & Risk Officer',
+  'Cyber Law & IP Specialist',
+  // Finance & Banking
+  'Financial Risk & Investment Analyst',
+  'Corporate Finance & Valuation Associate',
+  // Product & Strategy
+  'Product & Tech Strategy',
+  'Management & Strategy Consultant',
+  // Design & Creative Tech
+  'Product UI/UX & Interaction Designer',
+  // Marketing & Growth
+  'Digital Growth & Marketing Strategist',
+  // Tech & AI
   'AI Systems & Machine Learning Engineer',
   'Full-Stack Software Engineer',
   'Cloud & DevOps Architect',
   'Data Scientist & Analytics Engineer',
   'Cybersecurity Engineer',
-  'Product Manager – Tech',
-  'Blockchain & Web3 Developer',
 ]
 
 function DualRoadmapCard({ intel, input }) {
@@ -851,27 +864,21 @@ function InputSnapshot({ input, onUpdateInput, isLiveUpdating }) {
   }
 
   // Extract common candidate fields for rich presentation
-  const skillsList = Array.isArray(input.skills)
-    ? input.skills
-    : typeof input.skills === 'string' && input.skills.includes(',')
-    ? input.skills.split(',').map((s) => s.trim()).filter(Boolean)
-    : input.skills ? [input.skills] : []
+  const parseItems = (raw) => {
+    if (!raw) return []
+    if (Array.isArray(raw)) {
+      return raw.flatMap((item) => (typeof item === 'string' ? item.split(/[,;\n]+/).map((s) => s.trim()) : item)).filter(Boolean)
+    }
+    if (typeof raw === 'string') {
+      return raw.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+    }
+    return [String(raw)]
+  }
 
-  const projectsList = Array.isArray(input.projects)
-    ? input.projects
-    : typeof input.projects === 'string' && input.projects.includes(',')
-    ? input.projects.split(',').map((s) => s.trim()).filter(Boolean)
-    : input.projects ? [input.projects] : []
-
-  const projectDescriptions = Array.isArray(input.project_descriptions)
-    ? input.project_descriptions
-    : []
-
-  const certsList = Array.isArray(input.certifications)
-    ? input.certifications
-    : typeof input.certifications === 'string' && input.certifications.includes(',')
-    ? input.certifications.split(',').map((s) => s.trim()).filter(Boolean)
-    : input.certifications ? [input.certifications] : []
+  const skillsList = parseItems(input.skills)
+  const projectsList = parseItems(input.projects)
+  const projectDescriptions = Array.isArray(input.project_descriptions) ? input.project_descriptions : []
+  const certsList = parseItems(input.certifications)
 
   return (
     <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm col-span-full overflow-hidden transition-all duration-200">

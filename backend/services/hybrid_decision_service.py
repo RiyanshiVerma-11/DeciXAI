@@ -110,6 +110,88 @@ PATH_KEYWORD_HINTS = {
     "consulting": {"consulting", "consultant", "strategy", "management consulting", "business strategy", "advisory", "case study", "market entry", "operations", "stakeholder management", "problem solving", "contract drafting", "due diligence", "gdpr", "legal research", "corporate law", "compliance", "regulatory", "nda review", "intellectual property", "cyber law", "clinical research", "regulatory affairs", "legal", "law", "lawyer", "counsel"},
 }
 
+DOMAIN_SKILL_GAPS = {
+    "legal": [
+        "GDPR & Data Privacy (CIPP/E)",
+        "Regulatory Compliance Audit Protocol",
+        "Contract Drafting & Negotiation",
+        "Corporate Governance & Ethics",
+        "Cyber Law & Tech Compliance",
+        "Legal Risk Assessment",
+    ],
+    "finance": [
+        "Financial Modeling & Valuation (DCF / LBO)",
+        "Corporate Finance & Accounting",
+        "Portfolio & Risk Analytics",
+        "Equity Research & Financial Statement Analysis",
+        "Regulatory Reporting (SEC / FINRA)",
+    ],
+    "design": [
+        "Design Systems & Tokens (Figma)",
+        "User Research & Usability Testing",
+        "Interactive Prototyping",
+        "Information Architecture & Wireframing",
+        "Accessibility Standards (WCAG 2.1)",
+    ],
+    "marketing": [
+        "Digital Campaign & Funnel Analytics (GA4)",
+        "SEO & Content Strategy",
+        "Customer Acquisition & Growth Marketing",
+        "Brand Strategy & Copywriting",
+        "Performance Marketing & Ad Optimization",
+    ],
+    "consulting": [
+        "Strategic Problem Solving & Case Frameworks",
+        "Market Entry & Business Model Analysis",
+        "Stakeholder & Client Management",
+        "Financial & Operational Modeling",
+        "Executive Presentation & Storytelling",
+    ],
+    "healthcare": [
+        "Clinical Trials & GCP Guidelines",
+        "Pharmacovigilance & Drug Safety",
+        "Regulatory Affairs (FDA / EMA Compliance)",
+        "Medical Affairs & Clinical Data Management",
+        "Bioethics & Health Economics",
+    ],
+    "ai_engineer": [
+        "Agentic Frameworks (LangGraph / LlamaIndex)",
+        "LLM Evals & Guardrails (Ragas / DeepEval)",
+        "Vector Databases & Hybrid Search (Qdrant / PGVector)",
+        "Local Model Fine-Tuning & Quantization (vLLM / Unsloth)",
+    ],
+    "data_science": [
+        "Machine Learning & Statistical Modeling",
+        "Deep Learning Frameworks (PyTorch / TensorFlow)",
+        "Data Pipeline & Feature Engineering",
+        "SQL & Large-Scale Data Analysis",
+    ],
+    "software_development": [
+        "Full-Stack Architecture & Microservices",
+        "RESTful API & GraphQL Schema Design",
+        "Data Structures & Algorithms (DSA)",
+        "Database Optimization (PostgreSQL / Redis)",
+    ],
+    "cloud_devops": [
+        "Kubernetes & Container Orchestration",
+        "Infrastructure as Code (Terraform / Ansible)",
+        "Cloud Architecture (AWS / Azure / GCP)",
+        "CI/CD Pipeline Automation (GitHub Actions)",
+    ],
+    "product_management": [
+        "Product Strategy & PRD Specification",
+        "User Growth & Funnel Analytics (Mixpanel / GA4)",
+        "Agile & Scrum Methodologies (CSPO)",
+        "System Architecture for Product Managers",
+    ],
+    "cybersecurity": [
+        "Penetration Testing & Vulnerability Assessment",
+        "SOC Monitoring & Incident Response",
+        "Network Security & Threat Intelligence",
+        "Identity & Access Management (IAM)",
+    ],
+}
+
 
 def _clamp(value: float, minimum: float, maximum: float) -> float:
     if value != value:
@@ -148,9 +230,18 @@ def _split_items(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, list):
-        raw_items = value
+        raw_items = []
+        for item in value:
+            if isinstance(item, str):
+                raw_items.extend(re.split(LIST_SPLIT, item))
+            elif isinstance(item, list):
+                raw_items.extend(_split_items(item))
+            else:
+                raw_items.append(str(item))
+    elif isinstance(value, str):
+        raw_items = re.split(LIST_SPLIT, value)
     else:
-        raw_items = re.split(LIST_SPLIT, str(value))
+        raw_items = [str(value)]
 
     items = []
     seen = set()
@@ -823,8 +914,18 @@ def _career_track_roadmap(normalized: dict[str, Any], option: dict[str, Any], *,
 
     path_profile = option.get("path_profile", {}) or {}
     top_skills = path_profile.get("top_skills", []) or []
+
+    # Domain-aware skill gap lookup: ensure Legal/Finance/Design get domain skill gaps
+    domain_key = normalized.get("interest_domain") or normalized.get("course_group")
+    if domain_key in DOMAIN_SKILL_GAPS and domain_key in {"legal", "finance", "design", "marketing", "healthcare"}:
+        target_skills = DOMAIN_SKILL_GAPS[domain_key]
+    elif path_class in DOMAIN_SKILL_GAPS:
+        target_skills = DOMAIN_SKILL_GAPS[path_class]
+    else:
+        target_skills = top_skills or DOMAIN_SKILL_GAPS.get("software_development", [])
+
     user_skills = {_clean_token(skill) for skill in (normalized.get("expanded_skills") or normalized.get("skills", []))}
-    missing_skills = [skill for skill in top_skills[:6] if _clean_token(skill) not in user_skills]
+    missing_skills = [skill for skill in target_skills if _clean_token(skill) not in user_skills]
 
     projects = normalized.get("projects") or []
     certifications = normalized.get("certifications") or []
@@ -1541,6 +1642,7 @@ OUT_OF_SCOPE_DISCIPLINES = {
 
 
 BENCHMARK_ROLE_MAP = {
+    # Tech & AI
     "ai systems & machine learning engineer": "data_science",
     "ai systems & ml engineer": "data_science",
     "ai engineer": "data_science",
@@ -1564,6 +1666,26 @@ BENCHMARK_ROLE_MAP = {
     "product & tech strategy": "product_management",
     "product & engineering lead": "product_management",
     "product management": "product_management",
+    # Legal, Risk & Governance
+    "in-house legal counsel & compliance": "consulting",
+    "corporate regulatory & risk officer": "consulting",
+    "cyber law & ip specialist": "consulting",
+    "compliance & regulatory manager": "consulting",
+    "legal counsel": "consulting",
+    # Finance & Banking
+    "financial risk & investment analyst": "finance",
+    "corporate finance & valuation associate": "finance",
+    "financial analyst": "finance",
+    "investment banking analyst": "finance",
+    # Product & Strategy / Consulting
+    "product & tech strategy lead": "product_management",
+    "management & strategy consultant": "consulting",
+    # Design & Creative
+    "product ui/ux & interaction designer": "ui_ux_design",
+    "ux research & design lead": "ui_ux_design",
+    # Marketing & Growth
+    "digital growth & marketing strategist": "marketing",
+    "performance marketing lead": "marketing",
 }
 
 
