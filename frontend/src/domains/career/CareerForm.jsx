@@ -73,13 +73,51 @@ export default function CareerForm({
   onApplyPreset,
 }) {
   const [step, setStep] = useState(1)
-  const [intakeMode, setIntakeMode] = useState('manual') // 'resume' | 'manual'
+  const [intakeMode, setIntakeMode] = useState('form') // 'resume' | 'form' | 'prompt'
   const [uploadingResume, setUploadingResume] = useState(false)
   const [resumeSuccessMsg, setResumeSuccessMsg] = useState('')
   const [resumeErrorMsg, setResumeErrorMsg] = useState('')
+  const [promptText, setPromptText] = useState(input.raw_prompt || input.freeText || '')
+  const [promptParseSuccess, setPromptParseSuccess] = useState('')
   const [targetIntentChoice, setTargetIntentChoice] = useState(input.target_role && input.target_role !== 'auto' ? 'specific' : 'ai_recommend')
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002'
+
+  const handleParsePromptToForm = (overrideText) => {
+    const text = overrideText || promptText
+    if (!text.trim()) return
+
+    const cgpaMatch = text.match(/(?:cgpa|gpa|score|marks)\s*[:=]?\s*([\d.]+)/i)
+    const courseMatch = text.match(/(?:course|degree|graduated in)\s*[:=]?\s*([a-zA-Z\s.]+?)(?:,|$|specialization|skills|projects|certifications|interest)/i) || text.match(/\b(b\.?tech|btech|bs|ba llb|llb|b\.?com|bcom|mba|bba|msc|bdes|bpharm)\b/i)
+    const specMatch = text.match(/(?:specialization|major|in)\s*[:=]?\s*([a-zA-Z\s&]+?)(?:,|$|skills|projects|certifications|interest)/i)
+    const skillsMatch = text.match(/skills\s*[:=]?\s*([^,\n.]+?(?:,[^,\n.]+)*)/i)
+    const projectsMatch = text.match(/projects?\s*[:=]?\s*([^,\n.]+?(?:,[^,\n.]+)*)/i)
+    const certsMatch = text.match(/certifications?\s*[:=]?\s*([^,\n.]+?(?:,[^,\n.]+)*)/i)
+    const interestMatch = text.match(/interest\s*[:=]?\s*([^\n,.]+)/i)
+
+    const parsedScore = cgpaMatch ? parseFloat(cgpaMatch[1]) : (input.cgpa || 8.0)
+    const parsedCourse = courseMatch ? (courseMatch[1] || courseMatch[0]).trim() : (input.course || '')
+    const parsedSpec = specMatch ? specMatch[1].trim() : (input.specialization || '')
+    const parsedSkills = skillsMatch ? skillsMatch[1].split(',').map(s => s.trim()).filter(Boolean) : input.skills
+    const parsedProjects = projectsMatch ? projectsMatch[1].split(',').map(p => p.trim()).filter(Boolean) : input.projects
+    const parsedCerts = certsMatch ? certsMatch[1].split(',').map(c => c.trim()).filter(Boolean) : input.certifications
+    const parsedInterest = interestMatch ? interestMatch[1].trim() : input.interest
+
+    setInput((prev) => ({
+      ...prev,
+      cgpa: parsedScore,
+      raw_score: parsedScore,
+      course: parsedCourse || prev.course || 'B.Tech',
+      specialization: parsedSpec || prev.specialization,
+      skills: parsedSkills && parsedSkills.length > 0 ? parsedSkills : prev.skills,
+      projects: parsedProjects && parsedProjects.length > 0 ? parsedProjects : prev.projects,
+      certifications: parsedCerts && parsedCerts.length > 0 ? parsedCerts : prev.certifications,
+      interest: parsedInterest || prev.interest,
+      raw_prompt: text,
+    }))
+
+    setPromptParseSuccess('Prompt parsed successfully! Skills, CGPA, projects & course extracted into form state.')
+  }
 
   const handleChange = (field, value) => {
     setInput((prev) => ({ ...prev, [field]: value }))
@@ -348,33 +386,49 @@ export default function CareerForm({
             </button>
           </div>
 
-          {/* Option A vs Option B Dual Tab Switcher */}
-          <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
-            <button
-              type="button"
-              onClick={() => setIntakeMode('manual')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
-                intakeMode === 'manual'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              Option B: Manual Quick-Fill &amp; Presets
-            </button>
+          {/* 3-Option Sub-mode Switcher */}
+          <div className="grid grid-cols-3 gap-2 border-b border-slate-200 pb-3">
             <button
               type="button"
               onClick={() => setIntakeMode('resume')}
-              className={`px-4 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-bold rounded-xl transition cursor-pointer ${
                 intakeMode === 'resume'
                   ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
               }`}
             >
-              Option A: Drop Resume (PDF / DOCX) ⚡
+              <span>📄</span>
+              <span className="truncate">Resume Parser ATS</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIntakeMode('form')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-bold rounded-xl transition cursor-pointer ${
+                intakeMode === 'form' || intakeMode === 'manual'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+              }`}
+            >
+              <span>📝</span>
+              <span className="truncate">Studio Form</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIntakeMode('prompt')}
+              className={`flex items-center justify-center gap-1.5 py-2.5 px-3 text-xs font-bold rounded-xl transition cursor-pointer ${
+                intakeMode === 'prompt'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+              }`}
+            >
+              <span>💬</span>
+              <span className="truncate">Prompt NLP</span>
             </button>
           </div>
 
-          {/* OPTION A: RESUME DROP ZONE */}
+          {/* MODE 1: RESUME PARSER ATS */}
           {intakeMode === 'resume' && (
             <div className="space-y-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center">
               <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center mx-auto text-slate-700">
@@ -383,9 +437,9 @@ export default function CareerForm({
                 </svg>
               </div>
               <div>
-                <h4 className="text-sm font-bold text-slate-900">Upload Your Resume for Auto-Fill</h4>
+                <h4 className="text-sm font-bold text-slate-900">Upload Your Resume (ATS Parser)</h4>
                 <p className="text-xs text-slate-500 mt-1">
-                  Supports PDF or DOCX. Extracts your degree, CGPA, skills, projects, and certifications automatically.
+                  Supports PDF or DOCX. Automatically extracts your degree, CGPA, skills, projects, and certifications into form state.
                 </p>
               </div>
 
@@ -413,200 +467,291 @@ export default function CareerForm({
             </div>
           )}
 
-          {/* OPTION B: MANUAL QUICK-FILL FORM */}
-          <div className="space-y-3 pt-1">
-            {/* Quick Presets */}
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="font-bold text-slate-500">Quick Presets:</span>
-              <div className="flex flex-wrap items-center gap-1">
-                {CAREER_PRESETS.map((preset, idx) => (
+          {/* MODE 3: PROMPT NLP */}
+          {intakeMode === 'prompt' && (
+            <div className="space-y-4 bg-slate-50 border border-slate-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Natural Language Prompt NLP</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Type or paste a freeform profile description. The NLP parser will structure your score, skills, projects &amp; degree.
+                  </p>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200">
+                  NLP Engine
+                </span>
+              </div>
+
+              {/* Sample Prompt Pills */}
+              <div className="space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 block">Sample Prompts (Click to Fill):</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'CGPA 8.2, BTech CSE, skills Python SQL React, projects chatbot and dashboard, interest software engineering',
+                    'Meri CGPA 7.8 hai, skills Python SQL, degree B.Com, interest financial risk analyst',
+                    'GPA 3.8/4.0, BS Computer Science, skills PyTorch Docker Kubernetes, projects ML pipeline, interest AI Systems',
+                  ].map((sample, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setPromptText(sample)
+                        handleParsePromptToForm(sample)
+                      }}
+                      className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 hover:border-slate-400 hover:bg-slate-100 text-left transition cursor-pointer"
+                    >
+                      💡 {sample.slice(0, 50)}...
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Textarea */}
+              <div>
+                <textarea
+                  rows={4}
+                  value={promptText}
+                  onChange={(e) => {
+                    setPromptText(e.target.value)
+                    handleChange('raw_prompt', e.target.value)
+                  }}
+                  placeholder="Example: cgpa 8.4, course btech cse, specialization ai and ml, skills python sql react, certifications aws cloud practitioner, projects fraud detector dashboard, interest software development"
+                  className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900 leading-relaxed"
+                />
+              </div>
+
+              {promptParseSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-bold text-emerald-800 flex items-center justify-between">
+                  <span>✓ {promptParseSuccess}</span>
                   <button
-                    key={idx}
                     type="button"
-                    onClick={() => onApplyPreset(preset)}
-                    className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition cursor-pointer"
+                    onClick={() => setIntakeMode('form')}
+                    className="text-[11px] underline hover:text-emerald-950 font-extrabold"
                   >
-                    <span className="text-[10px] text-slate-400 uppercase">{preset.badge}</span>
-                    <span>{preset.label}</span>
+                    View in Studio Form &rarr;
                   </button>
-                ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleParsePromptToForm()}
+                  className="rounded-xl bg-slate-900 hover:bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>⚡</span>
+                  <span>Auto-Extract &amp; Structure Prompt</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleParsePromptToForm()
+                    setStep(4)
+                  }}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-xs transition cursor-pointer"
+                >
+                  Proceed to Target Intent &rarr;
+                </button>
               </div>
             </div>
+          )}
 
-            {/* Landscape Fields Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
-              {/* Academic Score */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-slate-800">
-                    Academic Score <span className="text-rose-500">*</span>
+          {/* MODE 2: STUDIO FORM (MANUAL QUICK-FILL FORM) */}
+          {(intakeMode === 'form' || intakeMode === 'manual') && (
+            <div className="space-y-3 pt-1">
+              {/* Quick Presets */}
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="font-bold text-slate-500">Quick Presets:</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {CAREER_PRESETS.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => onApplyPreset(preset)}
+                      className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      <span className="text-[10px] text-slate-400 uppercase">{preset.badge}</span>
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Landscape Fields Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-4 gap-y-3">
+                {/* Academic Score */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-800">
+                      Academic Score <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-0.5 bg-slate-100 rounded p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleScoreTypeChange('cgpa_10')}
+                        className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                          scoreType === 'cgpa_10' ? 'bg-slate-900 text-white' : 'text-slate-500'
+                        }`}
+                      >
+                        10 Scale
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleScoreTypeChange('gpa_4')}
+                        className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                          scoreType === 'gpa_4' ? 'bg-slate-900 text-white' : 'text-slate-500'
+                        }`}
+                      >
+                        4.0 GPA
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleScoreTypeChange('percentage')}
+                        className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
+                          scoreType === 'percentage' ? 'bg-slate-900 text-white' : 'text-slate-500'
+                        }`}
+                      >
+                        %
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="number"
+                    step={scoreType === 'percentage' ? '0.1' : '0.01'}
+                    min="0"
+                    max={scoreType === 'percentage' ? '100' : scoreType === 'gpa_4' ? '4.0' : '10.0'}
+                    value={rawScore}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? '' : Number(e.target.value)
+                      setInput((prev) => ({ ...prev, raw_score: val, cgpa: val }))
+                    }}
+                    placeholder={scoreType === 'percentage' ? '85.5' : scoreType === 'gpa_4' ? '3.8' : '8.5'}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+                  />
+                  {fieldErrors.cgpa && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.cgpa}</p>}
+                </div>
+
+                {/* Course / Degree */}
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Degree / Course <span className="text-rose-500">*</span>
                   </label>
-                  <div className="flex items-center gap-0.5 bg-slate-100 rounded p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => handleScoreTypeChange('cgpa_10')}
-                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                        scoreType === 'cgpa_10' ? 'bg-slate-900 text-white' : 'text-slate-500'
-                      }`}
-                    >
-                      10 Scale
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleScoreTypeChange('gpa_4')}
-                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                        scoreType === 'gpa_4' ? 'bg-slate-900 text-white' : 'text-slate-500'
-                      }`}
-                    >
-                      4.0 GPA
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleScoreTypeChange('percentage')}
-                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded ${
-                        scoreType === 'percentage' ? 'bg-slate-900 text-white' : 'text-slate-500'
-                      }`}
-                    >
-                      %
-                    </button>
+                  <input
+                    type="text"
+                    value={input.course || ''}
+                    onChange={(e) => handleChange('course', e.target.value)}
+                    placeholder={activeDomain.id === 'legal' ? 'e.g. BA LLB' : activeDomain.id === 'finance' ? 'e.g. B.Com / MBA' : 'e.g. B.Tech'}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+                  />
+                  {fieldErrors.course && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.course}</p>}
+                </div>
+
+                {/* Specialization */}
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Specialization / Major
+                  </label>
+                  <input
+                    type="text"
+                    value={input.specialization || ''}
+                    onChange={(e) => handleChange('specialization', e.target.value)}
+                    placeholder={activeDomain.id === 'legal' ? 'e.g. Cyber Law & IP' : activeDomain.id === 'finance' ? 'e.g. Financial Valuation' : 'e.g. Computer Science'}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
+
+                {/* Skills */}
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Domain &amp; Technical Skills (comma-separated) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={Array.isArray(input.skills) ? input.skills.join(', ') : input.skills || ''}
+                    onChange={(e) => handleChange('skills', e.target.value)}
+                    placeholder={`e.g. ${activeDomain.skillSuggestions.slice(0, 5).join(', ')}`}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+                  />
+                  {fieldErrors.skills && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.skills}</p>}
+
+                  {/* Skill Chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Suggested:</span>
+                    {activeDomain.skillSuggestions.map((skill, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleAddSkillChip(skill)}
+                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                      >
+                        + {skill}
+                      </button>
+                    ))}
                   </div>
                 </div>
-                <input
-                  type="number"
-                  step={scoreType === 'percentage' ? '0.1' : '0.01'}
-                  min="0"
-                  max={scoreType === 'percentage' ? '100' : scoreType === 'gpa_4' ? '4.0' : '10.0'}
-                  value={rawScore}
-                  onChange={(e) => {
-                    const val = e.target.value === '' ? '' : Number(e.target.value)
-                    setInput((prev) => ({ ...prev, raw_score: val, cgpa: val }))
-                  }}
-                  placeholder={scoreType === 'percentage' ? '85.5' : scoreType === 'gpa_4' ? '3.8' : '8.5'}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
-                />
-                {fieldErrors.cgpa && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.cgpa}</p>}
-              </div>
 
-              {/* Course / Degree */}
-              <div>
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Degree / Course <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={input.course || ''}
-                  onChange={(e) => handleChange('course', e.target.value)}
-                  placeholder={activeDomain.id === 'legal' ? 'e.g. BA LLB' : activeDomain.id === 'finance' ? 'e.g. B.Com / MBA' : 'e.g. B.Tech'}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
-                />
-                {fieldErrors.course && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.course}</p>}
-              </div>
-
-              {/* Specialization */}
-              <div>
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Specialization / Major
-                </label>
-                <input
-                  type="text"
-                  value={input.specialization || ''}
-                  onChange={(e) => handleChange('specialization', e.target.value)}
-                  placeholder={activeDomain.id === 'legal' ? 'e.g. Cyber Law & IP' : activeDomain.id === 'finance' ? 'e.g. Financial Valuation' : 'e.g. Computer Science'}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
-                />
-              </div>
-
-              {/* Skills */}
-              <div className="md:col-span-2">
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Domain &amp; Technical Skills (comma-separated) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={Array.isArray(input.skills) ? input.skills.join(', ') : input.skills || ''}
-                  onChange={(e) => handleChange('skills', e.target.value)}
-                  placeholder={`e.g. ${activeDomain.skillSuggestions.slice(0, 5).join(', ')}`}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
-                />
-                {fieldErrors.skills && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.skills}</p>}
-
-                {/* Skill Chips */}
-                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Suggested:</span>
-                  {activeDomain.skillSuggestions.map((skill, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleAddSkillChip(skill)}
-                      className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
-                    >
-                      + {skill}
-                    </button>
-                  ))}
+                {/* Target Focus */}
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Target Direction / Focus <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={input.interest || ''}
+                    onChange={(e) => handleChange('interest', e.target.value)}
+                    placeholder={activeDomain.id === 'legal' ? 'e.g. Corporate Law & Compliance' : activeDomain.id === 'finance' ? 'e.g. Investment Banking' : 'e.g. Software Engineering'}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+                  />
+                  {fieldErrors.interest && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.interest}</p>}
                 </div>
-              </div>
 
-              {/* Target Focus */}
-              <div>
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Target Direction / Focus <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={input.interest || ''}
-                  onChange={(e) => handleChange('interest', e.target.value)}
-                  placeholder={activeDomain.id === 'legal' ? 'e.g. Corporate Law & Compliance' : activeDomain.id === 'finance' ? 'e.g. Investment Banking' : 'e.g. Software Engineering'}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
-                />
-                {fieldErrors.interest && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.interest}</p>}
-              </div>
+                {/* Projects */}
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Projects, Audits &amp; Case Studies (comma-separated) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={Array.isArray(input.projects) ? input.projects.join(', ') : input.projects || ''}
+                    onChange={(e) => handleChange('projects', e.target.value)}
+                    placeholder={`e.g. ${activeDomain.projectSuggestions[0] || 'Capstone Project'}`}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+                  />
+                  {fieldErrors.projects && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.projects}</p>}
 
-              {/* Projects */}
-              <div className="md:col-span-2">
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Projects, Audits &amp; Case Studies (comma-separated) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={Array.isArray(input.projects) ? input.projects.join(', ') : input.projects || ''}
-                  onChange={(e) => handleChange('projects', e.target.value)}
-                  placeholder={`e.g. ${activeDomain.projectSuggestions[0] || 'Capstone Project'}`}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
-                />
-                {fieldErrors.projects && <p className="text-xs text-rose-600 mt-0.5">{fieldErrors.projects}</p>}
-
-                {/* Project Chips */}
-                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">Suggested:</span>
-                  {activeDomain.projectSuggestions.map((proj, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleAddProjectChip(proj)}
-                      className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
-                    >
-                      + {proj}
-                    </button>
-                  ))}
+                  {/* Project Chips */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Suggested:</span>
+                    {activeDomain.projectSuggestions.map((proj, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleAddProjectChip(proj)}
+                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                      >
+                        + {proj}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Certifications */}
-              <div>
-                <label className="text-xs font-bold text-slate-800 block mb-1">
-                  Certifications (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  value={Array.isArray(input.certifications) ? input.certifications.join(', ') : input.certifications || ''}
-                  onChange={(e) => handleChange('certifications', e.target.value)}
-                  placeholder={activeDomain.id === 'legal' ? 'e.g. CIPP/E, GDPR Auditor' : activeDomain.id === 'finance' ? 'e.g. CFA Level 1, FMVA' : 'e.g. AWS Developer, CKA'}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
-                />
-              </div>
+                {/* Certifications */}
+                <div>
+                  <label className="text-xs font-bold text-slate-800 block mb-1">
+                    Certifications (comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={Array.isArray(input.certifications) ? input.certifications.join(', ') : input.certifications || ''}
+                    onChange={(e) => handleChange('certifications', e.target.value)}
+                    placeholder={activeDomain.id === 'legal' ? 'e.g. CIPP/E, GDPR Auditor' : activeDomain.id === 'finance' ? 'e.g. CFA Level 1, FMVA' : 'e.g. AWS Developer, CKA'}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+                  />
+                </div>
 
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex justify-end pt-3 border-t border-slate-100">
             <button
