@@ -21,10 +21,69 @@ from urllib.request import Request, urlopen
 
 from dotenv import find_dotenv, load_dotenv
 
+import logging
 from services.hybrid_decision_service import analyze_career_profile, normalize_career_input
 from services.llm_client import call_llm_json as _client_call_llm_json
 
 load_dotenv(find_dotenv())
+
+logger = logging.getLogger("DeciXAI.CareerAccelerator")
+
+DATASETS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "datasets")
+
+# Load Compensation Data
+_comp_path = os.path.join(DATASETS_DIR, "career_compensation_data.json")
+if os.path.exists(_comp_path):
+    with open(_comp_path, "r", encoding="utf-8") as f:
+        _comp_data = json.load(f)
+    COUNTRY_CONFIGS = _comp_data.get("country_configs", {})
+    _SALARY_DATABASE = _comp_data.get("salary_database", {})
+    _DOMAIN_LADDER_LEVELS = _comp_data.get("domain_ladder_levels", {})
+    _DOMAIN_SKILL_ROI_PREMIUMS = _comp_data.get("domain_skill_roi_premiums", {})
+else:
+    COUNTRY_CONFIGS, _SALARY_DATABASE, _DOMAIN_LADDER_LEVELS, _DOMAIN_SKILL_ROI_PREMIUMS = {}, {}, {}, {}
+
+# Load Skills Taxonomy
+_skills_path = os.path.join(DATASETS_DIR, "career_skills_taxonomy.json")
+if os.path.exists(_skills_path):
+    with open(_skills_path, "r", encoding="utf-8") as f:
+        _skills_data = json.load(f)
+    _TECH_KEYWORDS_SET = set(_skills_data.get("tech_keywords", []))
+    _SKILL_SYNONYMS = _skills_data.get("skill_synonyms", {})
+else:
+    _TECH_KEYWORDS_SET = set()
+    _SKILL_SYNONYMS = {}
+
+_SKILL_ROI_PREMIUMS = _DOMAIN_SKILL_ROI_PREMIUMS.get("software_engineer", [])
+
+
+def detect_career_domain(role: str) -> str:
+    """
+    Normalizes job role / title into standard domain key:
+    'legal', 'finance', 'design', 'ai_engineer', 'data_science',
+    'data_engineering', 'cloud_devops', 'cybersecurity', 'product_management',
+    or default 'engineering'.
+    """
+    role_lower = (role or "").lower()
+    if any(k in role_lower for k in ["legal", "law", "compliance", "regulatory", "gdpr", "counsel"]):
+        return "legal"
+    if any(k in role_lower for k in ["finance", "banking", "valuation", "equity", "accounting"]):
+        return "finance"
+    if any(k in role_lower for k in ["design", "ui", "ux", "figma"]):
+        return "design"
+    if any(k in role_lower for k in ["ai", "machine learning", "ml"]):
+        return "ai_engineer"
+    if "data scientist" in role_lower or "science" in role_lower:
+        return "data_science"
+    if "data engineer" in role_lower:
+        return "data_engineering"
+    if any(k in role_lower for k in ["cloud", "devops", "sre", "infrastructure"]):
+        return "cloud_devops"
+    if "security" in role_lower:
+        return "cybersecurity"
+    if "product" in role_lower or "strategy" in role_lower or "consulting" in role_lower:
+        return "product_management"
+    return "engineering"
 
 
 def _call_llm_json(
@@ -47,7 +106,8 @@ def _call_llm_json(
 def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[str, Any]) -> dict[str, Any]:
     """
     Simulates counterfactual pivots on a candidate's profile.
-    Calculates exact model probabilities before and after, plus feature attribution waterfall.
+    Calculates exact model probabilities before and after using real ML model predictions,
+    and derives feature attribution waterfall from incremental model evaluation steps.
     """
     # 1. Base evaluation
     normalized_base = normalize_career_input(baseline_input)
@@ -55,103 +115,101 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
     base_prob = float(base_res.get("probability") or 0.60)
     base_pred = base_res.get("prediction", "Qualified")
 
-    # 2. Apply modifications
-    modified_input = dict(baseline_input)
-
-    # CGPA
-    if "cgpa" in modifications:
-        modified_input["cgpa"] = float(modifications["cgpa"])
-    elif "cgpa_delta" in modifications:
-        current_cgpa = float(baseline_input.get("cgpa") or 8.0)
-        modified_input["cgpa"] = min(10.0, max(5.0, current_cgpa + float(modifications["cgpa_delta"])))
-
-    # Skills
-    current_skills = list(baseline_input.get("skills") or [])
-    added_skills = list(modifications.get("added_skills") or [])
-    all_skills = list(dict.fromkeys(current_skills + added_skills))
-    modified_input["skills"] = all_skills
-
-    # Projects
-    current_projects = list(baseline_input.get("projects") or [])
-    added_projects = list(modifications.get("added_projects") or [])
-    all_projects = list(dict.fromkeys(current_projects + added_projects))
-    modified_input["projects"] = all_projects
-
-    # Certifications
-    current_certs = list(baseline_input.get("certifications") or [])
-    added_certs = list(modifications.get("added_certs") or [])
-    all_certs = list(dict.fromkeys(current_certs + added_certs))
-    modified_input["certifications"] = all_certs
-
-    # Target role override
-    if modifications.get("target_role"):
-        modified_input["interest"] = modifications["target_role"]
-
-    # 3. Simulated evaluation
-    normalized_sim = normalize_career_input(modified_input)
-    sim_res = analyze_career_profile(normalized_sim, source="simulation_mod")
-    sim_prob = float(sim_res.get("probability") or 0.75)
-    sim_pred = sim_res.get("prediction", "Accepted")
-
-    # 4. Compute waterfall attribution for each added factor
+    # 2. Track modifications step-by-step for real model waterfall
+    curr_profile = dict(baseline_input)
     waterfall = []
+    running_prob = base_prob
+
+    # A. Added skills step
+    added_skills = list(modifications.get("added_skills") or [])
     if added_skills:
-        skill_gain = round(min(0.28, len(added_skills) * 0.065), 3)
+        current_skills = list(curr_profile.get("skills") or [])
+        curr_profile["skills"] = list(dict.fromkeys(current_skills + added_skills))
+        norm_step = normalize_career_input(curr_profile)
+        step_res = analyze_career_profile(norm_step, source="sim_skills")
+        step_prob = float(step_res.get("probability") or running_prob)
+        delta = round(step_prob - running_prob, 3)
         waterfall.append({
             "factor": f"+{len(added_skills)} Key Skills ({', '.join(added_skills[:3])})",
-            "delta": skill_gain,
+            "delta": delta,
             "category": "skills",
             "description": f"Expands match with target domain tooling.",
         })
+        running_prob = step_prob
 
+    # B. Added projects step
+    added_projects = list(modifications.get("added_projects") or [])
     if added_projects:
-        proj_gain = round(min(0.22, len(added_projects) * 0.07), 3)
+        current_projects = list(curr_profile.get("projects") or [])
+        curr_profile["projects"] = list(dict.fromkeys(current_projects + added_projects))
+        norm_step = normalize_career_input(curr_profile)
+        step_res = analyze_career_profile(norm_step, source="sim_projects")
+        step_prob = float(step_res.get("probability") or running_prob)
+        delta = round(step_prob - running_prob, 3)
         waterfall.append({
             "factor": f"+{len(added_projects)} Capstone Project(s)",
-            "delta": proj_gain,
+            "delta": delta,
             "category": "projects",
             "description": "Demonstrates production architecture and practical deployment.",
         })
+        running_prob = step_prob
 
+    # C. Added certs step
+    added_certs = list(modifications.get("added_certs") or [])
     if added_certs:
-        cert_gain = round(min(0.12, len(added_certs) * 0.04), 3)
+        current_certs = list(curr_profile.get("certifications") or [])
+        curr_profile["certifications"] = list(dict.fromkeys(current_certs + added_certs))
+        norm_step = normalize_career_input(curr_profile)
+        step_res = analyze_career_profile(norm_step, source="sim_certs")
+        step_prob = float(step_res.get("probability") or running_prob)
+        delta = round(step_prob - running_prob, 3)
         waterfall.append({
             "factor": f"+{len(added_certs)} Industry Certification(s)",
-            "delta": cert_gain,
+            "delta": delta,
             "category": "certifications",
             "description": "Provides formal third-party validation of competencies.",
         })
+        running_prob = step_prob
 
-    cgpa_diff = round(float(modified_input.get("cgpa", 8.0)) - float(baseline_input.get("cgpa", 8.0)), 2)
+    # D. CGPA adjustment step
+    if "cgpa" in modifications:
+        curr_profile["cgpa"] = float(modifications["cgpa"])
+    elif "cgpa_delta" in modifications:
+        current_cgpa = float(baseline_input.get("cgpa") or 8.0)
+        curr_profile["cgpa"] = min(10.0, max(5.0, current_cgpa + float(modifications["cgpa_delta"])))
+
+    cgpa_diff = round(float(curr_profile.get("cgpa", 8.0)) - float(baseline_input.get("cgpa", 8.0)), 2)
     if abs(cgpa_diff) >= 0.1:
-        cgpa_gain = round(cgpa_diff * 0.035, 3)
+        norm_step = normalize_career_input(curr_profile)
+        step_res = analyze_career_profile(norm_step, source="sim_cgpa")
+        step_prob = float(step_res.get("probability") or running_prob)
+        delta = round(step_prob - running_prob, 3)
         waterfall.append({
             "factor": f"CGPA Adjustment ({'+' if cgpa_diff > 0 else ''}{cgpa_diff})",
-            "delta": cgpa_gain,
+            "delta": delta,
             "category": "academic",
             "description": "Improves institutional academic standing and initial screening percentile.",
         })
+        running_prob = step_prob
 
-    # Probability bounds & monotonic alignment with counterfactual waterfall
-    waterfall_sum = sum(w["delta"] for w in waterfall)
-    if waterfall_sum > 0:
-        headroom = max(0.01, 0.99 - base_prob)
-        scaled_gain = min(headroom, waterfall_sum * min(1.0, headroom / 0.35 + 0.1))
-        sim_prob = min(0.99, max(sim_prob, round(base_prob + scaled_gain, 3)))
-    elif waterfall_sum < 0:
-        sim_prob = max(0.15, min(sim_prob, round(base_prob + waterfall_sum, 3)))
-    else:
-        sim_prob = min(0.99, max(0.20, sim_prob))
+    # E. Target role override
+    if modifications.get("target_role"):
+        curr_profile["interest"] = modifications["target_role"]
+
+    # 3. Final simulated evaluation from model
+    normalized_sim = normalize_career_input(curr_profile)
+    sim_res = analyze_career_profile(normalized_sim, source="simulation_mod")
+    sim_prob = float(sim_res.get("probability") or running_prob)
+    sim_pred = sim_res.get("prediction", "Accepted" if sim_prob >= 0.70 else "Qualified")
 
     delta_prob = round(sim_prob - base_prob, 3)
-    if delta_prob >= 0 and sim_prob >= 0.70:
-        sim_pred = "Accepted"
 
-    # Recommended Optimal Pivot (domain-tailored combination to hit >= 90%)
+    # 4. Generate domain-tailored optimal recommendations if sim_prob < 0.90
     optimal_recommendations = []
     if sim_prob < 0.90:
-        interest_text = (modified_input.get("raw_interest") or modified_input.get("interest_domain") or "").lower()
-        if any(k in interest_text for k in ["legal", "law", "compliance", "regulatory", "gdpr", "counsel"]):
+        target_role = curr_profile.get("interest") or curr_profile.get("raw_interest") or "Software Engineer"
+        domain = detect_career_domain(target_role)
+        if domain == "legal":
             optimal_recommendations = [
                 {
                     "action": "Attain CIPP/E (Certified Information Privacy Professional) or ISO 27001 Lead Auditor Credential",
@@ -169,7 +227,7 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
                     "priority": "High",
                 },
             ]
-        elif any(k in interest_text for k in ["finance", "banking", "valuation", "equity"]):
+        elif domain == "finance":
             optimal_recommendations = [
                 {
                     "action": "Complete CFA Level 1 or FMVA (Financial Modeling & Valuation Analyst) Certification",
@@ -187,7 +245,7 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
                     "priority": "High",
                 },
             ]
-        elif any(k in interest_text for k in ["design", "ui", "ux", "figma"]):
+        elif domain == "design":
             optimal_recommendations = [
                 {
                     "action": "Publish Figma Enterprise Design System & Component Library (WCAG 2.1 Compliant)",
@@ -229,7 +287,7 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
         "delta_percentage": f"{'+' if delta_prob > 0 else ''}{round(delta_prob * 100, 1)}%",
         "waterfall": waterfall,
         "optimal_recommendations": optimal_recommendations,
-        "simulated_profile": modified_input,
+        "simulated_profile": curr_profile,
     }
 
 
@@ -1173,6 +1231,41 @@ def generate_mock_interview_questions(
 
 
 
+def _get_domain_interview_defaults(role: str) -> tuple[list[str], str]:
+    domain = detect_career_domain(role)
+    if domain == "legal":
+        return (
+            ["statutory compliance", "due diligence", "indemnity liability", "precedent", "regulatory risk"],
+            "Situation: During a cross-border SaaS transaction, the counterparty refused our standard limitation of liability and data transfer clauses. "
+            "Task: As Legal Counsel, my objective was to close the high-value deal within 14 days without exposing our company to uncapped indemnity under GDPR & DPDP Act. "
+            "Action: I drafted tailored Standard Contractual Clauses (SCCs), conducted a risk-weighted redlining session, and negotiated a mutual super-cap for data breaches tied to 12 months' SaaS fees. "
+            "Result: The contract was executed within 8 days with zero unmitigated regulatory exposure, protecting $1.2M in annual recurring revenue."
+        )
+    if domain == "finance":
+        return (
+            ["WACC", "discount rate", "sensitivity analysis", "EBITDA multiple", "scenario modeling"],
+            "Situation: Our investment committee was evaluating a $45M bolt-on acquisition with uncertain forward cash flows. "
+            "Task: Build a defensible DCF valuation model with dynamic sensitivity matrices to establish negotiation floor and ceiling. "
+            "Action: Formulated a 3-statement model incorporating Monte Carlo simulation across WACC and terminal growth rates, identifying an 18% overvaluation in seller's EBITDA projections. "
+            "Result: The firm renegotiated the acquisition price down by $4.2M, generating an immediate 14% IRR improvement."
+        )
+    if domain == "design":
+        return (
+            ["WCAG 2.1", "usability metrics", "design tokens", "user journey", "task completion rate"],
+            "Situation: User drop-off during onboarding for our mobile banking product was at an alarming 42%. "
+            "Task: Redesign the multi-step KYC verification flow to elevate onboarding conversion while maintaining compliance. "
+            "Action: Conducted 12 moderated usability sessions, identified cognitive load bottlenecks, and prototyped a progressive-disclosure flow in Figma with standardized design tokens. "
+            "Result: Usability testing showed a 65% drop in error rates, and live A/B rollout lifted completed onboarding from 58% to 84%."
+        )
+    return (
+        ["monitoring", "latency metrics", "fault tolerance", "scalability"],
+        "Situation: During a high-traffic flash sale, our payment gateway encountered intermittent timeout cascades. "
+        "Task: As Lead Engineer, my objective was to restore sub-500ms checkout confirmation without dropped transactions. "
+        "Action: I instituted an asynchronous queue worker pattern using Redis Streams with exponential backoff and a circuit breaker. "
+        "Result: System throughput increased from 1,200 to 5,800 orders/sec with zero dropped transactions, reducing latency by 45%."
+    )
+
+
 def evaluate_interview_response(question: str, user_answer: str, role: str) -> dict[str, Any]:
     """
     Evaluates a candidate's interview response using the STAR framework,
@@ -1231,40 +1324,7 @@ def evaluate_interview_response(question: str, user_answer: str, role: str) -> d
     ]
 
     llm_res = _call_llm_json(prompt_messages, timeout_seconds=15)
-
-    role_lower = (role or "").lower()
-    if any(k in role_lower for k in ["legal", "law", "compliance", "regulatory", "gdpr", "counsel"]):
-        default_missing = ["statutory compliance", "due diligence", "indemnity liability", "precedent", "regulatory risk"]
-        default_exemplary = (
-            "Situation: During a cross-border SaaS transaction, the counterparty refused our standard limitation of liability and data transfer clauses. "
-            "Task: As Legal Counsel, my objective was to close the high-value deal within 14 days without exposing our company to uncapped indemnity under GDPR & DPDP Act. "
-            "Action: I drafted tailored Standard Contractual Clauses (SCCs), conducted a risk-weighted redlining session, and negotiated a mutual super-cap for data breaches tied to 12 months' SaaS fees. "
-            "Result: The contract was executed within 8 days with zero unmitigated regulatory exposure, protecting $1.2M in annual recurring revenue."
-        )
-    elif any(k in role_lower for k in ["finance", "banking", "valuation", "equity"]):
-        default_missing = ["WACC", "discount rate", "sensitivity analysis", "EBITDA multiple", "scenario modeling"]
-        default_exemplary = (
-            "Situation: Our investment committee was evaluating a $45M bolt-on acquisition with uncertain forward cash flows. "
-            "Task: Build a defensible DCF valuation model with dynamic sensitivity matrices to establish negotiation floor and ceiling. "
-            "Action: Formulated a 3-statement model incorporating Monte Carlo simulation across WACC and terminal growth rates, identifying an 18% overvaluation in seller's EBITDA projections. "
-            "Result: The firm renegotiated the acquisition price down by $4.2M, generating an immediate 14% IRR improvement."
-        )
-    elif any(k in role_lower for k in ["design", "ui", "ux", "figma"]):
-        default_missing = ["WCAG 2.1", "usability metrics", "design tokens", "user journey", "task completion rate"]
-        default_exemplary = (
-            "Situation: User drop-off during onboarding for our mobile banking product was at an alarming 42%. "
-            "Task: Redesign the multi-step KYC verification flow to elevate onboarding conversion while maintaining compliance. "
-            "Action: Conducted 12 moderated usability sessions, identified cognitive load bottlenecks, and prototyped a progressive-disclosure flow in Figma with standardized design tokens. "
-            "Result: Usability testing showed a 65% drop in error rates, and live A/B rollout lifted completed onboarding from 58% to 84%."
-        )
-    else:
-        default_missing = ["monitoring", "latency metrics", "fault tolerance", "scalability"]
-        default_exemplary = (
-            "Situation: During a high-traffic flash sale, our payment gateway encountered intermittent timeout cascades. "
-            "Task: As Lead Engineer, my objective was to restore sub-500ms checkout confirmation without dropped transactions. "
-            "Action: I instituted an asynchronous queue worker pattern using Redis Streams with exponential backoff and a circuit breaker. "
-            "Result: System throughput increased from 1,200 to 5,800 orders/sec with zero dropped transactions, reducing latency by 45%."
-        )
+    default_missing, default_exemplary = _get_domain_interview_defaults(role)
 
     if llm_res and "overall_score" in llm_res:
         return {
@@ -1281,40 +1341,6 @@ def evaluate_interview_response(question: str, user_answer: str, role: str) -> d
             "missing_keywords": llm_res.get("missing_keywords", default_missing),
             "exemplary_answer": llm_res.get("exemplary_answer", default_exemplary),
         }
-
-    role_lower = (role or "").lower()
-    if any(k in role_lower for k in ["legal", "law", "compliance", "regulatory", "gdpr", "counsel"]):
-        missing_kw = ["statutory compliance", "due diligence", "indemnity liability", "precedent", "regulatory risk"]
-        exemplary = (
-            "Situation: During a cross-border SaaS transaction, the counterparty refused our standard limitation of liability and data transfer clauses. "
-            "Task: As Legal Counsel, my objective was to close the high-value deal within 14 days without exposing our company to uncapped indemnity under GDPR & DPDP Act. "
-            "Action: I drafted tailored Standard Contractual Clauses (SCCs), conducted a risk-weighted redlining session, and negotiated a mutual super-cap for data breaches tied to 12 months' SaaS fees. "
-            "Result: The contract was executed within 8 days with zero unmitigated regulatory exposure, protecting $1.2M in annual recurring revenue."
-        )
-    elif any(k in role_lower for k in ["finance", "banking", "valuation", "equity"]):
-        missing_kw = ["WACC", "discount rate", "sensitivity analysis", "EBITDA multiple", "scenario modeling"]
-        exemplary = (
-            "Situation: Our investment committee was evaluating a $45M bolt-on acquisition with uncertain forward cash flows. "
-            "Task: Build a defensible DCF valuation model with dynamic sensitivity matrices to establish negotiation floor and ceiling. "
-            "Action: Formulated a 3-statement model incorporating Monte Carlo simulation across WACC and terminal growth rates, identifying an 18% overvaluation in seller's EBITDA projections. "
-            "Result: The firm renegotiated the acquisition price down by $4.2M, generating an immediate 14% IRR improvement."
-        )
-    elif any(k in role_lower for k in ["design", "ui", "ux", "figma"]):
-        missing_kw = ["WCAG 2.1", "usability metrics", "design tokens", "user journey", "task completion rate"]
-        exemplary = (
-            "Situation: User drop-off during onboarding for our mobile banking product was at an alarming 42%. "
-            "Task: Redesign the multi-step KYC verification flow to elevate onboarding conversion while maintaining compliance. "
-            "Action: Conducted 12 moderated usability sessions, identified cognitive load bottlenecks, and prototyped a progressive-disclosure flow in Figma with standardized design tokens. "
-            "Result: Usability testing showed a 65% drop in error rates, and live A/B rollout lifted completed onboarding from 58% to 84%."
-        )
-    else:
-        missing_kw = ["latency", "scalability", "automated tests", "metrics"]
-        exemplary = (
-            "Situation: During a high-traffic flash sale, our payment gateway encountered intermittent timeout cascades. "
-            "Task: As Lead Engineer, my objective was to restore sub-500ms checkout confirmation without dropped transactions. "
-            "Action: I instituted an asynchronous queue worker pattern using Redis Streams with exponential backoff and a circuit breaker. "
-            "Result: System throughput increased from 1,200 to 5,800 orders/sec with zero dropped transactions, reducing latency by 45%."
-        )
 
     return {
         "success": True,
@@ -1333,8 +1359,8 @@ def evaluate_interview_response(question: str, user_answer: str, role: str) -> d
             "Include explicit numerical outcomes or quantified business impact.",
             "Highlight alternative solutions you considered and the rationale for your chosen path.",
         ],
-        "missing_keywords": missing_kw,
-        "exemplary_answer": exemplary,
+        "missing_keywords": default_missing,
+        "exemplary_answer": default_exemplary,
     }
 
 
@@ -1782,871 +1808,10 @@ def generate_90_day_sprint_roadmap(target_role: str, skill_gaps: list[str] | Non
 # 5. Market Compensation & Skill ROI Estimator
 # ===========================================================================
 
-COUNTRY_CONFIGS = {
-    "in": {
-        "code": "in",
-        "name": "India",
-        "flag": "🇮🇳",
-        "currency_symbol": "₹",
-        "currency_code": "INR",
-        "unit": "LPA",
-        "label": "₹ INR (LPA)",
-        "is_lpa": True,
-    },
-    "us": {
-        "code": "us",
-        "name": "United States",
-        "flag": "🇺🇸",
-        "currency_symbol": "$",
-        "currency_code": "USD",
-        "unit": "k/Yr",
-        "label": "$ USD (/Yr)",
-        "is_lpa": False,
-    },
-    "uk": {
-        "code": "uk",
-        "name": "United Kingdom",
-        "flag": "🇬🇧",
-        "currency_symbol": "£",
-        "currency_code": "GBP",
-        "unit": "k/Yr",
-        "label": "£ GBP (/Yr)",
-        "is_lpa": False,
-    },
-    "eu": {
-        "code": "eu",
-        "name": "Germany (EU)",
-        "flag": "🇪🇺",
-        "currency_symbol": "€",
-        "currency_code": "EUR",
-        "unit": "k/Yr",
-        "label": "€ EUR (/Yr)",
-        "is_lpa": False,
-    },
-    "ca": {
-        "code": "ca",
-        "name": "Canada",
-        "flag": "🇨🇦",
-        "currency_symbol": "C$",
-        "currency_code": "CAD",
-        "unit": "k/Yr",
-        "label": "C$ CAD (/Yr)",
-        "is_lpa": False,
-    },
-    "sg": {
-        "code": "sg",
-        "name": "Singapore",
-        "flag": "🇸🇬",
-        "currency_symbol": "S$",
-        "currency_code": "SGD",
-        "unit": "k/Yr",
-        "label": "S$ SGD (/Yr)",
-        "is_lpa": False,
-    },
-    "ae": {
-        "code": "ae",
-        "name": "UAE (Dubai)",
-        "flag": "🇦🇪",
-        "currency_symbol": "AED ",
-        "currency_code": "AED",
-        "unit": "k/Yr",
-        "label": "AED (/Yr)",
-        "is_lpa": False,
-    },
-}
+# Compensation data and domain taxonomies are loaded from datasets/career_compensation_data.json at module init.
 
-_SALARY_DATABASE = {
-    "software_engineer": {
-        "title": "Software Development Engineer (SDE)",
-        "brackets": {
-            "in": {
-                "entry": {"min": 4.2, "median": 6.8, "max": 12.0},
-                "mid": {"min": 9.0, "median": 14.5, "max": 22.0},
-                "senior": {"min": 18.0, "median": 26.0, "max": 38.0},
-                "staff": {"min": 35.0, "median": 48.0, "max": 70.0},
-            },
-            "us": {
-                "entry": {"min": 85, "median": 115, "max": 145},
-                "mid": {"min": 125, "median": 155, "max": 190},
-                "senior": {"min": 165, "median": 205, "max": 260},
-                "staff": {"min": 230, "median": 295, "max": 390},
-            },
-            "uk": {
-                "entry": {"min": 38, "median": 50, "max": 65},
-                "mid": {"min": 58, "median": 75, "max": 98},
-                "senior": {"min": 85, "median": 110, "max": 145},
-                "staff": {"min": 125, "median": 160, "max": 215},
-            },
-            "eu": {
-                "entry": {"min": 46, "median": 58, "max": 72},
-                "mid": {"min": 65, "median": 80, "max": 100},
-                "senior": {"min": 88, "median": 112, "max": 140},
-                "staff": {"min": 120, "median": 150, "max": 195},
-            },
-            "ca": {
-                "entry": {"min": 72, "median": 95, "max": 120},
-                "mid": {"min": 105, "median": 135, "max": 165},
-                "senior": {"min": 140, "median": 175, "max": 220},
-                "staff": {"min": 190, "median": 245, "max": 315},
-            },
-            "sg": {
-                "entry": {"min": 58, "median": 75, "max": 98},
-                "mid": {"min": 85, "median": 112, "max": 145},
-                "senior": {"min": 125, "median": 165, "max": 215},
-                "staff": {"min": 180, "median": 235, "max": 300},
-            },
-            "ae": {
-                "entry": {"min": 150, "median": 210, "max": 280},
-                "mid": {"min": 250, "median": 340, "max": 450},
-                "senior": {"min": 380, "median": 500, "max": 640},
-                "staff": {"min": 550, "median": 720, "max": 920},
-            },
-        },
-    },
-    "ai_engineer": {
-        "title": "AI / Machine Learning Engineer",
-        "brackets": {
-            "in": {
-                "entry": {"min": 4.8, "median": 8.0, "max": 14.5},
-                "mid": {"min": 11.0, "median": 17.0, "max": 26.0},
-                "senior": {"min": 22.0, "median": 32.0, "max": 46.0},
-                "staff": {"min": 40.0, "median": 58.0, "max": 82.0},
-            },
-            "us": {
-                "entry": {"min": 95, "median": 125, "max": 155},
-                "mid": {"min": 135, "median": 165, "max": 205},
-                "senior": {"min": 180, "median": 225, "max": 285},
-                "staff": {"min": 250, "median": 320, "max": 420},
-            },
-            "uk": {
-                "entry": {"min": 42, "median": 55, "max": 70},
-                "mid": {"min": 65, "median": 85, "max": 110},
-                "senior": {"min": 95, "median": 125, "max": 160},
-                "staff": {"min": 140, "median": 180, "max": 240},
-            },
-            "eu": {
-                "entry": {"min": 50, "median": 64, "max": 78},
-                "mid": {"min": 72, "median": 88, "max": 112},
-                "senior": {"min": 98, "median": 125, "max": 155},
-                "staff": {"min": 135, "median": 170, "max": 220},
-            },
-            "ca": {
-                "entry": {"min": 80, "median": 105, "max": 130},
-                "mid": {"min": 115, "median": 145, "max": 180},
-                "senior": {"min": 155, "median": 195, "max": 245},
-                "staff": {"min": 210, "median": 270, "max": 350},
-            },
-            "sg": {
-                "entry": {"min": 65, "median": 84, "max": 110},
-                "mid": {"min": 95, "median": 125, "max": 165},
-                "senior": {"min": 140, "median": 185, "max": 240},
-                "staff": {"min": 200, "median": 260, "max": 340},
-            },
-            "ae": {
-                "entry": {"min": 180, "median": 240, "max": 320},
-                "mid": {"min": 280, "median": 380, "max": 500},
-                "senior": {"min": 420, "median": 560, "max": 720},
-                "staff": {"min": 620, "median": 820, "max": 1050},
-            },
-        },
-    },
-    "data_science": {
-        "title": "Data Scientist",
-        "brackets": {
-            "in": {
-                "entry": {"min": 4.5, "median": 7.5, "max": 13.5},
-                "mid": {"min": 10.0, "median": 15.5, "max": 24.0},
-                "senior": {"min": 20.0, "median": 29.0, "max": 42.0},
-                "staff": {"min": 36.0, "median": 52.0, "max": 75.0},
-            },
-            "us": {
-                "entry": {"min": 90, "median": 120, "max": 150},
-                "mid": {"min": 130, "median": 160, "max": 195},
-                "senior": {"min": 170, "median": 215, "max": 270},
-                "staff": {"min": 240, "median": 305, "max": 400},
-            },
-            "uk": {
-                "entry": {"min": 40, "median": 52, "max": 68},
-                "mid": {"min": 62, "median": 80, "max": 105},
-                "senior": {"min": 90, "median": 118, "max": 150},
-                "staff": {"min": 130, "median": 170, "max": 225},
-            },
-            "eu": {
-                "entry": {"min": 48, "median": 60, "max": 75},
-                "mid": {"min": 68, "median": 84, "max": 108},
-                "senior": {"min": 92, "median": 118, "max": 148},
-                "staff": {"min": 128, "median": 162, "max": 210},
-            },
-            "ca": {
-                "entry": {"min": 75, "median": 100, "max": 125},
-                "mid": {"min": 110, "median": 138, "max": 172},
-                "senior": {"min": 148, "median": 185, "max": 235},
-                "staff": {"min": 200, "median": 255, "max": 330},
-            },
-            "sg": {
-                "entry": {"min": 60, "median": 78, "max": 102},
-                "mid": {"min": 90, "median": 118, "max": 155},
-                "senior": {"min": 130, "median": 172, "max": 225},
-                "staff": {"min": 190, "median": 245, "max": 320},
-            },
-            "ae": {
-                "entry": {"min": 165, "median": 225, "max": 300},
-                "mid": {"min": 265, "median": 360, "max": 475},
-                "senior": {"min": 400, "median": 530, "max": 680},
-                "staff": {"min": 580, "median": 770, "max": 980},
-            },
-        },
-    },
-    "data_engineering": {
-        "title": "Data Engineer",
-        "brackets": {
-            "in": {
-                "entry": {"min": 4.5, "median": 7.5, "max": 13.5},
-                "mid": {"min": 10.0, "median": 16.0, "max": 24.5},
-                "senior": {"min": 20.5, "median": 30.0, "max": 44.0},
-                "staff": {"min": 38.0, "median": 54.0, "max": 78.0},
-            },
-            "us": {
-                "entry": {"min": 92, "median": 122, "max": 152},
-                "mid": {"min": 132, "median": 162, "max": 200},
-                "senior": {"min": 175, "median": 220, "max": 275},
-                "staff": {"min": 245, "median": 310, "max": 405},
-            },
-            "uk": {
-                "entry": {"min": 40, "median": 53, "max": 68},
-                "mid": {"min": 63, "median": 82, "max": 106},
-                "senior": {"min": 92, "median": 120, "max": 155},
-                "staff": {"min": 132, "median": 172, "max": 230},
-            },
-            "eu": {
-                "entry": {"min": 48, "median": 62, "max": 76},
-                "mid": {"min": 70, "median": 85, "max": 110},
-                "senior": {"min": 95, "median": 120, "max": 150},
-                "staff": {"min": 130, "median": 165, "max": 215},
-            },
-            "ca": {
-                "entry": {"min": 76, "median": 102, "max": 126},
-                "mid": {"min": 112, "median": 140, "max": 175},
-                "senior": {"min": 150, "median": 188, "max": 238},
-                "staff": {"min": 205, "median": 260, "max": 335},
-            },
-            "sg": {
-                "entry": {"min": 62, "median": 80, "max": 105},
-                "mid": {"min": 92, "median": 120, "max": 158},
-                "senior": {"min": 135, "median": 175, "max": 230},
-                "staff": {"min": 195, "median": 250, "max": 325},
-            },
-            "ae": {
-                "entry": {"min": 170, "median": 230, "max": 310},
-                "mid": {"min": 270, "median": 370, "max": 485},
-                "senior": {"min": 410, "median": 540, "max": 700},
-                "staff": {"min": 600, "median": 790, "max": 1000},
-            },
-        },
-    },
-    "cloud_devops": {
-        "title": "Cloud / DevOps Engineer",
-        "brackets": {
-            "in": {
-                "entry": {"min": 4.0, "median": 7.0, "max": 12.5},
-                "mid": {"min": 9.0, "median": 14.5, "max": 22.5},
-                "senior": {"min": 18.5, "median": 27.0, "max": 40.0},
-                "staff": {"min": 35.0, "median": 48.0, "max": 70.0},
-            },
-            "us": {
-                "entry": {"min": 88, "median": 118, "max": 148},
-                "mid": {"min": 128, "median": 158, "max": 195},
-                "senior": {"min": 170, "median": 212, "max": 268},
-                "staff": {"min": 238, "median": 300, "max": 395},
-            },
-            "uk": {
-                "entry": {"min": 39, "median": 51, "max": 66},
-                "mid": {"min": 60, "median": 78, "max": 102},
-                "senior": {"min": 88, "median": 115, "max": 148},
-                "staff": {"min": 128, "median": 165, "max": 220},
-            },
-            "eu": {
-                "entry": {"min": 47, "median": 60, "max": 74},
-                "mid": {"min": 66, "median": 82, "max": 105},
-                "senior": {"min": 90, "median": 115, "max": 145},
-                "staff": {"min": 125, "median": 158, "max": 205},
-            },
-            "ca": {
-                "entry": {"min": 74, "median": 98, "max": 122},
-                "mid": {"min": 108, "median": 136, "max": 170},
-                "senior": {"min": 145, "median": 180, "max": 230},
-                "staff": {"min": 198, "median": 250, "max": 325},
-            },
-            "sg": {
-                "entry": {"min": 60, "median": 76, "max": 100},
-                "mid": {"min": 88, "median": 115, "max": 150},
-                "senior": {"min": 128, "median": 168, "max": 220},
-                "staff": {"min": 188, "median": 240, "max": 310},
-            },
-            "ae": {
-                "entry": {"min": 160, "median": 220, "max": 295},
-                "mid": {"min": 260, "median": 350, "max": 465},
-                "senior": {"min": 390, "median": 520, "max": 665},
-                "staff": {"min": 570, "median": 750, "max": 950},
-            },
-        },
-    },
-    "cybersecurity": {
-        "title": "Cybersecurity Specialist",
-        "brackets": {
-            "in": {
-                "entry": {"min": 4.0, "median": 6.5, "max": 12.0},
-                "mid": {"min": 8.5, "median": 14.0, "max": 21.0},
-                "senior": {"min": 18.0, "median": 26.0, "max": 38.0},
-                "staff": {"min": 33.0, "median": 46.0, "max": 68.0},
-            },
-            "us": {
-                "entry": {"min": 85, "median": 115, "max": 145},
-                "mid": {"min": 125, "median": 155, "max": 190},
-                "senior": {"min": 165, "median": 208, "max": 262},
-                "staff": {"min": 232, "median": 292, "max": 385},
-            },
-            "uk": {
-                "entry": {"min": 37, "median": 49, "max": 64},
-                "mid": {"min": 57, "median": 74, "max": 96},
-                "senior": {"min": 84, "median": 108, "max": 142},
-                "staff": {"min": 122, "median": 158, "max": 210},
-            },
-            "eu": {
-                "entry": {"min": 45, "median": 57, "max": 71},
-                "mid": {"min": 64, "median": 79, "max": 100},
-                "senior": {"min": 87, "median": 110, "max": 138},
-                "staff": {"min": 118, "median": 148, "max": 195},
-            },
-            "ca": {
-                "entry": {"min": 72, "median": 95, "max": 118},
-                "mid": {"min": 105, "median": 132, "max": 165},
-                "senior": {"min": 140, "median": 175, "max": 222},
-                "staff": {"min": 192, "median": 242, "max": 315},
-            },
-            "sg": {
-                "entry": {"min": 57, "median": 74, "max": 96},
-                "mid": {"min": 84, "median": 110, "max": 142},
-                "senior": {"min": 124, "median": 162, "max": 210},
-                "staff": {"min": 182, "median": 232, "max": 298},
-            },
-            "ae": {
-                "entry": {"min": 155, "median": 215, "max": 288},
-                "mid": {"min": 252, "median": 342, "max": 452},
-                "senior": {"min": 382, "median": 505, "max": 648},
-                "staff": {"min": 555, "median": 730, "max": 925},
-            },
-        },
-    },
-    "product_management": {
-        "title": "Product Manager",
-        "brackets": {
-            "in": {
-                "entry": {"min": 6.0, "median": 9.5, "max": 15.5},
-                "mid": {"min": 13.5, "median": 20.0, "max": 30.0},
-                "senior": {"min": 24.0, "median": 36.0, "max": 52.0},
-                "staff": {"min": 44.0, "median": 62.0, "max": 90.0},
-            },
-            "us": {
-                "entry": {"min": 98, "median": 130, "max": 165},
-                "mid": {"min": 142, "median": 178, "max": 220},
-                "senior": {"min": 190, "median": 240, "max": 305},
-                "staff": {"min": 265, "median": 340, "max": 440},
-            },
-            "uk": {
-                "entry": {"min": 44, "median": 58, "max": 75},
-                "mid": {"min": 68, "median": 90, "max": 118},
-                "senior": {"min": 100, "median": 132, "max": 172},
-                "staff": {"min": 148, "median": 192, "max": 255},
-            },
-            "eu": {
-                "entry": {"min": 52, "median": 66, "max": 82},
-                "mid": {"min": 75, "median": 94, "max": 120},
-                "senior": {"min": 102, "median": 132, "max": 165},
-                "staff": {"min": 142, "median": 182, "max": 235},
-            },
-            "ca": {
-                "entry": {"min": 82, "median": 108, "max": 135},
-                "mid": {"min": 120, "median": 152, "max": 190},
-                "senior": {"min": 162, "median": 205, "max": 258},
-                "staff": {"min": 220, "median": 282, "max": 365},
-            },
-            "sg": {
-                "entry": {"min": 68, "median": 88, "max": 115},
-                "mid": {"min": 100, "median": 132, "max": 172},
-                "senior": {"min": 148, "median": 195, "max": 252},
-                "staff": {"min": 210, "median": 275, "max": 355},
-            },
-            "ae": {
-                "entry": {"min": 190, "median": 255, "max": 340},
-                "mid": {"min": 300, "median": 410, "max": 540},
-                "senior": {"min": 450, "median": 600, "max": 780},
-                "staff": {"min": 660, "median": 880, "max": 1120},
-            },
-        },
-    },
-    "legal": {
-        "title": "In-House Legal Counsel / Compliance Manager",
-        "brackets": {
-            "in": {
-                "entry": {"min": 5.0, "median": 8.5, "max": 14.0},
-                "mid": {"min": 11.0, "median": 18.0, "max": 28.0},
-                "senior": {"min": 22.0, "median": 35.0, "max": 50.0},
-                "staff": {"min": 40.0, "median": 65.0, "max": 95.0},
-            },
-            "us": {
-                "entry": {"min": 85, "median": 120, "max": 150},
-                "mid": {"min": 130, "median": 170, "max": 215},
-                "senior": {"min": 185, "median": 240, "max": 310},
-                "staff": {"min": 260, "median": 350, "max": 480},
-            },
-            "uk": {
-                "entry": {"min": 40, "median": 55, "max": 72},
-                "mid": {"min": 65, "median": 85, "max": 115},
-                "senior": {"min": 95, "median": 125, "max": 165},
-                "staff": {"min": 140, "median": 185, "max": 250},
-            },
-            "eu": {
-                "entry": {"min": 45, "median": 60, "max": 78},
-                "mid": {"min": 70, "median": 90, "max": 118},
-                "senior": {"min": 98, "median": 128, "max": 160},
-                "staff": {"min": 135, "median": 175, "max": 230},
-            },
-            "ca": {
-                "entry": {"min": 75, "median": 100, "max": 125},
-                "mid": {"min": 110, "median": 140, "max": 180},
-                "senior": {"min": 150, "median": 190, "max": 245},
-                "staff": {"min": 210, "median": 270, "max": 350},
-            },
-            "sg": {
-                "entry": {"min": 62, "median": 82, "max": 108},
-                "mid": {"min": 92, "median": 122, "max": 160},
-                "senior": {"min": 135, "median": 178, "max": 230},
-                "staff": {"min": 195, "median": 255, "max": 330},
-            },
-            "ae": {
-                "entry": {"min": 170, "median": 235, "max": 310},
-                "mid": {"min": 275, "median": 375, "max": 490},
-                "senior": {"min": 410, "median": 550, "max": 710},
-                "staff": {"min": 600, "median": 800, "max": 1020},
-            },
-        },
-    },
-    "finance": {
-        "title": "Financial Risk / Investment Analyst",
-        "brackets": {
-            "in": {
-                "entry": {"min": 5.5, "median": 9.0, "max": 15.0},
-                "mid": {"min": 12.0, "median": 19.5, "max": 30.0},
-                "senior": {"min": 24.0, "median": 38.0, "max": 55.0},
-                "staff": {"min": 42.0, "median": 68.0, "max": 100.0},
-            },
-            "us": {
-                "entry": {"min": 90, "median": 125, "max": 160},
-                "mid": {"min": 135, "median": 175, "max": 225},
-                "senior": {"min": 190, "median": 250, "max": 325},
-                "staff": {"min": 270, "median": 365, "max": 500},
-            },
-            "uk": {
-                "entry": {"min": 42, "median": 58, "max": 76},
-                "mid": {"min": 68, "median": 92, "max": 122},
-                "senior": {"min": 100, "median": 135, "max": 178},
-                "staff": {"min": 150, "median": 200, "max": 270},
-            },
-            "eu": {
-                "entry": {"min": 48, "median": 64, "max": 82},
-                "mid": {"min": 72, "median": 94, "max": 124},
-                "senior": {"min": 102, "median": 135, "max": 170},
-                "staff": {"min": 145, "median": 190, "max": 250},
-            },
-            "ca": {
-                "entry": {"min": 80, "median": 106, "max": 132},
-                "mid": {"min": 118, "median": 148, "max": 188},
-                "senior": {"min": 158, "median": 200, "max": 258},
-                "staff": {"min": 225, "median": 288, "max": 370},
-            },
-            "sg": {
-                "entry": {"min": 65, "median": 86, "max": 112},
-                "mid": {"min": 98, "median": 128, "max": 168},
-                "senior": {"min": 142, "median": 188, "max": 242},
-                "staff": {"min": 205, "median": 268, "max": 348},
-            },
-            "ae": {
-                "entry": {"min": 180, "median": 248, "max": 328},
-                "mid": {"min": 290, "median": 395, "max": 515},
-                "senior": {"min": 435, "median": 580, "max": 750},
-                "staff": {"min": 640, "median": 850, "max": 1080},
-            },
-        },
-    },
-    "design": {
-        "title": "Product UI/UX & Interaction Designer",
-        "brackets": {
-            "in": {
-                "entry": {"min": 4.5, "median": 7.5, "max": 13.0},
-                "mid": {"min": 10.0, "median": 16.0, "max": 25.0},
-                "senior": {"min": 20.0, "median": 30.0, "max": 44.0},
-                "staff": {"min": 35.0, "median": 50.0, "max": 75.0},
-            },
-            "us": {
-                "entry": {"min": 80, "median": 110, "max": 140},
-                "mid": {"min": 120, "median": 150, "max": 185},
-                "senior": {"min": 160, "median": 205, "max": 260},
-                "staff": {"min": 225, "median": 290, "max": 380},
-            },
-            "uk": {
-                "entry": {"min": 36, "median": 48, "max": 62},
-                "mid": {"min": 56, "median": 74, "max": 96},
-                "senior": {"min": 82, "median": 108, "max": 140},
-                "staff": {"min": 120, "median": 155, "max": 210},
-            },
-            "eu": {
-                "entry": {"min": 44, "median": 56, "max": 70},
-                "mid": {"min": 62, "median": 78, "max": 98},
-                "senior": {"min": 85, "median": 108, "max": 135},
-                "staff": {"min": 115, "median": 145, "max": 190},
-            },
-            "ca": {
-                "entry": {"min": 70, "median": 92, "max": 115},
-                "mid": {"min": 102, "median": 130, "max": 162},
-                "senior": {"min": 138, "median": 172, "max": 218},
-                "staff": {"min": 188, "median": 238, "max": 308},
-            },
-            "sg": {
-                "entry": {"min": 56, "median": 72, "max": 94},
-                "mid": {"min": 82, "median": 108, "max": 140},
-                "senior": {"min": 122, "median": 160, "max": 208},
-                "staff": {"min": 178, "median": 228, "max": 292},
-            },
-            "ae": {
-                "entry": {"min": 150, "median": 210, "max": 280},
-                "mid": {"min": 245, "median": 335, "max": 440},
-                "senior": {"min": 370, "median": 490, "max": 630},
-                "staff": {"min": 540, "median": 710, "max": 900},
-            },
-        },
-    },
-}
 
-_DOMAIN_LADDER_LEVELS = {
-    "legal": [
-        ("Junior Associate / Legal Trainee (0-2 Yrs)", "entry"),
-        ("Senior Associate / Legal Counsel (2-5 Yrs)", "mid"),
-        ("Principal Associate / Counsel (5-8 Yrs)", "senior"),
-        ("Partner / Legal Director / General Counsel (8+ Yrs)", "staff"),
-    ],
-    "finance": [
-        ("Analyst / Junior Associate (0-2 Yrs)", "entry"),
-        ("Senior Analyst / Associate (2-5 Yrs)", "mid"),
-        ("VP / Investment Director (5-8 Yrs)", "senior"),
-        ("Managing Director / Partner (8+ Yrs)", "staff"),
-    ],
-    "design": [
-        ("Associate / Junior UI/UX Designer (0-2 Yrs)", "entry"),
-        ("Product Designer (2-5 Yrs)", "mid"),
-        ("Senior / Lead Product Designer (5-8 Yrs)", "senior"),
-        ("Design Principal / Head of Design (8+ Yrs)", "staff"),
-    ],
-    "product_management": [
-        ("Associate Product Manager (APM) (0-2 Yrs)", "entry"),
-        ("Product Manager (2-5 Yrs)", "mid"),
-        ("Senior / Group PM (5-8 Yrs)", "senior"),
-        ("Director / VP of Product (8+ Yrs)", "staff"),
-    ],
-    "software_engineer": [
-        ("Entry / Associate Engineer (0-2 Yrs)", "entry"),
-        ("Mid-Level Software Engineer (2-5 Yrs)", "mid"),
-        ("Senior Software Engineer (5-8 Yrs)", "senior"),
-        ("Staff / Principal Engineer (8+ Yrs)", "staff"),
-    ],
-}
-
-_DOMAIN_SKILL_ROI_PREMIUMS = {
-    "legal": [
-        {
-            "skill": "CIPP/E & GDPR / DPDP Privacy Governance (Legal)",
-            "uplift_pct": "+18%",
-            "uplifts": {
-                "in": "+₹1.5 - 3.2 LPA",
-                "us": "+$18k - 30k",
-                "uk": "+£10k - 18k",
-                "eu": "+€12k - 20k",
-                "ca": "+C$15k - 26k",
-                "sg": "+S$16k - 28k",
-                "ae": "+AED 40k - 70k",
-            },
-            "demand_score": 96,
-            "reasoning": "High enterprise corporate demand for data privacy certification across EU/India/US technology regulation.",
-        },
-        {
-            "skill": "Tech M&A Legal Due Diligence & Antitrust / Merger Control (CCI / FTC)",
-            "uplift_pct": "+22%",
-            "uplifts": {
-                "in": "+₹2.0 - 4.5 LPA",
-                "us": "+$24k - 42k",
-                "uk": "+£14k - 26k",
-                "eu": "+€16k - 28k",
-                "ca": "+C$20k - 35k",
-                "sg": "+S$22k - 38k",
-                "ae": "+AED 50k - 90k",
-            },
-            "demand_score": 98,
-            "reasoning": "Critical technical requirement for high-tier cross-border tech acquisitions, private equity, and CCI combination filings.",
-        },
-        {
-            "skill": "Patent Prosecution & WIPO / USPTO Filings",
-            "uplift_pct": "+20%",
-            "uplifts": {
-                "in": "+₹1.8 - 3.8 LPA",
-                "us": "+$22k - 36k",
-                "uk": "+£12k - 22k",
-                "eu": "+€14k - 24k",
-                "ca": "+C$18k - 30k",
-                "sg": "+S$20k - 34k",
-                "ae": "+AED 45k - 80k",
-            },
-            "demand_score": 95,
-            "reasoning": "Premium corporate demand for IP attorneys capable of drafting patent claims, FTO opinions, and WIPO filings.",
-        },
-        {
-            "skill": "Cross-Border Commercial Contract Negotiation & Redlining Playbooks",
-            "uplift_pct": "+16%",
-            "uplifts": {
-                "in": "+₹1.4 - 2.8 LPA",
-                "us": "+$16k - 28k",
-                "uk": "+£9k - 16k",
-                "eu": "+€10k - 18k",
-                "ca": "+C$14k - 24k",
-                "sg": "+S$15k - 26k",
-                "ae": "+AED 35k - 60k",
-            },
-            "demand_score": 92,
-            "reasoning": "Essential capability distinguishing in-house counsel and senior associates handling multi-jurisdictional SaaS MSAs.",
-        },
-        {
-            "skill": "Regulatory Risk Assessment & SEBI / Compliance Frameworks",
-            "uplift_pct": "+15%",
-            "uplifts": {
-                "in": "+₹1.2 - 2.5 LPA",
-                "us": "+$15k - 25k",
-                "uk": "+£8k - 15k",
-                "eu": "+€9k - 16k",
-                "ca": "+C$12k - 22k",
-                "sg": "+S$14k - 24k",
-                "ae": "+AED 30k - 55k",
-            },
-            "demand_score": 90,
-            "reasoning": "Growing statutory enforcement requires in-house governance leaders who can design board compliance dashboards.",
-        },
-        {
-            "skill": "Intellectual Property Valuation & Technology Licensing",
-            "uplift_pct": "+17%",
-            "uplifts": {
-                "in": "+₹1.5 - 3.0 LPA",
-                "us": "+$18k - 32k",
-                "uk": "+£10k - 18k",
-                "eu": "+€11k - 20k",
-                "ca": "+C$15k - 26k",
-                "sg": "+S$16k - 28k",
-                "ae": "+AED 38k - 65k",
-            },
-            "demand_score": 93,
-            "reasoning": "Critical for technology commercialization, patent monetization, and IP holding entity structuring.",
-        },
-    ],
-    "finance": [
-        {
-            "skill": "Financial Modeling & Valuation (DCF / LBO)",
-            "uplift_pct": "+22%",
-            "uplifts": {
-                "in": "+₹2.0 - 4.0 LPA",
-                "us": "+$25k - 40k",
-                "uk": "+£14k - 24k",
-                "eu": "+€15k - 25k",
-                "ca": "+C$20k - 32k",
-                "sg": "+S$22k - 36k",
-                "ae": "+AED 50k - 85k",
-            },
-            "demand_score": 97,
-            "reasoning": "Core technical requirement for high-tier Investment Banking, M&A, and Private Equity recruitment.",
-        },
-        {
-            "skill": "CFA & Equity Research Analytics",
-            "uplift_pct": "+20%",
-            "uplifts": {
-                "in": "+₹1.8 - 3.5 LPA",
-                "us": "+$22k - 35k",
-                "uk": "+£12k - 22k",
-                "eu": "+€14k - 24k",
-                "ca": "+C$18k - 30k",
-                "sg": "+S$20k - 34k",
-                "ae": "+AED 45k - 80k",
-            },
-            "demand_score": 96,
-            "reasoning": "Gold-standard asset management credential for equity analysts and portfolio research.",
-        },
-        {
-            "skill": "Credit Risk & Basel III / IFRS 9 Modeling",
-            "uplift_pct": "+18%",
-            "uplifts": {
-                "in": "+₹1.5 - 3.2 LPA",
-                "us": "+$20k - 32k",
-                "uk": "+£11k - 20k",
-                "eu": "+€12k - 22k",
-                "ca": "+C$16k - 28k",
-                "sg": "+S$18k - 30k",
-                "ae": "+AED 40k - 75k",
-            },
-            "demand_score": 94,
-            "reasoning": "High institutional demand in banking and fintech credit underwriting.",
-        },
-    ],
-    "design": [
-        {
-            "skill": "Enterprise Design Systems & Token Architecture (Figma)",
-            "uplift_pct": "+20%",
-            "uplifts": {
-                "in": "+₹1.8 - 3.2 LPA",
-                "us": "+$20k - 35k",
-                "uk": "+£12k - 20k",
-                "eu": "+€13k - 22k",
-                "ca": "+C$18k - 30k",
-                "sg": "+S$18k - 32k",
-                "ae": "+AED 42k - 75k",
-            },
-            "demand_score": 97,
-            "reasoning": "Crucial requirement distinguishing Senior/Lead designers who establish scalable component libraries.",
-        },
-        {
-            "skill": "UX Research & Usability Benchmarking (WCAG 2.1)",
-            "uplift_pct": "+18%",
-            "uplifts": {
-                "in": "+₹1.5 - 3.0 LPA",
-                "us": "+$18k - 30k",
-                "uk": "+£10k - 18k",
-                "eu": "+€11k - 20k",
-                "ca": "+C$15k - 26k",
-                "sg": "+S$16k - 28k",
-                "ae": "+AED 38k - 68k",
-            },
-            "demand_score": 94,
-            "reasoning": "Accessibility compliance and qualitative user testing drive enterprise adoption.",
-        },
-    ],
-    "product_management": [
-        {
-            "skill": "Product Analytics & Funnel Instrumentation (Mixpanel / GA4)",
-            "uplift_pct": "+18%",
-            "uplifts": {
-                "in": "+₹1.5 - 3.2 LPA",
-                "us": "+$20k - 34k",
-                "uk": "+£11k - 20k",
-                "eu": "+€12k - 22k",
-                "ca": "+C$16k - 28k",
-                "sg": "+S$18k - 30k",
-                "ae": "+AED 40k - 75k",
-            },
-            "demand_score": 96,
-            "reasoning": "Essential capability for data-driven product managers tracking user activation and churn.",
-        },
-        {
-            "skill": "Product Strategy & Market Sizing (TAM / SAM / SOM)",
-            "uplift_pct": "+20%",
-            "uplifts": {
-                "in": "+₹1.8 - 3.5 LPA",
-                "us": "+$22k - 38k",
-                "uk": "+£13k - 22k",
-                "eu": "+€14k - 25k",
-                "ca": "+C$18k - 32k",
-                "sg": "+S$20k - 34k",
-                "ae": "+AED 45k - 80k",
-            },
-            "demand_score": 97,
-            "reasoning": "Differentiates Senior and Group PMs leading zero-to-one product initiatives.",
-        },
-    ],
-    "software_engineer": [
-        {
-            "skill": "Kubernetes & Cloud Orchestration",
-            "uplift_pct": "+16%",
-            "uplifts": {
-                "in": "+₹1.2 - 2.5 LPA",
-                "us": "+$16k - 26k",
-                "uk": "+£8k - 15k",
-                "eu": "+€9k - 16k",
-                "ca": "+C$14k - 24k",
-                "sg": "+S$15k - 26k",
-                "ae": "+AED 35k - 60k",
-            },
-            "demand_score": 96,
-            "reasoning": "High enterprise shortage for engineers who can containerize and manage autoscaling clusters.",
-        },
-        {
-            "skill": "System Design & Distributed Systems",
-            "uplift_pct": "+20%",
-            "uplifts": {
-                "in": "+₹1.8 - 3.2 LPA",
-                "us": "+$22k - 35k",
-                "uk": "+£12k - 20k",
-                "eu": "+€13k - 22k",
-                "ca": "+C$18k - 30k",
-                "sg": "+S$20k - 34k",
-                "ae": "+AED 45k - 80k",
-            },
-            "demand_score": 98,
-            "reasoning": "The single most decisive factor distinguishing Mid-level from Senior/Staff compensation brackets.",
-        },
-        {
-            "skill": "Generative AI & LLM Engineering (RAG / Agentic)",
-            "uplift_pct": "+18%",
-            "uplifts": {
-                "in": "+₹1.5 - 3.0 LPA",
-                "us": "+$20k - 32k",
-                "uk": "+£10k - 18k",
-                "eu": "+€11k - 20k",
-                "ca": "+C$16k - 28k",
-                "sg": "+S$18k - 30k",
-                "ae": "+AED 40k - 75k",
-            },
-            "demand_score": 95,
-            "reasoning": "Premium budget allocation across startups and tech enterprises building intelligent automation.",
-        },
-        {
-            "skill": "FastAPI & Asynchronous Python High-Throughput APIs",
-            "uplift_pct": "+12%",
-            "uplifts": {
-                "in": "+₹0.8 - 1.8 LPA",
-                "us": "+$10k - 18k",
-                "uk": "+£6k - 11k",
-                "eu": "+€7k - 12k",
-                "ca": "+C$9k - 16k",
-                "sg": "+S$10k - 18k",
-                "ae": "+AED 22k - 40k",
-            },
-            "demand_score": 91,
-            "reasoning": "Replacing legacy synchronous stacks in modern microservice architectures.",
-        },
-        {
-            "skill": "CI/CD Automation & Infrastructure as Code (Terraform)",
-            "uplift_pct": "+14%",
-            "uplifts": {
-                "in": "+₹1.0 - 2.2 LPA",
-                "us": "+$12k - 22k",
-                "uk": "+£7k - 13k",
-                "eu": "+€8k - 14k",
-                "ca": "+C$11k - 20k",
-                "sg": "+S$12k - 22k",
-                "ae": "+AED 26k - 48k",
-            },
-            "demand_score": 92,
-            "reasoning": "Eliminates deployment friction; engineering organizations pay a premium for self-sufficient builders.",
-        },
-    ],
-}
-
-# Backward compatibility alias
-_SKILL_ROI_PREMIUMS = _DOMAIN_SKILL_ROI_PREMIUMS["software_engineer"]
-
+# Compensation data and domain taxonomies are loaded from datasets/career_compensation_data.json at module init.
 
 def _calc_stage_percentiles(b: dict[str, dict[str, float]], exp: float, skill_mult: float, is_lpa: bool):
     """Interpolates salary percentiles cleanly across career stages without overfluff."""

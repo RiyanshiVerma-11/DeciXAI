@@ -1,7 +1,11 @@
+import logging
+
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from models.schemas import CareerInput, CareerPromptInput, DecisionResponse
 from services.career_service import get_career_analysis_from_text, get_career_comparison, get_career_decision
 from services.resume_parser_service import parse_and_analyze_resume
+
+logger = logging.getLogger("DeciXAI.CareerRouter")
 
 router = APIRouter()
 
@@ -40,7 +44,8 @@ async def upload_and_evaluate_resume(
     except ValueError as val_err:
         raise HTTPException(status_code=422, detail=str(val_err))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Resume analysis failed: {str(exc)}")
+        logger.exception("Resume analysis failed unexpectedly: %s", exc)
+        raise HTTPException(status_code=500, detail="Resume analysis failed due to an internal error.")
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from difflib import SequenceMatcher
 from typing import Any
@@ -1731,9 +1732,14 @@ def _career_narrative_summary(
     top_skills = top_option.get("path_profile", {}).get("top_skills", []) or []
     project_count = int(normalized.get("project_count", 0) or 0)
     skill_count = int(normalized.get("skill_count", 0) or 0)
-    cgpa = float(normalized.get("cgpa", 0.0) or 0.0)
-    summary = f"{top_path} is your strongest fit right now with a {round(score)} / 100 profile score."
-    summary += f" Your CGPA ({cgpa:.1f}), {skill_count} relevant skills, and {project_count} projects already create a credible foundation."
+    score_clean = 70.0 if (score is None or math.isnan(float(score))) else float(score)
+    cgpa_raw = normalized.get("cgpa")
+    cgpa_clean = 0.0 if (cgpa_raw is None or math.isnan(float(cgpa_raw))) else float(cgpa_raw)
+    summary = f"{top_path} is your strongest fit right now with a {round(score_clean)} / 100 profile score."
+    if cgpa_clean > 0:
+        summary += f" Your CGPA ({cgpa_clean:.1f}), {skill_count} relevant skills, and {project_count} projects already create a credible foundation."
+    else:
+        summary += f" Your {skill_count} relevant skills and {project_count} projects already create a credible foundation."
     desired_path = _pick_desired_path_from_interest(normalized)
     if desired_path and desired_path != top_class:
         desired_label = desired_path.replace("_", " ").title()
