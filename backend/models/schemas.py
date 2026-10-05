@@ -19,6 +19,10 @@ class CareerInput(BaseModel):
     education_level: str | None = None
     year_of_study: float | None = Field(None, ge=1.0, le=5.0, description="Year of study, usually between 1.0 and 5.0")
     experience_years: float | None = Field(None, ge=0.0, le=50.0, description="Years of professional experience")
+    persona: str | None = Field("student", description="Candidate stage/persona: student, graduate, or professional")
+    parent_domain: str | None = None
+    domain: str | None = None
+    target_role: str | None = None
 
 
 class FinanceInput(BaseModel):

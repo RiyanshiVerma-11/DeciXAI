@@ -82,27 +82,42 @@ def segment_resume_sections(raw_text: str) -> dict[str, str]:
         stripped = line.strip()
         if not stripped:
             continue
-        cleaned_header = re.sub(r"[:\-_|•*#]+", " ", stripped).strip().lower()
+
+        # Check for inline section header, e.g. "Skills: Python, ..." or "Education: BBA LLB..."
+        inline_match = re.match(r"^([A-Za-z\s&]{2,30})\s*:\s*(.+)$", stripped)
         matched_section = None
 
-        # Headers are usually concise lines (< 50 chars)
-        if len(stripped) <= 50:
+        if inline_match:
+            cand_header = re.sub(r"[:\-_|•*#]+", " ", inline_match.group(1)).strip().lower()
             for sec_name, aliases in section_aliases.items():
-                if any(cleaned_header == alias or cleaned_header.startswith(alias + " ") for alias in aliases):
+                if any(cand_header == alias or cand_header.startswith(alias + " ") for alias in aliases):
                     matched_section = sec_name
+                    current_section = sec_name
+                    if current_section not in sections:
+                        sections[current_section] = []
+                    sections[current_section].append(inline_match.group(2).strip())
                     break
 
-        if matched_section:
-            current_section = matched_section
-            if current_section not in sections:
-                sections[current_section] = []
-        else:
-            sections[current_section].append(stripped)
+        if not matched_section:
+            cleaned_header = re.sub(r"[:\-_|•*#]+", " ", stripped).strip().lower()
+            # Headers are usually concise lines (< 50 chars)
+            if len(stripped) <= 50:
+                for sec_name, aliases in section_aliases.items():
+                    if any(cleaned_header == alias or cleaned_header.startswith(alias + " ") for alias in aliases):
+                        matched_section = sec_name
+                        break
+
+            if matched_section:
+                current_section = matched_section
+                if current_section not in sections:
+                    sections[current_section] = []
+            else:
+                sections[current_section].append(stripped)
 
     return {k: "\n".join(v).strip() for k, v in sections.items()}
 
 
-# Comprehensive canonical tech vocabulary across software, AI/ML, cloud, data, and devops
+# Comprehensive canonical domain skills across Software, AI/ML, Cloud, Data, Legal, Finance, and Design
 KNOWN_TECH_SKILLS = [
     # AI / ML & GenAI
     "machine learning", "deep learning", "nlp", "computer vision", "generative ai", "genai",
@@ -132,6 +147,21 @@ KNOWN_TECH_SKILLS = [
     "mysql", "mongodb", "sqlite", "sqlite3", "sqlalchemy", "prisma", "render", "vercel", "aws lambda",
     # Developer Tooling
     "vs code", "visual studio code", "postman", "jupyter", "streamlit", "gradio",
+    # Legal, Privacy & Compliance
+    "ip due diligence", "trademark filing", "patent search", "patent prosecution", "antitrust compliance",
+    "regulatory risk assessment", "competition law", "contract drafting", "gdpr", "dpdp", "dpdp act 2023",
+    "data privacy", "merger control", "due diligence", "corporate governance", "sebi compliance",
+    "intellectual property", "fto opinion", "freedom to operate", "trademark clearance", "licensing agreements",
+    "commercial contracts", "standard contractual clauses", "dpa", "legal compliance", "compliance audit",
+    # Finance, Valuation & Investment
+    "financial modeling", "dcf valuation", "lbo", "equity research", "cfa", "credit risk", "basel iii",
+    "ifrs 9", "portfolio management", "var", "risk management", "investment banking", "m&a advisory",
+    "corporate valuation", "wealth management", "derivatives", "financial analysis", "balance sheet analysis",
+    "accounting", "financial reporting", "excel modeling", "vba",
+    # Design & Product
+    "figma", "ui/ux", "user research", "wireframing", "prototyping", "design systems", "wcag", "wcag 2.1",
+    "usability testing", "interaction design", "information architecture", "product management", "prd",
+    "product analytics", "mixpanel", "google analytics", "a/b testing", "user journey mapping", "scrum", "agile",
 ]
 
 
@@ -215,34 +245,78 @@ def extract_cgpa_from_resume(raw_text: str, edu_section: str) -> tuple[float, st
 
 
 def extract_degree_and_spec(raw_text: str, edu_section: str) -> tuple[str, str]:
-    """Extract degree and specialization from the education block or full text."""
-    target_text = f"{edu_section} {raw_text}".lower()
+    """Extract degree and specialization from the education block with priority over full text."""
+    edu_lower = (edu_section or "").lower()
+    full_lower = (raw_text or "").lower()
+    
+    # Priority order for search text: education section first, then full resume
+    search_texts = [edu_lower, full_lower] if edu_lower.strip() else [full_lower]
 
-    # Degree
+    def _find_degree(text: str) -> str | None:
+        if any(d in text for d in ["bba llb", "bba.llb", "bba-llb", "bba ll.b"]):
+            return "BBA LLB"
+        if any(d in text for d in ["ba llb", "ba.llb", "ba-llb", "ba ll.b"]):
+            return "BA LLB"
+        if any(d in text for d in ["b.tech", "btech", "bachelor of technology"]):
+            return "B.Tech"
+        if any(d in text for d in ["b.e.", "b.e ", "bachelor of engineering"]):
+            return "B.E."
+        if any(d in text for d in ["m.tech", "mtech", "master of technology"]):
+            return "M.Tech"
+        if any(d in text for d in ["mca", "master of computer applications"]):
+            return "MCA"
+        if any(d in text for d in ["bca", "bachelor of computer applications"]):
+            return "BCA"
+        if any(d in text for d in ["mba", "master of business administration"]):
+            return "MBA"
+        if any(d in text for d in ["bba", "bachelor of business administration"]):
+            return "BBA"
+        if any(d in text for d in ["b.com", "bcom", "bachelor of commerce"]):
+            return "B.Com"
+        if any(d in text for d in ["b.des", "bdes", "m.des", "mdes", "bachelor of design"]):
+            return "B.Des"
+        if any(d in text for d in ["b.sc", "bsc", "bachelor of science"]):
+            return "B.Sc"
+        if any(d in text for d in ["m.sc", "msc", "master of science"]):
+            return "M.Sc"
+        if re.search(r"\b(?:ll\.m\.?|master of laws)\b", text) or (
+            re.search(r"\bllm\b", text) and any(w in text for w in ["law", "legal", "advocate", "barrister", "juris"])
+        ):
+            return "LLM"
+        if any(d in text for d in ["ll.b", "llb", "bachelor of laws"]):
+            return "LLB"
+        if "diploma" in text:
+            return "Diploma"
+        return None
+
     degree = "B.Tech"
-    if any(d in target_text for d in ["b.tech", "btech", "bachelor of technology"]):
-        degree = "B.Tech"
-    elif any(d in target_text for d in ["b.e.", "b.e ", "bachelor of engineering"]):
-        degree = "B.E."
-    elif any(d in target_text for d in ["m.tech", "mtech", "master of technology"]):
-        degree = "M.Tech"
-    elif any(d in target_text for d in ["mca", "master of computer applications"]):
-        degree = "MCA"
-    elif any(d in target_text for d in ["bca", "bachelor of computer applications"]):
-        degree = "BCA"
-    elif any(d in target_text for d in ["b.sc", "bsc", "bachelor of science"]):
-        degree = "B.Sc"
-    elif any(d in target_text for d in ["m.sc", "msc", "master of science"]):
-        degree = "M.Sc"
-    elif any(d in target_text for d in ["diploma"]):
-        degree = "Diploma"
+    for st in search_texts:
+        found_deg = _find_degree(st)
+        if found_deg:
+            degree = found_deg
+            break
 
-    # Specialization
-    spec = "Computer Science Engineering"
+    # Specialization - prioritize education section first
+    spec = "General"
+    target_text = f"{edu_lower} {full_lower}"
     if any(s in target_text for s in ["data science", "cse(ds)", "cse (ds)", "cse - ds", "ds specialization"]):
         spec = "Computer Science (Data Science)"
     elif any(s in target_text for s in ["artificial intelligence", "ai & ml", "ai/ml", "cse(ai)", "cse (ai)"]):
         spec = "Computer Science (AI & ML)"
+    elif any(s in target_text for s in ["intellectual property", "ip law", "patent", "trademark", "wipo"]):
+        spec = "Intellectual Property & Competition Law"
+    elif any(s in target_text for s in ["competition law", "antitrust", "merger control"]):
+        spec = "Competition & Corporate Law"
+    elif any(s in target_text for s in ["corporate law", "company law", "commercial law"]):
+        spec = "Corporate Law"
+    elif any(s in target_text for s in ["cyber law", "technology law", "privacy law", "data privacy"]):
+        spec = "Cyber & Technology Law"
+    elif any(s in target_text for s in ["investment banking", "corporate finance", "equity research"]):
+        spec = "Investment Banking & Valuation"
+    elif any(s in target_text for s in ["financial risk", "credit risk", "risk management"]):
+        spec = "Financial Risk & Banking"
+    elif any(s in target_text for s in ["ui/ux", "interaction design", "product design"]):
+        spec = "UI/UX & Product Design"
     elif any(s in target_text for s in ["cybersecurity", "cyber security", "information security"]):
         spec = "Cybersecurity"
     elif any(s in target_text for s in ["information technology", " it\b"]):
@@ -503,6 +577,21 @@ def infer_best_fit_role(skills: list[str], specialization: str, target_role: str
     skills_lower = set(s.lower() for s in skills)
     spec_lower = specialization.lower()
 
+    # Legal & Compliance
+    legal_hits = sum(1 for s in skills_lower if any(w in s for w in ["legal", "trademark", "patent", "antitrust", "gdpr", "dpdp", "compliance", "regulatory", "ip due", "contract", "merger", "wipo"]))
+    if legal_hits >= 2 or any(l in spec_lower for l in ["law", "legal", "compliance", "intellectual property", "antitrust"]):
+        return "IP & Technology Lawyer"
+
+    # Finance & Investment
+    fin_hits = sum(1 for s in skills_lower if any(w in s for w in ["finance", "valuation", "dcf", "lbo", "equity research", "cfa", "credit risk", "accounting", "banking"]))
+    if fin_hits >= 2 or any(f in spec_lower for f in ["finance", "banking", "investment", "accounting"]):
+        return "Finance & Investment Analyst"
+
+    # UI/UX & Design
+    design_hits = sum(1 for s in skills_lower if any(w in s for w in ["figma", "ui", "ux", "wireframing", "prototyping", "usability", "wcag"]))
+    if design_hits >= 2 or any(d in spec_lower for d in ["design", "ui", "ux"]):
+        return "Product UI/UX Designer"
+
     # AI / ML Engineer
     ai_ml_hits = sum(1 for s in skills_lower if s in {
         "machine learning", "deep learning", "nlp", "gemini api", "gemini", "claude", "groq", "pytorch",
@@ -544,7 +633,7 @@ def calculate_ats_audit(text: str, parsed_profile: dict[str, Any]) -> dict[str, 
     score = 72.0
 
     # 1. Section checks
-    has_edu = any(w in lowered for w in ["education", "degree", "university", "college", "b.tech", "btech", "bca", "mca", "b.e", "m.tech"])
+    has_edu = any(w in lowered for w in ["education", "degree", "university", "college", "b.tech", "btech", "bca", "mca", "b.e", "m.tech", "llb", "ba llb", "bba llb", "llm", "law", "b.com", "bcom", "bba", "mba", "b.des"])
     has_skills = any(w in lowered for w in ["skills", "technical skills", "technologies", "proficiencies", "tech stack"])
     has_proj = any(w in lowered for w in ["projects", "technical projects", "key projects"])
     has_exp = any(w in lowered for w in ["experience", "work experience", "professional experience", "internship", "internships"])
@@ -696,6 +785,24 @@ def parse_and_analyze_resume(file_bytes: bytes, filename: str, target_role: str 
     active_target = target_role.strip() if (target_role and target_role.strip()) else inferred_track
 
     # 4. Normalize profile for ML model
+    persona = "student" if experience_years < 1.0 else ("graduate" if experience_years < 2.5 else "professional")
+
+    # Domain-aware fallback options
+    active_domain = None
+    target_lower = active_target.lower()
+    if any(k in target_lower for k in ["legal", "law", "compliance", "regulatory", "ip", "patent", "trademark"]):
+        active_domain = "legal"
+        domain_options = [active_target, "Corporate Legal Counsel", "Compliance & Regulatory Manager"]
+    elif any(k in target_lower for k in ["finance", "banking", "investment", "valuation", "equity"]):
+        active_domain = "finance"
+        domain_options = [active_target, "Financial Analyst", "Investment Banking Analyst"]
+    elif any(k in target_lower for k in ["design", "ui", "ux"]):
+        active_domain = "design"
+        domain_options = [active_target, "Product UI/UX Designer", "Design Systems Lead"]
+    else:
+        active_domain = "engineering"
+        domain_options = [active_target, "Data Scientist & Analytics Engineer", "Full-Stack Software Engineer"]
+
     normalized = normalize_career_input({
         "degree": degree,
         "course": degree,
@@ -715,7 +822,11 @@ def parse_and_analyze_resume(file_bytes: bytes, filename: str, target_role: str 
         "certification_count": len(certifications),
         "achievements": achievements,
         "interest": active_target,
-        "options": [active_target, "Data Scientist & Analytics Engineer", "Full-Stack Software Engineer"],
+        "options": domain_options,
+        "persona": persona,
+        "domain": active_domain,
+        "parent_domain": active_domain,
+        "target_role": active_target,
         "raw_prompt": raw_text[:2500],
     })
 
@@ -742,30 +853,38 @@ def parse_and_analyze_resume(file_bytes: bytes, filename: str, target_role: str 
             ats_audit["recommendations"].insert(0, f"Target Role Gap: Add more explicit projects/skills tailored to '{active_target}'.")
         ats_audit["target_role"] = active_target
 
+    parsed_profile = {
+        "degree": degree,
+        "course": degree,
+        "specialization": specialization,
+        "cgpa": cgpa,
+        "score_type": score_type,
+        "skills": skills,
+        "skills_count": len(skills),
+        "projects": projects,
+        "projects_count": len(projects),
+        "project_descriptions": project_descriptions,
+        "internships": internships,
+        "internships_count": len(internships),
+        "certifications": certifications,
+        "certifications_count": len(certifications),
+        "achievements": achievements,
+        "achievements_count": len(achievements),
+        "experience_years": experience_years,
+        "interest": active_target,
+        "target_role": target_role.strip() if target_role else None,
+        "persona": persona,
+        "domain": active_domain,
+    }
+
     return {
         "filename": filename,
         "target_role": target_role.strip() if target_role else None,
         "extracted_text_preview": raw_text[:1200] + ("..." if len(raw_text) > 1200 else ""),
-        "parsed_profile": {
-            "degree": degree,
-            "specialization": specialization,
-            "cgpa": cgpa,
-            "score_type": score_type,
-            "skills": skills,
-            "skills_count": len(skills),
-            "projects": projects,
-            "projects_count": len(projects),
-            "project_descriptions": project_descriptions,
-            "internships": internships,
-            "internships_count": len(internships),
-            "certifications": certifications,
-            "certifications_count": len(certifications),
-            "achievements": achievements,
-            "achievements_count": len(achievements),
-            "experience_years": experience_years,
-            "interest": active_target,
-            "target_role": target_role.strip() if target_role else None,
-        },
+        "raw_text": raw_text,
+        "parsed_profile": parsed_profile,
+        "parsed_credentials": parsed_profile,
+        "normalized": normalized,
         "ats_audit": ats_audit,
         "decision": decision_result,
     }

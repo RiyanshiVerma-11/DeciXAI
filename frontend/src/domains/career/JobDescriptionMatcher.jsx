@@ -23,7 +23,7 @@ Responsibilities & Skills:
   },
 ]
 
-export default function JobDescriptionMatcher({ candidateProfile }) {
+export default function JobDescriptionMatcher({ candidateProfile, resumeData }) {
   const [jdText, setJdText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -39,8 +39,13 @@ export default function JobDescriptionMatcher({ candidateProfile }) {
     setLoading(true)
     setError(null)
     try {
+      const fullProfile = {
+        ...(candidateProfile || {}),
+        ...(resumeData?.parsed_profile || {}),
+        raw_text: resumeData?.raw_text || candidateProfile?.raw_prompt || candidateProfile?.raw_text || '',
+      }
       const res = await matchJobDescription({
-        candidate_profile: candidateProfile || {},
+        candidate_profile: fullProfile,
         job_description: text,
       })
       setAnalysis(res)
@@ -154,15 +159,34 @@ export default function JobDescriptionMatcher({ candidateProfile }) {
                   {analysis.fit_score >= 80 ? 'Strong Fit' : analysis.fit_score >= 60 ? 'Moderate Alignment' : 'Gap Detected'}
                 </span>
               </div>
+              {analysis.score_breakdown && (
+                <div className="mt-2.5 pt-2 border-t border-indigo-100/70 text-[10px] text-slate-500 space-y-0.5 font-mono">
+                  <div className="flex justify-between">
+                    <span>Fundamentals:</span>
+                    <span className="font-bold text-slate-700">{analysis.score_breakdown.fundamentals}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Domain Stack:</span>
+                    <span className="font-bold text-indigo-600">{analysis.score_breakdown.domain_stack}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Architectural Rigor:</span>
+                    <span className="font-bold text-emerald-600">{analysis.score_breakdown.architectural_rigor}%</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
                 Target Role
               </span>
-              <div className="text-sm font-bold text-slate-900 mt-1 truncate">
+              <div className="text-sm font-bold text-slate-900 mt-1 truncate" title={analysis.detected_role}>
                 {analysis.detected_role}
               </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Extracted from JD responsibilities and hiring criteria.
+              </p>
             </div>
 
             <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4">
@@ -172,14 +196,34 @@ export default function JobDescriptionMatcher({ candidateProfile }) {
               <div className="text-sm font-bold text-emerald-600 mt-1 font-mono">
                 {analysis.matched_keywords?.length || 0} Skills Overlapping
               </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Verified against candidate projects and technical skills.
+              </p>
             </div>
           </div>
+
+          {/* Anti-Patterns Avoided Banner */}
+          {analysis.anti_patterns_avoided && analysis.anti_patterns_avoided.length > 0 && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-3.5 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
+                <svg className="h-4 w-4 text-blue-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Role Trap / Anti-Pattern Avoided:</span>
+              </div>
+              {analysis.anti_patterns_avoided.map((ap, idx) => (
+                <p key={idx} className="text-xs text-blue-800 pl-5">
+                  <strong className="text-blue-950 font-bold">{ap.pattern}:</strong> {ap.detail}
+                </p>
+              ))}
+            </div>
+          )}
 
           {/* Keywords Breakdown */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
               <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block mb-2">
-                ✓ Overlapping Keywords Detected ({analysis.matched_keywords?.length})
+                ✓ Overlapping Keywords Detected ({analysis.matched_keywords?.length || 0})
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {analysis.matched_keywords?.map((kw) => (
@@ -190,22 +234,62 @@ export default function JobDescriptionMatcher({ candidateProfile }) {
               </div>
             </div>
 
-            <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-4">
-              <span className="text-xs font-bold text-rose-800 uppercase tracking-wider flex items-center gap-1.5 mb-2">
-                <svg className="h-4 w-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <span>Critical Missing Keywords ({analysis.missing_keywords?.length})</span>
+            <div className={`rounded-xl border p-4 ${analysis.missing_keywords?.length > 0 ? 'border-rose-200 bg-rose-50/40' : 'border-emerald-200 bg-emerald-50/40'}`}>
+              <span className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2 ${analysis.missing_keywords?.length > 0 ? 'text-rose-800' : 'text-emerald-800'}`}>
+                {analysis.missing_keywords?.length > 0 ? (
+                  <>
+                    <svg className="h-4 w-4 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>Critical Missing Keywords ({analysis.missing_keywords.length})</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>All Core Technical Requirements Met!</span>
+                  </>
+                )}
+              </span>
+              {analysis.missing_keywords?.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {analysis.missing_keywords.map((kw) => (
+                    <span key={kw} className="rounded-lg bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 text-xs font-bold">
+                      + {kw}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-emerald-700 font-medium">
+                  Candidate meets all primary technical prerequisites mentioned in the job posting.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Bonus / Good-to-Have Skills */}
+          {analysis.bonus_skills && analysis.bonus_skills.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 block mb-1.5">
+                Preferred / Nice-to-Have Stack (Useful, but not required)
               </span>
               <div className="flex flex-wrap gap-1.5">
-                {analysis.missing_keywords?.map((kw) => (
-                  <span key={kw} className="rounded-lg bg-rose-100 text-rose-800 border border-rose-200 px-2 py-0.5 text-xs font-bold">
-                    + {kw}
+                {analysis.bonus_skills.map((b, idx) => (
+                  <span
+                    key={idx}
+                    className={`rounded-lg px-2 py-0.5 text-xs font-semibold border ${
+                      b.status === 'met'
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                        : 'bg-slate-100 text-slate-600 border-slate-200'
+                    }`}
+                  >
+                    {b.skill} {b.status === 'met' ? '✓' : '(Optional)'}
                   </span>
                 ))}
               </div>
             </div>
-          </div>
+          )}
 
           {/* Google X-Y-Z Resume Bullet Rewriter */}
           <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-5">

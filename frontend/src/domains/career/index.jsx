@@ -518,11 +518,25 @@ export default function CareerDomain() {
         acceleratorTab === 'what-if' ? (
           <WhatIfSimulator
             candidateProfile={resultInput || input}
+            targetRole={
+              result?.prediction ||
+              result?.details?.career_intelligence?.interest?.path_label ||
+              result?.details?.career_intelligence?.best_fit?.path_label ||
+              resultInput?.interest ||
+              input?.interest ||
+              'Career Path'
+            }
+            skillGaps={
+              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
+              result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
+              []
+            }
             onApplyToForm={handleApplySimulatedProfile}
           />
         ) : acceleratorTab === 'jd-match' ? (
           <JobDescriptionMatcher
             candidateProfile={resultInput || input}
+            resumeData={resumeData}
           />
         ) : acceleratorTab === 'mock-interview' ? (
           <MockInterviewStudio

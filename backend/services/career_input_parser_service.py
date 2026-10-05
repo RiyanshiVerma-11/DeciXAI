@@ -218,10 +218,14 @@ SKILL_ALIASES = {
 
     # ── Law & Legal Track Skills ──
     "contract drafting": ("contract drafting", "drafting contracts", "agreement drafting", "contract management", "contracts"),
-    "due diligence": ("due diligence", "legal due diligence", "corporate due diligence"),
+    "due diligence": ("due diligence", "legal due diligence", "corporate due diligence", "ip due diligence"),
     "gdpr compliance": ("gdpr compliance", "gdpr", "data privacy", "privacy law", "dpdp", "data protection"),
     "legal research": ("legal research", "case law research", "statutory interpretation", "westlaw", "manupatra", "lexisnexis"),
     "intellectual property": ("intellectual property", "ip law", "patent drafting", "trademark prosecution", "copyright law", "patents"),
+    "trademark filing": ("trademark filing", "trademark prosecution", "trademark search", "trademark registration", "trademark"),
+    "patent search": ("patent search", "prior art search", "fto search", "freedom to operate", "patent analytics"),
+    "antitrust compliance": ("antitrust compliance", "antitrust", "competition law", "merger control", "competition compliance"),
+    "regulatory risk assessment": ("regulatory risk assessment", "regulatory compliance", "regulatory risk", "compliance audit", "regulatory assessment"),
     "corporate governance": ("corporate governance", "board compliance", "secretarial audit", "compliance"),
     "litigation": ("litigation", "dispute resolution", "arbitration", "moot court", "court drafting"),
     "mergers and acquisitions": ("mergers and acquisitions", "m&a", "ma", "joint ventures"),
@@ -1012,13 +1016,18 @@ def _split_project_phrases(section: str) -> list[str]:
 def _extract_skills(text: str) -> list[str]:
     """Scan text and skills section for skills across all professional tracks."""
     section = _extract_section(text, ("skills", "skill", "technologies", "tech stack"))
+    if not section and text.strip():
+        # If text is already the isolated skills substring (label was stripped before calling), treat text as section
+        if not re.search(r"\b(?:cgpa|course|specialization|interest|projects|certifications)\b[:=]", text, flags=re.IGNORECASE):
+            section = text.strip()
+
     search_space = text
     matches = _extract_from_aliases(search_space, SKILL_ALIASES)
 
     if section:
         for item in _split_section_items(section):
             item_clean = _collapse_spaces(item.strip(" .,:;-"))
-            if not item_clean or len(item_clean) < 2 or len(item_clean) > 50:
+            if not item_clean or len(item_clean) < 2 or len(item_clean) > 60:
                 continue
             sub_matches = _extract_from_aliases(item_clean, SKILL_ALIASES)
             if sub_matches:

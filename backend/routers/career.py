@@ -54,6 +54,7 @@ from services.career_accelerator_service import (
     evaluate_interview_response,
     generate_90_day_sprint_roadmap,
     estimate_career_compensation,
+    fetch_project_context_from_url,
 )
 
 
@@ -67,13 +68,32 @@ async def what_if_simulation(payload: dict):
 
 @router.post('/jd-match')
 async def job_description_matching(payload: dict):
-    """Match candidate against target Job Description and generate Google XYZ bullets."""
+    """Match candidate against target Job Description and generate Google XYZ bullets strictly grounded in verified project context."""
     candidate_profile = payload.get('candidate_profile') or {}
     jd_text = payload.get('job_description') or ''
-    res = match_job_description(candidate_profile, jd_text)
+    project_url = payload.get('project_url') or candidate_profile.get('project_url') or candidate_profile.get('github_url') or ''
+    project_name = payload.get('project_name') or candidate_profile.get('project_name') or ''
+    project_details = payload.get('project_details') or candidate_profile.get('project_details') or ''
+
+    res = match_job_description(
+        candidate_profile=candidate_profile,
+        jd_text=jd_text,
+        project_url=project_url,
+        project_name=project_name,
+        project_details=project_details,
+    )
     if not res.get('success'):
         raise HTTPException(status_code=400, detail=res.get('error', 'Job description analysis failed.'))
     return res
+
+
+@router.post('/inspect-project-url')
+async def inspect_project_url(payload: dict):
+    """Safely inspects a GitHub or live project repository URL to extract architecture and stack details for true grounding."""
+    url = (payload.get('url') or '').strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="Project URL is required.")
+    return fetch_project_context_from_url(url)
 
 
 @router.post('/mock-interview/questions')

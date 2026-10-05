@@ -6,20 +6,15 @@ export default function LandingPage() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
 
-  // State for interactive features
+  // State for interactive hero terminal preview
   const [activeStudio, setActiveStudio] = useState('career')
-  const [openFaq, setOpenFaq] = useState(null)
+  const [openFaq, setOpenFaq] = useState(0)
   const [copiedCurl, setCopiedCurl] = useState(false)
 
   // Interactive 'What-If' Demo State
   const [whatIfSkills, setWhatIfSkills] = useState(['Python', 'Machine Learning'])
   const [whatIfProjects, setWhatIfProjects] = useState(1)
   const [whatIfCgpa, setWhatIfCgpa] = useState(8.4)
-
-  // Custom Quick Scenario Demo
-  const [scenarioInput, setScenarioInput] = useState('')
-  const [scenarioLoading, setScenarioLoading] = useState(false)
-  const [scenarioResult, setScenarioResult] = useState(null)
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
@@ -37,30 +32,6 @@ export default function LandingPage() {
   const simulatedScore = Math.min(99, Math.max(50, baseScore + skillBonus + projectBonus + cgpaBonus))
   const scoreDelta = simulatedScore - baseScore
 
-  // Interactive Quick Evaluator
-  const runScenario = (e) => {
-    e.preventDefault()
-    if (!scenarioInput.trim()) return
-    setScenarioLoading(true)
-    setScenarioResult(null)
-
-    setTimeout(() => {
-      setScenarioLoading(false)
-      const score = Math.floor(Math.random() * 25) + 72
-      setScenarioResult({
-        score,
-        verdict: score >= 82 ? 'Highly Recommended' : 'Feasible with Optimizations',
-        factors: [
-          { name: 'Core Competency Match', delta: '+16%', positive: true },
-          { name: 'Market Demand Index', delta: '+11%', positive: true },
-          { name: 'Resource Runway / Risk', delta: score > 80 ? '+6%' : '-8%', positive: score > 80 },
-          { name: 'Execution Complexity', delta: '-4%', positive: false },
-        ],
-        advice: `For "${scenarioInput}", DeciXAI recommends phased deployment within 45 days. Prioritize mitigating the identified friction factors before scaling.`,
-      })
-    }, 900)
-  }
-
   // Copy Curl snippet
   const copyApiSnippet = () => {
     const code = `curl -X POST https://api.decixai.io/api/v1/career/ \\
@@ -74,24 +45,15 @@ export default function LandingPage() {
     }
   }
 
-  // Studio Showcase Content
+  // Hero Terminal Showcases (Active Studio preview)
   const studioShowcases = {
     career: {
       tag: 'ATS 2.0 Talent Studio',
       title: 'Career & Talent Intelligence',
       badgeColor: 'bg-cyan-50 text-cyan-800 border-cyan-200',
       accentColor: 'from-cyan-500 to-blue-600',
-      description:
-        'Transform job hunting into an engineered strategy with counterfactual simulation, resume gap analysis, and STAR interview evaluation.',
       score: 94,
       scoreLabel: 'Hiring Match Probability',
-      features: [
-        'Counterfactual "What-If" Pivot Simulator (real-time probability delta testing)',
-        'ATS 2.0 Resume Parser with Google X-Y-Z Bullet Point Rewriter',
-        'Live O*NET Evidence Signals & Industry Competency Benchmarks',
-        'Mock Interview Studio with AI STAR Scoring (Situation, Task, Action, Result)',
-        'Real-Time Compensation Estimator across Tier 1 to Tier 3 Locations',
-      ],
       previewStats: [
         { label: 'Skills Match', val: '94%' },
         { label: 'ATS Parsability', val: '98/100' },
@@ -110,20 +72,11 @@ export default function LandingPage() {
       title: 'Finance & Loan Intelligence',
       badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-200',
       accentColor: 'from-emerald-500 to-teal-600',
-      description:
-        'Eliminate lending uncertainty with automated DigiLocker eKYC, bank penny drops, debt-to-income analysis, and transparent risk explainability.',
       score: 91,
       scoreLabel: 'Credit Viability Score',
-      features: [
-        'Automated 7-Step Loan Application & Underwriting Wizard',
-        'Instant DigiLocker eKYC & Aadhaar Masked Identity Verification',
-        'Live Bank Account Penny Drop Verification with IMPS Protocol',
-        'Debt-to-Income (DTI) Stress Testing & Repayment Probability Modeling',
-        'Risk Radar Explainability isolating high-friction loan parameters',
-      ],
       previewStats: [
         { label: 'DTI Ratio', val: '24.2%' },
-        { label: 'Credit Health', val: 'Tier-A (760)' },
+        { label: 'Credit Health', val: 'Prime (760)' },
         { label: 'Fraud Risk', val: '< 0.2%' },
       ],
       waterfall: [
@@ -139,17 +92,8 @@ export default function LandingPage() {
       title: 'Startup & Valuation Intelligence',
       badgeColor: 'bg-fuchsia-50 text-fuchsia-800 border-fuchsia-200',
       accentColor: 'from-fuchsia-500 to-indigo-600',
-      description:
-        'Model startup survival, valuation multiples, and investor readiness with real-time burn rate, ARR traction, and go-to-market simulations.',
       score: 82,
       scoreLabel: 'Investor Readiness Score',
-      features: [
-        'Real-time Valuation Multiples based on ARR, MoM Growth & Margin',
-        'Dynamic Cash Burn Rate & Runway Extension Calculator (6 to 18 months)',
-        'Investor Pitch Scorecard evaluating Moat, TAM, and Founder Velocity',
-        'Unit Economics Modeler (LTV to CAC ratio & Net Retention benchmarks)',
-        'Go-to-Market (GTM) Strategy Engine with cost-per-acquisition benchmarks',
-      ],
       previewStats: [
         { label: 'Est. Valuation', val: '$4.2M' },
         { label: 'Current Runway', val: '14 Months' },
@@ -168,17 +112,8 @@ export default function LandingPage() {
       title: 'Government & Policy Intelligence',
       badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
       accentColor: 'from-amber-500 to-orange-600',
-      description:
-        'Quantify civic impact, budget allocations, and algorithmic bias with multi-policy tradeoff matrices and public sentiment forecasting.',
       score: 76,
       scoreLabel: 'Policy Feasibility Index',
-      features: [
-        'Multi-Policy Tradeoff Matrix comparing subsidies vs infrastructure grants',
-        'Algorithmic Fairness & Bias Governance Safeguard Checklists',
-        'Municipal Budget Allocation Simulator maximizing target beneficiary ROI',
-        'Public Demographic Sentiment & Adoption Friction Analysis',
-        'Downloadable Audit-Ready PDF Reports for Legislative Committees',
-      ],
       previewStats: [
         { label: 'Target Beneficiaries', val: '450k+' },
         { label: 'Budget Efficiency', val: '+31%' },
@@ -194,42 +129,86 @@ export default function LandingPage() {
     },
   }
 
+  // Unified 4 Domain Studios: The Problem They Solve & What DeciXAI Computes
+  const domainStudios = [
+    {
+      id: 'career',
+      icon: '🎓',
+      title: 'Career & Talent Intelligence',
+      subtitle: 'ATS 2.0 & Job Placement',
+      badge: 'border-cyan-200 bg-cyan-50 text-cyan-800',
+      problem: 'Over 75% of resumes get rejected by black-box ATS keyword filters with zero feedback. Candidates waste months not knowing which skill gap cost them the interview.',
+      solution: '3-tier resume parser (PyPDF, PDFPlumber, regex), O*NET 29.0 taxonomy benchmarking, and live What-If simulation that calculates the exact placement probability boost of adding specific skills or capstones.',
+      tools: ['Multi-tier ATS 2.0 Parser', 'Counterfactual Pivot Sandbox', 'O*NET 29.0 Competency Radar', 'AI STAR Interview Mock Studio'],
+    },
+    {
+      id: 'finance',
+      icon: '💳',
+      title: 'Finance & Loan Intelligence',
+      subtitle: 'Underwriting & Credit Risk',
+      badge: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+      problem: 'Applicants receive arbitrary credit rejections from proprietary scoring black boxes with zero explanation, while banks risk regulatory non-compliance and unmonitored bias.',
+      solution: 'Calibrated gradient-boosted credit trees, deterministic debt-to-income (DTI) safety caps, automated DigiLocker eKYC & IMPS penny drops, and exact counterfactual debt-clearing paths for approval.',
+      tools: ['7-Step Underwriting Wizard', 'DigiLocker eKYC & Bank Penny Drop', 'DTI Stress-Testing Model', 'SHAP Risk Penalty Decomposition'],
+    },
+    {
+      id: 'startup',
+      icon: '🚀',
+      title: 'Startup & Valuation Intelligence',
+      subtitle: 'Venture Viability & Runway',
+      badge: 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-800',
+      problem: 'Over 90% of early-stage startups fail because founders make crucial hiring and capital decisions on intuition instead of comparing their burn rate and unit economics to successful cohorts.',
+      solution: 'Acquisition and survival classifiers trained on historical venture cohorts, benchmarking your cash burn, ARR traction, and moat factors against 25th and 50th industry percentiles.',
+      tools: ['Cohort Percentile Benchmarking', 'Runway Stress-Test Simulator', 'Unit Economics (LTV/CAC) Modeler', 'Investor Pitch Scorecard'],
+    },
+    {
+      id: 'policy',
+      icon: '🏛️',
+      title: 'Public Policy & Governance',
+      subtitle: 'Civic Impact & Feasibility',
+      badge: 'border-amber-200 bg-amber-50 text-amber-800',
+      problem: 'Multi-crore public welfare schemes fail when launched without empirical socio-economic feasibility forecasts, leading to wasted funds, demographic bottlenecks, and public backlash.',
+      solution: 'Socio-economic feasibility classifier factoring budgetary allocations, target demographic scale, administrative urgency, corruption risk, and algorithmic fairness safeguards.',
+      tools: ['Multi-Policy Tradeoff Matrix', 'Algorithmic Fairness Checklists', 'Demographic Sentiment Modeler', 'Legislative PDF Dossier Export'],
+    },
+  ]
+
   const currentStudio = studioShowcases[activeStudio]
 
   const faqData = [
     {
-      q: 'What is Explainable AI (XAI) and how does DeciXAI eliminate the "Black Box"?',
-      a: 'Traditional AI models give a raw score without reasoning. DeciXAI uses SHAP (SHapley Additive exPlanations) values to calculate the exact mathematical contribution of every single variable. Whether evaluating loan eligibility, resume fit, or startup runway, you see exactly which factors boosted or penalized the prediction.',
+      q: 'Why was DeciXAI created? What core problem does it solve?',
+      a: 'DeciXAI was created to eliminate the opacity of "Black-Box AI" in high-stakes decisions. Traditional ML algorithms reject candidates or loan applicants without explanation, and modern LLMs (like ChatGPT) invent numbers without mathematical grounding. DeciXAI solves this with a hybrid pipeline: deterministic ML models calculate calibrated probabilities, SHAP isolates the exact positive and negative factors, and grounded generative AI builds personalized action plans without hallucinating.',
     },
     {
-      q: 'What makes the Counterfactual "What-If" Simulator unique?',
-      a: 'Instead of guessing what changes will yield better results, the "What-If" Simulator allows candidates, founders, or loan officers to inject counterfactual variables (like adding Docker, extending runway by 3 months, or adjusting CGPA) and immediately see the live hiring or approval probability delta without submitting the full profile.',
+      q: 'What is Explainable AI (XAI) and how does SHAP eliminate the black box?',
+      a: 'Instead of providing an ungrounded binary verdict, DeciXAI computes SHAP (SHapley Additive exPlanations) values derived from cooperative game theory. Every input parameter (such as CGPA, verified salary, runway months, or infrastructure index) is assigned an exact positive (+) or negative (-) percentage impact so you see the exact reason behind every prediction.',
     },
     {
-      q: 'How does the Conversational Copilot integrate with the Saved Workspace?',
-      a: 'DeciXAI Copilot understands both English and Hindi. When the bot generates actionable roadmaps, interview questions, or loan tips, you can click "Save to Workspace" on that message. It automatically categorizes the insight into its dedicated Studio folder (Career, Finance, Startup, or Policy) in your workspace.',
+      q: 'How does the "What-If" Counterfactual Simulator work?',
+      a: 'Instead of guessing what changes will yield better results, the "What-If" Simulator allows candidates, founders, or loan applicants to test counterfactual adjustments (like adding Docker, extending runway by 3 months, or adjusting CGPA) and immediately see the live calculated probability delta without submitting the full profile.',
     },
     {
-      q: 'Is my data encrypted and audit-compliant?',
-      a: 'Yes. Every evaluation and decision run generates an immutable audit record with SHA-256 hash validation. Identity verification runs via DigiLocker eKYC with masked IDs. All data is protected with TLS 1.3 in transit and AES-256 at rest.',
+      q: 'How does DeciXAI ensure regulatory compliance and auditability?',
+      a: 'Every evaluation generates an immutable audit record in decision_audit.jsonl with a SHA-256 cryptographic hash, timestamp, user context, and model parameters. You can export a tamper-evident Decision Dossier PDF for regulatory compliance, board reviews, or candidate debriefs.',
     },
     {
       q: 'Can developers integrate DeciXAI via API?',
-      a: 'DeciXAI features a complete Developer Hub. You can generate API keys instantly, access RESTful endpoints with bearer authentication, and integrate decision scoring into your apps with sub-15ms inference latency in Python, Node.js, or curl.',
+      a: 'Yes. DeciXAI features a complete Developer Hub where you can generate API keys and run decision scoring inferences with sub-15ms latency in Python, Node.js, or curl.',
     },
   ]
 
   return (
     <div className="min-h-screen bg-[#FBFDFF] text-slate-900 font-sans selection:bg-cyan-100 selection:text-cyan-900">
       
-      {/* Subtle Ambient Light Gradients (Pure Light Theme) */}
+      {/* Ambient Light Gradients */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-gradient-to-b from-sky-100/60 via-indigo-50/40 to-transparent rounded-full blur-3xl" />
         <div className="absolute top-[30%] -left-40 w-[600px] h-[600px] bg-cyan-100/30 rounded-full blur-3xl" />
         <div className="absolute top-[50%] -right-40 w-[600px] h-[600px] bg-emerald-100/25 rounded-full blur-3xl" />
       </div>
 
-      {/* ── 1. Dark Navbar Matching App Sidebar (#0B1120) ──────────────────── */}
+      {/* ── 1. Navbar ──────────────────────────────────────────────────────── */}
       <nav className="sticky top-0 z-50 border-b border-slate-800/80 bg-[#0B1120]/95 backdrop-blur-xl shadow-lg shadow-black/20 transition-all">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
@@ -243,18 +222,17 @@ export default function LandingPage() {
                 DeciXAI
               </span>
               <span className="hidden sm:inline-block rounded-full bg-cyan-950/70 border border-cyan-800/70 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
-                v2.4 Live
+                Explainable Decision Intelligence
               </span>
             </div>
           </div>
 
           {/* Desktop Navigation Links */}
-          <div className="hidden lg:flex items-center gap-7 text-xs font-bold text-slate-300">
-            <a href="#studios" className="hover:text-cyan-400 transition">Decision Studios</a>
-            <a href="#what-if" className="hover:text-cyan-400 transition">What-If Simulator</a>
-            <a href="#features" className="hover:text-cyan-400 transition">Feature Matrix</a>
-            <a href="#copilot" className="hover:text-cyan-400 transition">AI Copilot</a>
-            <a href="#developer" className="hover:text-cyan-400 transition">API Hub</a>
+          <div className="hidden lg:flex items-center gap-6 text-xs font-bold text-slate-300">
+            <a href="#problem" className="hover:text-cyan-400 transition">The Problem</a>
+            <a href="#studios" className="hover:text-cyan-400 transition">4 Decision Studios</a>
+            <a href="#what-if" className="hover:text-cyan-400 transition">What-If Engine</a>
+            <a href="#architecture" className="hover:text-cyan-400 transition">How It Works</a>
             <a href="#faq" className="hover:text-cyan-400 transition">FAQ</a>
           </div>
 
@@ -280,7 +258,7 @@ export default function LandingPage() {
                   onClick={() => navigate('/auth?mode=register')}
                   className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-4 py-2 text-xs font-bold transition shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 cursor-pointer flex items-center gap-1.5"
                 >
-                  <span>Launch Free Workspace</span>
+                  <span>Launch Decision Studio</span>
                   <span>→</span>
                 </button>
               </>
@@ -289,33 +267,33 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* ── 2. Hero Section: Headline & Live Interactive Terminal ────────── */}
-      <section className="relative z-10 px-4 sm:px-6 pt-10 pb-16 lg:pt-16 lg:pb-24">
+      {/* ── 2. Hero Section: Clear Purpose & Interactive Preview ─────────── */}
+      <section className="relative z-10 px-4 sm:px-6 pt-10 pb-12 lg:pt-14 lg:pb-16">
         <div className="mx-auto max-w-7xl">
           
-          {/* Hero Top Eyebrow */}
           <div className="text-center max-w-4xl lg:max-w-5xl mx-auto mb-8">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50/80 px-3.5 py-1 text-xs font-bold text-cyan-800 shadow-2xs mb-5">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50/90 px-4 py-1 text-xs font-bold text-cyan-900 shadow-2xs mb-5">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-500 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-600"></span>
               </span>
-              <span>Next-Gen Explainable AI (XAI) Intelligence Platform</span>
+              <span>Why Was This Built? High-Stakes Decisions Cannot Rely on Black-Box AI</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-slate-950 leading-tight">
-              <span className="block sm:whitespace-nowrap">
-                Stop Guessing with Black-Box AI.
+              <span className="block">
+                Stop Accepting Black-Box AI Decisions.
               </span>
               <span className="block mt-1 sm:mt-2 bg-gradient-to-r from-cyan-600 via-sky-600 to-indigo-600 bg-clip-text text-transparent">
-                Explain Every Decision.
+                Understand The "Why" Behind Every Outcome.
               </span>
             </h1>
 
-            <p className="mt-5 text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
-              DeciXAI combines high-precision machine learning with live SHAP attribution charts,
-              counterfactual What-If simulations, and an anti-hallucination bilingual copilot
-              across <strong>Career, Finance, Startup, and Policy</strong>.
+            <p className="mt-5 text-sm sm:text-base text-slate-700 leading-relaxed max-w-3xl mx-auto font-medium">
+              Every day, automated algorithms reject resumes, decline bank loans, miscalculate startup runways,
+              and misdirect public funds without ever explaining why. <strong>DeciXAI was engineered to eliminate this opacity</strong>:
+              uniting calibrated Machine Learning, game-theoretic SHAP explainability, and counterfactual simulation
+              so every high-stakes decision is transparent, auditable, and actionable.
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
@@ -323,35 +301,26 @@ export default function LandingPage() {
                 onClick={handleGetStarted}
                 className="w-full sm:w-auto rounded-xl bg-slate-950 hover:bg-slate-800 text-white px-7 py-3.5 text-sm font-bold shadow-md hover:shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
               >
-                <span>Launch Decision Workspace</span>
+                <span>Launch Decision Studio</span>
                 <span>→</span>
               </button>
               <a
-                href="#what-if"
-                className="w-full sm:w-auto rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 px-6 py-3.5 text-sm font-bold shadow-2xs hover:shadow-sm transition-all text-center"
+                href="#problem"
+                className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 px-6 py-3.5 text-sm font-bold shadow-2xs hover:shadow-sm transition-all text-center"
               >
-                ⚡ Try 'What-If' Simulator
+                📖 The Problem We Solve
               </a>
-            </div>
-
-            {/* Quick Proof Metrics */}
-            <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-3 text-left max-w-3xl mx-auto">
-              {[
-                { val: '< 15ms', label: 'ML Inference Latency' },
-                { val: '100%', label: 'Deterministic SHAP Math' },
-                { val: '4 Studios', label: 'Unified Decision Engines' },
-                { val: '0% Hallucination', label: 'Grounded Model XAI' },
-              ].map((m, i) => (
-                <div key={i} className="rounded-xl border border-slate-200/80 bg-white/70 p-3 shadow-2xs">
-                  <div className="text-base sm:text-lg font-black text-slate-900">{m.val}</div>
-                  <div className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mt-0.5">{m.label}</div>
-                </div>
-              ))}
+              <a
+                href="#what-if"
+                className="w-full sm:w-auto rounded-xl border border-cyan-200 bg-cyan-50/70 hover:bg-cyan-100/70 text-cyan-900 px-5 py-3.5 text-sm font-bold shadow-2xs transition-all text-center"
+              >
+                ⚡ Live 'What-If' Demo
+              </a>
             </div>
           </div>
 
           {/* Interactive Live Hero Terminal Preview */}
-          <div className="mt-8 rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-7 shadow-xl shadow-slate-200/40 relative">
+          <div className="mt-6 rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-7 shadow-xl shadow-slate-200/40 relative">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-5">
               <div className="flex items-center gap-2">
                 <span className="flex gap-1.5">
@@ -359,7 +328,7 @@ export default function LandingPage() {
                   <span className="h-3 w-3 rounded-full bg-amber-400" />
                   <span className="h-3 w-3 rounded-full bg-emerald-400" />
                 </span>
-                <span className="text-xs font-mono font-bold text-slate-400 ml-2">decixai-terminal-v2.4</span>
+                <span className="text-xs font-mono font-bold text-slate-400 ml-2">decixai-live-inference-preview</span>
               </div>
 
               {/* Studio Switcher Tabs inside Hero */}
@@ -395,7 +364,7 @@ export default function LandingPage() {
                       {currentStudio.scoreLabel}
                     </span>
                     <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${currentStudio.badgeColor}`}>
-                      Live Prediction
+                      Calibrated Model Output
                     </span>
                   </div>
 
@@ -404,13 +373,13 @@ export default function LandingPage() {
                       {currentStudio.score}%
                     </span>
                     <span className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                      ✓ High Confidence
+                      ✓ Calibrated Probability
                     </span>
                   </div>
 
                   <div className="mt-4 h-2 w-full rounded-full bg-slate-200 overflow-hidden">
                     <div
-                      className={`h-full rounded-full bg-gradient-to-r ${currentStudio.accentColor} transition-all duration-700`}
+                      className="h-full rounded-full bg-gradient-to-r ${currentStudio.accentColor} transition-all duration-700"
                       style={{ width: `${currentStudio.score}%` }}
                     />
                   </div>
@@ -428,7 +397,7 @@ export default function LandingPage() {
                 {/* AI Plan Snippet */}
                 <div className="rounded-xl border border-cyan-100 bg-cyan-50/40 p-3.5 text-xs text-slate-700">
                   <span className="font-bold text-cyan-900 block text-[11px] uppercase tracking-wider mb-1">
-                    🤖 Grounded XAI Recommendation:
+                    🤖 Grounded Strategic Recommendation:
                   </span>
                   <p className="italic leading-relaxed">"{currentStudio.sampleOutput}"</p>
                 </div>
@@ -438,8 +407,8 @@ export default function LandingPage() {
               <div className="lg:col-span-7 rounded-2xl border border-slate-100 bg-slate-50/40 p-5 space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">SHAP Attribution Waterfall</h3>
-                    <p className="text-[11px] text-slate-500">Exact feature impact calculated for this decision</p>
+                    <h3 className="text-sm font-bold text-slate-900">SHAP Attribution Breakdown</h3>
+                    <p className="text-[11px] text-slate-500">Every factor mathematically isolated — positive drivers and risk penalties</p>
                   </div>
                   <span className="text-[10px] font-mono text-cyan-700 font-bold bg-cyan-100/70 px-2 py-0.5 rounded">
                     Mathematical XAI
@@ -461,7 +430,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="pt-2 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 text-[11px]">Features grounded strictly in model features</span>
+                  <span className="text-slate-500 text-[11px]">Strictly grounded in trained ML feature weights</span>
                   <button
                     onClick={() => navigate(`/dashboard/${activeStudio}`)}
                     className="font-bold text-cyan-700 hover:text-cyan-900 hover:underline cursor-pointer flex items-center gap-1"
@@ -478,8 +447,179 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 3. Interactive 'What-If' Simulator Live Playground ────────────── */}
-      <section id="what-if" className="relative z-10 px-4 sm:px-6 py-16 bg-slate-50/70 border-y border-slate-200/80">
+      {/* ── 3. The Core Problem: Why Black-Box AI Fails ───────────────────── */}
+      <section id="problem" className="relative z-10 px-4 sm:px-6 py-16 bg-slate-900 text-white">
+        <div className="mx-auto max-w-7xl">
+          
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300 bg-cyan-950/80 border border-cyan-800 px-3 py-1 rounded-full">
+              The Reality of Decision Making Today
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tight mt-4 text-white">
+              The Problem: Algorithmic Opacity &amp; AI Hallucinations
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 mt-3 leading-relaxed">
+              When decisions impact careers, credit, venture capital, and public governance,
+              relying on traditional opaque AI introduces severe risks.
+            </p>
+          </div>
+
+          {/* Side-by-side: The Two Critical Flaws vs The Solution */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Flaw 1: Black-Box ML */}
+            <div className="rounded-3xl border border-rose-900/60 bg-rose-950/20 p-6 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">⬛</span>
+                  <span className="text-[11px] font-mono font-bold text-rose-400 bg-rose-900/40 border border-rose-800/60 px-2 py-0.5 rounded-full">
+                    Flaw #1
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white">
+                  Opaque Black-Box ML
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed mt-2">
+                  Traditional ML systems output binary verdicts: <em className="text-rose-300">"Rejected"</em> or <em className="text-rose-300">"High Risk"</em>.
+                  Nobody knows <strong>why</strong>. Neither candidate nor underwriter knows what caused the penalty, making audits impossible.
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5 text-[11px] text-rose-300 font-mono">
+                ⚠️ Result: Zero feedback, untraceable bias, and helplessness.
+              </div>
+            </div>
+
+            {/* Flaw 2: Generative Hallucinations */}
+            <div className="rounded-3xl border border-amber-900/60 bg-amber-950/20 p-6 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">🎭</span>
+                  <span className="text-[11px] font-mono font-bold text-amber-400 bg-amber-900/40 border border-amber-800/60 px-2 py-0.5 rounded-full">
+                    Flaw #2
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white">
+                  Hallucinating LLMs (ChatGPT)
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed mt-2">
+                  Modern LLMs speak with total confidence, but <strong className="text-amber-300">fabricate numbers and invent probabilities</strong> without any mathematical training. Following hallucinated business or credit advice leads to severe losses.
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-2.5 text-[11px] text-amber-300 font-mono">
+                ⚠️ Result: Persuasive text with zero mathematical validity.
+              </div>
+            </div>
+
+            {/* The DeciXAI Solution */}
+            <div className="rounded-3xl border border-cyan-800/80 bg-cyan-950/30 p-6 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">⚡</span>
+                  <span className="text-[11px] font-mono font-bold text-cyan-400 bg-cyan-900/40 border border-cyan-700/60 px-2 py-0.5 rounded-full">
+                    DeciXAI Solution
+                  </span>
+                </div>
+                <h3 className="text-lg font-bold text-white">
+                  Hybrid Grounded Intelligence
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed mt-2">
+                  Deterministic ML calculates calibrated probabilities first. SHAP breaks down each factor mathematically. The LLM is strictly constrained to synthesize strategy based only on verified SHAP drivers, logged in an immutable SHA-256 audit ledger.
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-950/70 border border-cyan-900/60 p-2.5 text-[11px] text-cyan-300 font-mono">
+                ✅ Result: Exact math, full explainability, and real action items.
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── 4. Unified 4 Decision Studios (No Duplication) ─────────────────── */}
+      <section id="studios" className="relative z-10 px-4 sm:px-6 py-16 lg:py-20 bg-white border-b border-slate-200/80">
+        <div className="mx-auto max-w-7xl">
+          
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
+              4 Specialized Decision Studios
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight mt-3">
+              Real-World Problems Solved in Each Studio
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 mt-2">
+              Every studio combines calibrated ML models, SHAP explainability, and domain-specific safety guardrails.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {domainStudios.map((item) => (
+              <div
+                key={item.id}
+                className="rounded-3xl border border-slate-200 bg-slate-50/50 p-6 sm:p-7 flex flex-col justify-between hover:shadow-md transition-all"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <span className="text-3xl">{item.icon}</span>
+                    <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${item.badge}`}>
+                      {item.subtitle}
+                    </span>
+                  </div>
+
+                  <h3 className="text-xl font-black text-slate-950 mb-3">
+                    {item.title}
+                  </h3>
+
+                  {/* The Problem */}
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-3.5 mb-3 text-xs text-rose-950 space-y-1">
+                    <div className="font-bold text-rose-800 uppercase text-[10px] tracking-wider">
+                      ⚠️ Real-World Problem:
+                    </div>
+                    <p className="leading-relaxed">{item.problem}</p>
+                  </div>
+
+                  {/* The DeciXAI Solution */}
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3.5 mb-4 text-xs text-emerald-950 space-y-1">
+                    <div className="font-bold text-emerald-800 uppercase text-[10px] tracking-wider">
+                      ✅ How DeciXAI Solves It:
+                    </div>
+                    <p className="leading-relaxed text-slate-700">{item.solution}</p>
+                  </div>
+
+                  {/* Built-in Features */}
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      Core Built-in Capabilities:
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5 text-xs text-slate-700">
+                      {item.tools.map((tool, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5">
+                          <span className="text-cyan-600 font-bold">•</span>
+                          <span className="truncate">{tool}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+                  <button
+                    onClick={() => navigate(`/dashboard/${item.id}`)}
+                    className="rounded-xl bg-slate-950 hover:bg-slate-800 text-white px-4 py-2 text-xs font-bold transition cursor-pointer"
+                  >
+                    Open {item.title} →
+                  </button>
+                  <span className="text-[11px] font-bold text-cyan-700">Full XAI Access</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+        </div>
+      </section>
+
+      {/* ── 5. Interactive 'What-If' Simulator Live Playground ────────────── */}
+      <section id="what-if" className="relative z-10 px-4 sm:px-6 py-16 bg-slate-50/70 border-b border-slate-200/80">
         <div className="mx-auto max-w-6xl">
           <div className="text-center max-w-2xl mx-auto mb-10">
             <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 border border-cyan-200 px-3 py-1 rounded-full">
@@ -623,357 +763,143 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 4. The 4 Specialized Decision Studios ─────────────────────────── */}
-      <section id="studios" className="relative z-10 px-4 sm:px-6 py-16 lg:py-24">
+      {/* ── 6. How It Works (4-Step Pipeline) ─────────────────────────────── */}
+      <section id="architecture" className="relative z-10 px-4 sm:px-6 py-16 lg:py-20 bg-white border-b border-slate-200/80">
         <div className="mx-auto max-w-7xl">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
-              Comprehensive Domain Suite
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight mt-3">
-              Four High-Stakes Decision Studios
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-600 mt-2">
-              Each studio combines fine-tuned machine learning models with explainable SHAP reasoning and actionable execution roadmaps.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Object.keys(studioShowcases).map((key) => {
-              const s = studioShowcases[key]
-              return (
-                <div
-                  key={key}
-                  className="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-xs hover:shadow-md transition-all flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className={`rounded-lg border px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${s.badgeColor}`}>
-                        {s.tag}
-                      </span>
-                      <span className="text-xs font-mono font-black text-slate-900">
-                        {s.score}% Baseline
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-slate-950">{s.title}</h3>
-                    <p className="mt-2 text-xs sm:text-sm text-slate-600 leading-relaxed">
-                      {s.description}
-                    </p>
-
-                    <div className="mt-5 space-y-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                        Core Built-In Tools:
-                      </span>
-                      {s.features.map((feat, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-xs text-slate-700">
-                          <span className="text-cyan-600 font-bold leading-none mt-0.5">•</span>
-                          <span>{feat}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <button
-                      onClick={() => navigate(`/dashboard/${key}`)}
-                      className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 text-xs font-bold transition cursor-pointer"
-                    >
-                      Open {s.title} →
-                    </button>
-                    <span className="text-[11px] font-bold text-slate-400">Included in Free Tier</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 5. Feature Matrix Bento Grid ─────────────────────────────────── */}
-      <section id="features" className="relative z-10 px-4 sm:px-6 py-16 bg-slate-50/60 border-t border-slate-200/80">
-        <div className="mx-auto max-w-7xl">
-          <div className="text-center max-w-2xl mx-auto mb-12">
+          
+          <div className="text-center max-w-3xl mx-auto mb-12">
             <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-800 bg-cyan-50 border border-cyan-200 px-3 py-1 rounded-full">
-              Enterprise Infrastructure
+              System Architecture
             </span>
             <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight mt-3">
-              Built for Transparency, Auditability &amp; Speed
+              How DeciXAI Operates: Step-by-Step Rigor
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 mt-2">
-              Every feature is built from the ground up to prevent AI hallucinations and provide mathematical certainty.
+              Our hybrid pipeline guarantees mathematical defensibility and eliminates hallucinations.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
               {
-                icon: '📄',
-                title: 'ATS 2.0 Resume Scanner',
-                desc: 'Upload PDF/DOCX resumes for instant skill extraction, Google X-Y-Z bullet rewrites, and target role alignment scoring.',
+                step: '01',
+                title: 'Normalize & Ingest',
+                desc: 'Ingests resumes, eKYC, or venture financials and converts them into normalized feature vectors.',
+                detail: 'O*NET 29.0 taxonomy + IMPS protocol',
               },
               {
-                icon: '⚡',
-                title: 'DigiLocker & Penny Drop KYC',
-                desc: 'Native Indian FinTech integration: instant Aadhaar eKYC via DigiLocker and IMPS bank account penny drop validation.',
+                step: '02',
+                title: 'Deterministic ML',
+                desc: 'Trained Scikit-Learn pipelines & XGBoost decision trees compute calibrated probabilities.',
+                detail: 'Calibrated math, no LLM guesswork',
               },
               {
-                icon: '🎤',
-                title: 'Mock Interview Studio',
-                desc: 'Practice tough domain questions with live STAR scorecard evaluations and actionable feedback from an AI evaluator.',
+                step: '03',
+                title: 'SHAP Decomposition',
+                desc: 'TreeExplainer isolates the exact positive (+) and negative (-) contributions for every parameter.',
+                detail: 'Game-theoretic factor attribution',
               },
               {
-                icon: '💬',
-                title: 'Bilingual AI Copilot with 4 Folders',
-                desc: 'Chat naturally in English or Hindi with strict anti-hallucination guardrails and 1-click "Save to Workspace" studio folders.',
+                step: '04',
+                title: 'Grounded Action Plan',
+                desc: 'Cloud LLM is prompted strictly with verified SHAP drivers to synthesize step-by-step counterfactual roadmaps.',
+                detail: 'SHA-256 tamper-evident ledger',
               },
-              {
-                icon: '🛡️',
-                title: 'Tamper-Evident Audit Trail',
-                desc: 'SHA-256 cryptographic integrity hash for every decision, timestamped history logs, and verifiable public share links.',
-              },
-              {
-                icon: '⚡',
-                title: 'Developer API Hub',
-                desc: 'Provision live API keys, monitor request latency, and run decision inferences from any backend using Python or curl.',
-              },
-            ].map((card, i) => (
-              <div key={i} className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xs hover:shadow-md transition">
-                <div className="text-2xl mb-3">{card.icon}</div>
-                <h3 className="text-base font-bold text-slate-950">{card.title}</h3>
-                <p className="mt-2 text-xs text-slate-600 leading-relaxed">{card.desc}</p>
+            ].map((st, i) => (
+              <div key={i} className="rounded-3xl border border-slate-200 bg-slate-50/70 p-6 flex flex-col justify-between">
+                <div>
+                  <span className="text-3xl font-black text-cyan-600 font-mono">{st.step}</span>
+                  <h3 className="text-base font-bold text-slate-950 mt-3">{st.title}</h3>
+                  <p className="text-xs text-slate-600 mt-2 leading-relaxed">{st.desc}</p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-200 text-[10px] font-mono font-bold text-slate-500">
+                  {st.detail}
+                </div>
               </div>
             ))}
           </div>
+
         </div>
       </section>
 
-      {/* ── 6. Conversational AI Copilot Spotlight ───────────────────────── */}
-      <section id="copilot" className="relative z-10 px-4 sm:px-6 py-16 lg:py-24">
+      {/* ── 7. Grounded Copilot & Developer API Hub (Concise) ─────────────── */}
+      <section className="relative z-10 px-4 sm:px-6 py-16 bg-slate-50/60 border-b border-slate-200/80">
         <div className="mx-auto max-w-6xl">
-          <div className="rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-10 shadow-lg">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-              
-              <div className="lg:col-span-6 space-y-4">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-800 bg-cyan-50 border border-cyan-200 px-3 py-1 rounded-full">
-                  Bilingual Live Copilot
-                </span>
-                <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
-                  Chat Naturally in English or Hindi.
-                  Save Roadmaps Straight to Workspace.
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  DeciXAI Copilot adapts dynamically to the studio you are on. In Career mode,
-                  it offers tailored STAR interview questions and 3-month transition roadmaps. In Finance,
-                  it answers loan eligibility limits in plain Hindi or English.
-                </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            
+            {/* Copilot Summary */}
+            <div className="lg:col-span-5 space-y-4">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-800 bg-cyan-50 border border-cyan-200 px-3 py-1 rounded-full">
+                Bilingual Copilot &amp; API
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
+                Grounded Assistant &amp; RESTful API Hub
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                DeciXAI Copilot speaks English &amp; Hindi, grounded strictly in model features without hallucinating.
+                Developers can integrate the same explainable decision scores via sub-15ms RESTful APIs.
+              </p>
 
-                <div className="space-y-2 pt-2 text-xs text-slate-700">
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-600 font-bold">✓</span>
-                    <span>1-Click <strong>Save to Workspace</strong> with 4 dedicated studio folders</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-600 font-bold">✓</span>
-                    <span>Strict anti-hallucination grounding tied to ML model features</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-emerald-600 font-bold">✓</span>
-                    <span>Real-time streaming text with copy, cancel, and clear options</span>
-                  </div>
-                </div>
-
-                <div className="pt-3">
-                  <button
-                    onClick={() => navigate('/dashboard/workspace?tab=chatbot')}
-                    className="rounded-xl bg-slate-950 hover:bg-slate-800 text-white px-5 py-2.5 text-xs font-bold transition cursor-pointer"
-                  >
-                    View Saved Chatbot Workspace →
-                  </button>
-                </div>
+              <div className="pt-2 flex flex-wrap gap-2 text-xs">
+                <button
+                  onClick={() => navigate('/dashboard/workspace?tab=chatbot')}
+                  className="rounded-xl bg-slate-950 hover:bg-slate-800 text-white px-4 py-2 font-bold transition cursor-pointer"
+                >
+                  Open Copilot Workspace →
+                </button>
+                <button
+                  onClick={() => navigate('/dashboard/developer')}
+                  className="rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 px-4 py-2 font-bold transition cursor-pointer"
+                >
+                  Get Developer API Keys →
+                </button>
               </div>
-
-              {/* Visual Chat Mockup (Light Theme) */}
-              <div className="lg:col-span-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3 shadow-inner">
-                <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-xs font-bold text-slate-800">DeciXAI Copilot</span>
-                    <span className="text-[10px] bg-cyan-100 text-cyan-800 px-1.5 py-0.2 rounded font-bold">Career Mode</span>
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-mono">Live Session</span>
-                </div>
-
-                <div className="space-y-2.5 text-xs">
-                  {/* User Bubble */}
-                  <div className="flex justify-end">
-                    <div className="rounded-2xl bg-slate-900 text-white px-3.5 py-2 max-w-[85%] font-medium">
-                      Data Science me switch karne ke liye step-by-step 3-month roadmap batao
-                    </div>
-                  </div>
-
-                  {/* Assistant Bubble */}
-                  <div className="flex justify-start">
-                    <div className="rounded-2xl bg-white border border-slate-200 p-3.5 max-w-[90%] text-slate-800 shadow-2xs space-y-1.5">
-                      <div className="font-bold text-slate-900 flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-500" />
-                        <span>3-Month Transition Roadmap (Python → Data Science):</span>
-                      </div>
-                      <p className="text-[11px] text-slate-600">
-                        <strong>Month 1:</strong> Advanced Pandas, NumPy &amp; Statistical Hypotheses.<br />
-                        <strong>Month 2:</strong> End-to-End Scikit-Learn pipelines &amp; SHAP model explainability.<br />
-                        <strong>Month 3:</strong> Deploy 2 Production Capstones with FastAPI &amp; Docker.
-                      </p>
-                      <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
-                        <span className="text-slate-400">DeciXAI Intelligence</span>
-                        <span className="rounded bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 border border-emerald-200">
-                          ✓ Saved to Workspace
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 7. Developer API Section ──────────────────────────────────────── */}
-      <section id="developer" className="relative z-10 px-4 sm:px-6 py-16 bg-slate-50/70 border-t border-slate-200/80">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 bg-white border border-slate-200 px-3 py-1 rounded-full">
-              Developer Hub
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-3">
-              RESTful API Inferences in One Request
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-600 mt-2">
-              Integrate explainable decision scoring into your HR systems, banking backends, or SaaS products with instant API keys.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-950 p-5 sm:p-7 text-white shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-              <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                <span className="text-emerald-400">POST</span>
-                <span>https://api.decixai.io/api/v1/career/</span>
-              </div>
-              <button
-                type="button"
-                onClick={copyApiSnippet}
-                className="rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-2.5 py-1 transition cursor-pointer"
-              >
-                {copiedCurl ? '✓ Copied' : 'Copy cURL'}
-              </button>
             </div>
 
-            <pre className="font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto">
+            {/* Developer Code Snippet */}
+            <div className="lg:col-span-7 rounded-2xl border border-slate-200 bg-slate-950 p-5 text-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+                  <span className="text-emerald-400 font-bold">POST</span>
+                  <span>https://api.decixai.io/api/v1/career/</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={copyApiSnippet}
+                  className="rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold px-2 py-1 transition cursor-pointer"
+                >
+                  {copiedCurl ? '✓ Copied' : 'Copy cURL'}
+                </button>
+              </div>
+
+              <pre className="font-mono text-xs text-slate-300 leading-relaxed overflow-x-auto">
 {`curl -X POST https://api.decixai.io/api/v1/career/ \\
   -H "Authorization: Bearer dxa_live_89b2c3d4e5f6..." \\
   -H "Content-Type: application/json" \\
   -d '{
-    "skills": ["Python", "FastAPI", "Docker", "PyTorch"],
-    "projects": ["Vocalis-AI: Speech synthesis tool"],
+    "skills": ["Python", "FastAPI", "Docker"],
     "cgpa": 8.8,
     "interest": "AI Systems & Machine Learning Engineer"
   }'`}
-            </pre>
-
-            <div className="mt-6 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-              <span className="text-slate-400 font-medium">Response returns score, SHAP feature weights, and roadmap milestones in &lt;15ms.</span>
-              <button
-                onClick={() => navigate('/dashboard/developer')}
-                className="rounded-lg bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black px-4 py-2 transition cursor-pointer"
-              >
-                Get API Keys in Developer Hub →
-              </button>
+              </pre>
+              <div className="mt-3 pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                Returns calibrated probability, SHAP factors, and roadmap in &lt;15ms.
+              </div>
             </div>
+
           </div>
         </div>
       </section>
 
-      {/* ── 8. Comparison Matrix: DeciXAI vs Black-Box AI ─────────────────── */}
-      <section className="relative z-10 px-4 sm:px-6 py-16 lg:py-24">
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
-              Decision Defense
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-3">
-              Why Leaders Choose DeciXAI Over Generic LLMs
-            </h2>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/80 font-bold text-slate-600">
-                    <th className="p-4">Capability</th>
-                    <th className="p-4 text-cyan-900 font-extrabold bg-cyan-50/60">DeciXAI Platform</th>
-                    <th className="p-4 text-slate-500">Black-Box LLMs (ChatGPT)</th>
-                    <th className="p-4 text-slate-500">Manual Spreadsheets</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {[
-                    {
-                      name: 'Mathematical Feature Explainability (SHAP)',
-                      deci: '✓ Exact SHAP Attribution',
-                      other1: '✗ Fabricated / Hallucinated',
-                      other2: '✗ None',
-                    },
-                    {
-                      name: 'Counterfactual "What-If" Delta Simulator',
-                      deci: '✓ Live Interactive Deltas',
-                      other1: '✗ Static Output',
-                      other2: '✗ High Manual Work',
-                    },
-                    {
-                      name: 'Multi-Studio Coverage (Career, Finance, Startup, Policy)',
-                      deci: '✓ 4 Unified Studios',
-                      other1: '✗ Generic General Knowledge',
-                      other2: '✗ Fragmented Tools',
-                    },
-                    {
-                      name: 'Verified FinTech KYC (DigiLocker & Penny Drop)',
-                      deci: '✓ Built-in Protocol',
-                      other1: '✗ Not Supported',
-                      other2: '✗ Third-Party Portals',
-                    },
-                    {
-                      name: 'Tamper-Evident SHA-256 Audit Trail',
-                      deci: '✓ Immutable Verification',
-                      other1: '✗ Ephemeral Chats',
-                      other2: '✗ Unsecured Sheets',
-                    },
-                  ].map((row, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/50 transition">
-                      <td className="p-4 font-bold text-slate-900">{row.name}</td>
-                      <td className="p-4 font-bold text-cyan-800 bg-cyan-50/30">{row.deci}</td>
-                      <td className="p-4 text-slate-500 font-medium">{row.other1}</td>
-                      <td className="p-4 text-slate-400 font-medium">{row.other2}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 9. Interactive FAQ Accordion ─────────────────────────────────── */}
-      <section id="faq" className="relative z-10 px-4 sm:px-6 py-16 bg-slate-50/60 border-t border-slate-200/80">
+      {/* ── 8. Concise FAQ Accordion ──────────────────────────────────────── */}
+      <section id="faq" className="relative z-10 px-4 sm:px-6 py-16 bg-white border-b border-slate-200/80">
         <div className="mx-auto max-w-3xl">
           <div className="text-center mb-10">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 bg-white border border-slate-200 px-3 py-1 rounded-full">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full">
               Frequently Asked Questions
             </span>
             <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight mt-3">
-              Everything You Need to Know
+              Why DeciXAI Matters
             </h2>
           </div>
 
@@ -1007,18 +933,17 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── 10. High-Impact Bottom Call to Action ─────────────────────────── */}
-      <section className="relative z-10 px-4 sm:px-6 py-20">
+      {/* ── 9. Final Call to Action ───────────────────────────────────────── */}
+      <section className="relative z-10 px-4 sm:px-6 py-20 bg-gradient-to-b from-white to-slate-50">
         <div className="mx-auto max-w-4xl rounded-3xl border border-cyan-200 bg-gradient-to-br from-cyan-50 via-sky-50 to-indigo-50 p-8 sm:p-14 text-center shadow-lg">
           <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-800 bg-white border border-cyan-200 px-3 py-1 rounded-full shadow-2xs">
-            Start Free Today
+            Ground Your Decisions Today
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-950 tracking-tight mt-4">
             Make Decisions You Can Mathematically Defend.
           </h2>
           <p className="mt-3 text-sm sm:text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
-            Join candidates, loan officers, startup founders, and policy analysts utilizing
-            transparent, explainable AI intelligence.
+            Eliminate blind black-box rejections and generic hallucinations with verifiable, explainable AI intelligence.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -1026,19 +951,19 @@ export default function LandingPage() {
               onClick={handleGetStarted}
               className="w-full sm:w-auto rounded-xl bg-slate-950 hover:bg-slate-800 text-white px-8 py-3.5 text-sm font-bold shadow-md hover:shadow-lg transition cursor-pointer"
             >
-              Get Started in 30 Seconds →
+              Launch Decision Studio →
             </button>
             <button
               onClick={() => navigate('/dashboard/career')}
               className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 px-6 py-3.5 text-sm font-bold shadow-2xs transition cursor-pointer"
             >
-              Explore Live Studios
+              Explore Career Studio
             </button>
           </div>
         </div>
       </section>
 
-      {/* ── 11. Crisp Clean Light Footer ─────────────────────────────────── */}
+      {/* ── 10. Footer ────────────────────────────────────────────────────── */}
       <footer className="border-t border-slate-200/90 bg-white px-4 sm:px-6 py-12 text-xs text-slate-500">
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
@@ -1048,16 +973,16 @@ export default function LandingPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-6 font-semibold">
-            <button onClick={() => navigate('/dashboard/career')} className="hover:text-slate-900 transition">Career Studio</button>
-            <button onClick={() => navigate('/dashboard/finance')} className="hover:text-slate-900 transition">Finance Studio</button>
-            <button onClick={() => navigate('/dashboard/startup')} className="hover:text-slate-900 transition">Startup Studio</button>
-            <button onClick={() => navigate('/dashboard/policy')} className="hover:text-slate-900 transition">Policy Studio</button>
-            <button onClick={() => navigate('/dashboard/workspace')} className="hover:text-slate-900 transition">Saved Workspace</button>
-            <button onClick={() => navigate('/dashboard/developer')} className="hover:text-slate-900 transition">Developer API</button>
+            <button onClick={() => navigate('/dashboard/career')} className="hover:text-slate-900 transition cursor-pointer">Career Studio</button>
+            <button onClick={() => navigate('/dashboard/finance')} className="hover:text-slate-900 transition cursor-pointer">Finance Studio</button>
+            <button onClick={() => navigate('/dashboard/startup')} className="hover:text-slate-900 transition cursor-pointer">Startup Studio</button>
+            <button onClick={() => navigate('/dashboard/policy')} className="hover:text-slate-900 transition cursor-pointer">Policy Studio</button>
+            <button onClick={() => navigate('/dashboard/workspace')} className="hover:text-slate-900 transition cursor-pointer">Saved Workspace</button>
+            <button onClick={() => navigate('/dashboard/developer')} className="hover:text-slate-900 transition cursor-pointer">Developer API</button>
           </div>
 
           <div className="text-[11px] text-slate-400">
-            © {new Date().getFullYear()} DeciXAI. All mathematical models grounded in XAI.
+            © {new Date().getFullYear()} DeciXAI. Grounded in Explainable AI (XAI) &amp; Deterministic ML.
           </div>
         </div>
       </footer>

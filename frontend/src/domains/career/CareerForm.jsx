@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import axios from 'axios'
+import { uploadResume } from '../../api'
 import { CAREER_PERSONAS, CAREER_PARENT_DOMAINS, CAREER_TARGET_ROLES, CAREER_PRESETS } from './careerConfig'
 
 const renderIcon = (iconName) => {
@@ -216,34 +217,33 @@ export default function CareerForm({
     setResumeSuccessMsg('')
 
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      if (input.interest) formData.append('target_role', input.interest)
+      const data = await uploadResume(file, input.interest || '')
+      const creds = data.parsed_profile || data.parsed_credentials || data.normalized || {}
 
-      const response = await axios.post(`${API_BASE_URL}/api/v1/career/upload-resume`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-
-      const data = response.data
-      const creds = data.parsed_credentials || data.normalized || {}
+      const extractedSkills = Array.isArray(creds.skills) && creds.skills.length > 0 ? creds.skills : null
+      const extractedProjects = Array.isArray(creds.projects) && creds.projects.length > 0 ? creds.projects : null
 
       setInput((prev) => ({
         ...prev,
         course: creds.degree || creds.course || prev.course || 'B.Tech',
         specialization: creds.specialization || prev.specialization || 'Computer Science',
-        cgpa: creds.cgpa || prev.cgpa || 8.0,
-        skills: creds.skills && creds.skills.length > 0 ? creds.skills : prev.skills,
-        projects: creds.projects && creds.projects.length > 0 ? creds.projects : prev.projects,
-        certifications: creds.certifications || prev.certifications || [],
-        internships: creds.internships || prev.internships || [],
-        resume_text: data.raw_text || '',
+        cgpa: typeof creds.cgpa === 'number' && creds.cgpa > 0 ? creds.cgpa : (prev.cgpa || 8.0),
+        raw_score: typeof creds.cgpa === 'number' && creds.cgpa > 0 ? creds.cgpa : (prev.raw_score || 8.0),
+        skills: extractedSkills || prev.skills,
+        projects: extractedProjects || prev.projects,
+        certifications: Array.isArray(creds.certifications) && creds.certifications.length > 0 ? creds.certifications : prev.certifications,
+        internships: Array.isArray(creds.internships) && creds.internships.length > 0 ? creds.internships : prev.internships,
+        resume_text: data.extracted_text_preview || data.raw_text || '',
         resume_extracted: true,
       }))
 
-      setResumeSuccessMsg(`Resume successfully parsed! Extracted ${creds.skills?.length || 0} skills and ${creds.projects?.length || 0} projects.`)
+      const skillsCount = extractedSkills?.length || 0
+      const projectsCount = extractedProjects?.length || 0
+      setResumeSuccessMsg(`Resume successfully parsed! Extracted ${skillsCount} skills and ${projectsCount} projects into form state.`)
     } catch (err) {
       console.error('Resume upload error:', err)
-      setResumeErrorMsg(err.response?.data?.detail || 'Failed to parse resume. You can fill the fields manually.')
+      const msg = err.response?.data?.detail || err.message || 'Failed to parse resume. Ensure backend server is running on port 8002.'
+      setResumeErrorMsg(msg)
     } finally {
       setUploadingResume(false)
     }
