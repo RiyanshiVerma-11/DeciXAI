@@ -375,7 +375,7 @@ async def get_status(application_id: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 DIGILOCKER_CLIENT_ID = os.getenv('DIGILOCKER_CLIENT_ID', 'SANDBOX_DECIXAI_FINANCE')
 DIGILOCKER_CLIENT_SECRET = os.getenv('DIGILOCKER_CLIENT_SECRET', 'sandbox_secret_key')
-DIGILOCKER_REDIRECT_URI = os.getenv('DIGILOCKER_REDIRECT_URI', 'http://localhost:3002/loan-application/digilocker/callback')
+DIGILOCKER_REDIRECT_URI = os.getenv('DIGILOCKER_REDIRECT_URI', 'http://localhost:3003/loan-application/digilocker/callback')
 DIGILOCKER_ENV = os.getenv('DIGILOCKER_ENV', 'sandbox')
 
 _DIGILOCKER_SESSIONS: dict[str, dict[str, Any]] = {}
