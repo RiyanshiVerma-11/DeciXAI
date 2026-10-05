@@ -26,16 +26,26 @@ class CareerInput(BaseModel):
 
 
 class FinanceInput(BaseModel):
-    income: float = Field(..., ge=1.0, description="Annual income must be positive")
-    loan: float = Field(..., ge=0.0, description="Loan amount cannot be negative")
+    income: float = Field(..., ge=1.0, le=100_000_000_000.0, description="Annual income, bounded up to 100B to reject absurd values")
+    loan: float = Field(..., ge=0.0, le=100_000_000_000.0, description="Loan amount, bounded up to 100B to reject absurd values")
     credit_score: float = Field(..., ge=300.0, le=850.0, description="Credit score must be between 300 and 850")
 
 
 class StartupInput(BaseModel):
-    funding: float = Field(..., ge=0.0, description="Funding amount cannot be negative")
-    team_size: int = Field(..., ge=1, description="Team size must be at least 1")
-    market: str
+    funding: float = Field(..., ge=0.0, le=100_000_000_000.0, description="Funding amount in the given currency, bounded up to 100B to keep runway math sane")
+    team_size: int = Field(..., ge=1, le=10_000, description="Team size must be between 1 and 10000")
+    market: str = Field(..., min_length=1, description="Target market / vertical, non-empty")
     experience: float = Field(..., ge=0.0, le=60.0, description="Founder years of experience, bounded up to 60")
+    currency: str = Field("USD", description="Funding currency: INR or USD (₹/$). Model normalizes to USD internally.")
+
+    @model_validator(mode="after")
+    def normalize_currency(self) -> "StartupInput":
+        cur = str(self.currency or "USD").strip().upper()
+        if cur in {"₹", "RS", "RS.", "RUPEE", "RUPEES", "INR"}:
+            self.currency = "INR"
+        else:
+            self.currency = "USD"
+        return self
 
 
 class StartupPromptInput(BaseModel):
@@ -47,9 +57,9 @@ class CareerPromptInput(BaseModel):
 
 
 class PolicyInput(BaseModel):
-    sector: str
-    budget: float = Field(..., ge=0.0, description="Policy budget cannot be negative")
-    population: float = Field(..., ge=0.0, description="Target population size cannot be negative")
+    sector: str = Field(..., min_length=1, description="Policy sector, non-empty")
+    budget: float = Field(..., ge=0.0, le=1_000_000_000_000.0, description="Policy budget, bounded up to 1T to reject absurd values")
+    population: float = Field(..., ge=0.0, le=10_000_000_000.0, description="Target population, bounded up to 10B (world population)")
     political_support: str | None = None
     infrastructure_readiness: str | None = None
     risk_level: str | None = None

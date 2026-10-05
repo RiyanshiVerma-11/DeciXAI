@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { submitCareer } from '../api'
+import StartupRoadmapCard from './StartupRoadmapCard'
 
 const DOMAIN_STYLES = {
   career: {
@@ -1162,6 +1163,7 @@ export default function InsightPanel({
   const followupQuestions = Array.isArray(result.followup_questions) ? result.followup_questions : []
   const evidenceSources = result?.details?.retrieved_sources || []
   const careerIntel = result?.details?.career_intelligence || null
+  const startupRoadmap = result?.details?.startup_roadmap || null
   const ringId = `scoreRingGradient-${domain}-${score}-${title.replace(/\s+/g, '-').toLowerCase()}`
 
   return (
@@ -1226,11 +1228,14 @@ export default function InsightPanel({
         {/* Roadmap (Career only) */}
         {domain === 'career' && careerIntel && <DualRoadmapCard intel={careerIntel} input={input} />}
 
+        {/* Roadmap (Startup phased execution plan) */}
+        {domain === 'startup' && startupRoadmap && <StartupRoadmapCard roadmap={startupRoadmap} />}
+
         {/* Evidence (Career only) */}
         {domain === 'career' && evidenceSources.length > 0 && <EvidenceCard sources={evidenceSources} />}
 
-        {/* Quick Questions (Career only) */}
-        {domain === 'career' && followupQuestions.length > 0 && <QuestionsCard questions={followupQuestions} />}
+        {/* Quick Questions (Career + Startup) */}
+        {(domain === 'career' || domain === 'startup') && followupQuestions.length > 0 && <QuestionsCard questions={followupQuestions} />}
 
         {/* Blocking Factors */}
         {blockingFactors.length > 0 && <BlockingFactorsCard items={blockingFactors} />}

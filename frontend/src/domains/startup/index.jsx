@@ -21,6 +21,7 @@ import { useAuth } from '../../components/AuthContext'
 
 const INITIAL_STARTUP_INPUT = {
   funding: 300000,
+  currency: 'USD',
   team_size: 5,
   market: 'B2B SaaS',
   experience: 4,
@@ -143,7 +144,7 @@ export default function StartupDomain() {
       const payload = {
         title: `Startup Evaluation - ${new Date().toLocaleDateString()}`,
         domain: 'startup',
-        notes: `Venture viability for ${activeInput.market} ($${activeInput.funding} funding, team of ${activeInput.team_size})`,
+        notes: `Venture viability for ${activeInput.market} (${activeInput.currency === 'INR' ? '₹' : '$'}${activeInput.funding} funding, team of ${activeInput.team_size})`,
         tags: 'Startup,Venture,Evaluation',
         input_payload: activeInput,
         output_payload: result || {},
@@ -151,7 +152,7 @@ export default function StartupDomain() {
         verdict: effectiveVerdict,
         input: activeInput,
         result: result || {},
-        summary: `Venture viability for ${activeInput.market} ($${activeInput.funding} funding, team of ${activeInput.team_size})`,
+        summary: `Venture viability for ${activeInput.market} (${activeInput.currency === 'INR' ? '₹' : '$'}${activeInput.funding} funding, team of ${activeInput.team_size})`,
       }
       await saveDecision(payload, effectiveToken)
       alert('Project saved successfully to your Workspace.')
@@ -165,14 +166,28 @@ export default function StartupDomain() {
     setIsSidebarCollapsed(false)
   }
 
+  const hasScore = (payload) =>
+    payload && (typeof payload.score === 'number' || typeof payload.probability === 'number')
+
   const hasComparisonResult = Boolean(
-    result && pinnedResult && result.metrics && pinnedResult.metrics
+    result && pinnedResult && hasScore(result) && hasScore(pinnedResult)
   )
+
+  const toCompareItem = (payload, title) => {
+    if (!payload) return null
+    return {
+      score: typeof payload.score === 'number' ? payload.score : undefined,
+      domain: 'startup',
+      title,
+      verdict: payload.decision || payload.score_label || 'Evaluated',
+      output_payload: payload,
+    }
+  }
 
   const interactiveFields = [
     {
       name: 'funding',
-      label: 'Capital Raised ($)',
+      label: `Capital Raised (${interactiveInput?.currency === 'INR' ? '₹' : '$'})`,
       type: 'number',
       range: { min: 10000, max: 1000000, step: 25000 },
       value: interactiveInput?.funding || 300000,
@@ -305,6 +320,39 @@ export default function StartupDomain() {
         </div>
       )}
 
+      {result && (
+        <div className="rounded-2xl border border-fuchsia-200 bg-fuchsia-50/60 p-3 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-fuchsia-950 font-medium">
+            <span className="font-black uppercase tracking-wider text-fuchsia-800 mr-2">
+              Market Segment:
+            </span>
+            Toggle to see traction-phase tasks update live.
+          </div>
+          <div className="flex items-center gap-2">
+            {['enterprise', 'consumer'].map((segment) => {
+              const current = String(interactiveInput?.market || '').toLowerCase()
+              const active = segment === 'enterprise'
+                ? /enterprise|b2b/.test(current)
+                : /consumer|b2c|d2c/.test(current)
+              return (
+                <button
+                  key={segment}
+                  type="button"
+                  onClick={() => handleInteractiveChange('market', segment)}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-bold capitalize transition shadow-2xs cursor-pointer ${
+                    active
+                      ? 'bg-fuchsia-600 text-white'
+                      : 'bg-white border border-fuchsia-300 text-fuchsia-800 hover:bg-fuchsia-100'
+                  }`}
+                >
+                  {segment}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {result ? (
         hasComparisonResult ? (
           <DecisionReport
@@ -353,13 +401,9 @@ export default function StartupDomain() {
 
       {isCompareOpen && (
         <CompareModal
-          isOpen={isCompareOpen}
+          itemA={toCompareItem(pinnedResult, 'Startup Baseline')}
+          itemB={toCompareItem(result, 'Startup Candidate')}
           onClose={() => setIsCompareOpen(false)}
-          domain="startup"
-          baselinePayload={pinnedResult}
-          candidatePayload={result}
-          baselineInput={pinnedInputs}
-          candidateInput={resultInput || input}
         />
       )}
     </DomainLayout>
