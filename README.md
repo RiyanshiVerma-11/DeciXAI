@@ -470,3 +470,4 @@ DeciXAI satisfies enterprise governance and auditability requirements:
 This project is licensed under the **MIT License**.
 
 Developed with ❤️ by **Riyanshi Verma** — Transforming complex machine learning and explainable AI into actionable decision intelligence.
+
