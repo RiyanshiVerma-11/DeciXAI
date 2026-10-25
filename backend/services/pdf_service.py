@@ -118,6 +118,81 @@ def generate_decision_report(domain: str, decision_data: dict) -> io.BytesIO:
         elements.append(Paragraph("Detailed Context", heading_style))
         elements.append(Paragraph(explanation, normal_style))
 
+    # Startup phased roadmap (deterministic, mirrors career roadmap in UI)
+    details = decision_data.get('details') or {}
+    startup_roadmap = details.get('startup_roadmap') or decision_data.get('startup_roadmap')
+    if isinstance(startup_roadmap, dict):
+        phases = startup_roadmap.get('phases') or []
+        if phases:
+            stage = startup_roadmap.get('stage', '')
+            vertical = startup_roadmap.get('vertical') or {}
+            vertical_label = vertical.get('label', '') if isinstance(vertical, dict) else ''
+            heading = f"Startup Roadmap{f' — {stage}' if stage else ''}{f' ({vertical_label})' if vertical_label else ''}"
+            elements.append(Paragraph(heading, heading_style))
+            funding_plan = startup_roadmap.get('funding_plan') or {}
+            if isinstance(funding_plan, dict) and funding_plan:
+                burn = funding_plan.get('monthly_burn', '')
+                runway = funding_plan.get('runway_months', '')
+                try:
+                    burn_txt = f"${int(burn):,}/mo" if burn != '' else 'N/A'
+                except Exception:
+                    burn_txt = str(burn)
+                elements.append(Paragraph(
+                    f"<b>Funding plan:</b> burn {burn_txt} | runway ~{runway} mo | "
+                    f"target ${int(startup_roadmap.get('capital_target') or funding_plan.get('capital_target') or 0):,}",
+                    normal_style))
+                elements.append(Spacer(1, 4))
+                for use in (funding_plan.get('use_of_funds') or [])[:3]:
+                    elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;• {use}", normal_style))
+                    elements.append(Spacer(1, 4))
+            hiring_plan = startup_roadmap.get('hiring_plan') or []
+            if hiring_plan:
+                elements.append(Paragraph("<b>Hiring plan:</b>", normal_style))
+                elements.append(Spacer(1, 4))
+                for hire in hiring_plan[:5]:
+                    if isinstance(hire, dict):
+                        elements.append(Paragraph(
+                            f"&nbsp;&nbsp;&nbsp;&nbsp;• {hire.get('role', '')} [{hire.get('when', '')}] — {hire.get('why', '')}",
+                            normal_style))
+                    else:
+                        elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;• {hire}", normal_style))
+                    elements.append(Spacer(1, 4))
+            risk_flags = startup_roadmap.get('risk_flags') or []
+            if risk_flags:
+                risk_style = ParagraphStyle(
+                    'RiskFlagStyle',
+                    parent=normal_style,
+                    textColor=colors.HexColor("#b91c1c"),
+                    fontName='Helvetica-Bold',
+                    backColor=colors.HexColor("#fef2f2"),
+                    borderPadding=(6, 6, 6),
+                )
+                elements.append(Paragraph("CRITICAL BLOCKERS — fix before scaling:", heading_style))
+                for flag in risk_flags[:5]:
+                    elements.append(Paragraph(f"⛔ {flag}", risk_style))
+                    elements.append(Spacer(1, 6))
+            gaps = startup_roadmap.get('gaps') or []
+            for gap in gaps[:4]:
+                elements.append(Paragraph(f"• Gap: {gap}", normal_style))
+                elements.append(Spacer(1, 6))
+            for phase in phases:
+                name = phase.get('phase', 'Phase')
+                timeline = phase.get('timeline', '')
+                focus = phase.get('focus', '')
+                elements.append(Paragraph(f"<b>{name} ({timeline})</b> — {focus}", normal_style))
+                elements.append(Spacer(1, 4))
+                for task in (phase.get('tasks') or [])[:5]:
+                    elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;• {task}", normal_style))
+                    elements.append(Spacer(1, 4))
+                exit_gate = phase.get('exit_criteria', '')
+                if exit_gate:
+                    elements.append(Paragraph(f"<i>Exit gate: {exit_gate}</i>", normal_style))
+                    elements.append(Spacer(1, 4))
+                for kpi in (phase.get('kpis') or [])[:4]:
+                    elements.append(Paragraph(f"&nbsp;&nbsp;&nbsp;&nbsp;▸ KPI: {kpi}", normal_style))
+                    elements.append(Spacer(1, 4))
+                elements.append(Spacer(1, 2))
+
     doc.build(elements)
     buffer.seek(0)
     return buffer

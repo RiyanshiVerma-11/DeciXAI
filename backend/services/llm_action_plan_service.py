@@ -90,16 +90,16 @@ def generate_action_plan(
         "Constraints:\n"
         "1. Confidence Calibration: Do not exceed 80% unless they have production/internship proof.\n"
         "2. Score Consistency: Ensure your reasoning matches the provided scores.\n"
-        "3. Action Plan: Be specific and realistic. If Python is a core skill, prioritize suggesting Flask/Django for backend pivots. Avoid suggesting Node.js unless it fits their existing JS expertise.\n"
+        "3. Action Plan: Be specific, realistic, and strictly domain-appropriate. For non-tech roles (Legal, Compliance, Finance, Design, Marketing), suggest field-specific competencies (e.g., regulatory frameworks, compliance protocols, financial modeling, design systems, CRO); NEVER suggest software frameworks like Flask, Django, or Docker for legal, finance, or design candidates unless explicitly requested. For tech profiles, suggest tools matching their target specialization.\n"
         "4. 🔥 REALISTIC PROJECT IDEAS (ACHIEVABLE):\n"
-        "   Suggest 3-4 resume-worthy projects. Avoid overkill like 'Microservices' for beginners. Focus on robust CRUD, data pipelines, or automated tools.\n"
+        "   Suggest 3-4 resume-worthy deliverables tailored to their target profession. For tech: robust apps/pipelines; for legal/compliance: compliance protocols, contract frameworks, policy audits; for finance: DCF/LBO models; for design: design systems and usability studies.\n"
         "   Each MUST include:\n"
-        "   - Title: Professional project name\n"
+        "   - Title: Professional project / deliverable name\n"
         "   - Problem: Real-world scenario\n"
-        "   - Stack: Realistic tools (e.g. Flask/React, not Kafka/K8s for starters)\n"
+        "   - Stack: Relevant domain tools / frameworks\n"
         "   - Features: 2-3 core tasks\n"
         "   - Impact: Recruiter signal\n"
-        "   - Deployment: Hosting strategy\n\n"
+        "   - Deployment: Deliverable format / hosting strategy\n\n"
         "Return ONLY JSON in this exact format:\n"
         "{\n"
         "  \"reality_check\": \"Blunt 1-sentence assessment\",\n"
@@ -122,32 +122,9 @@ def generate_action_plan(
         {"role": "user", "content": json.dumps(user, ensure_ascii=True)},
     ]
 
-    request = _ollama_request(messages, num_predict=1200)  # more tokens for detailed projects
-    try:
-        with urlopen(request, timeout=timeout_seconds) as response:
-            raw = response.read().decode("utf-8")
-            data = json.loads(raw)
-            content = _extract_content(data).strip()
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, ValueError):
-        return None
-
-    if not content:
-        return None
-
-    # Parse JSON response safely.
-    try:
-        parsed = json.loads(content)
-    except json.JSONDecodeError:
-        start = content.find("{")
-        end = content.rfind("}")
-        if start < 0 or end < 0 or end <= start:
-            return None
-        try:
-            parsed = json.loads(content[start : end + 1])
-        except Exception:
-            return None
-
-    if not isinstance(parsed, dict):
+    from services.llm_client import call_llm_json
+    parsed = call_llm_json(messages, timeout_seconds=timeout_seconds)
+    if not parsed or not isinstance(parsed, dict):
         return None
 
     return {
@@ -155,4 +132,5 @@ def generate_action_plan(
         "reality_check": parsed.get("reality_check", "Profile is promising but needs more production-ready evidence."),
         "project_ideas": parsed.get("project_ideas", [])[:3]
     }
+
 

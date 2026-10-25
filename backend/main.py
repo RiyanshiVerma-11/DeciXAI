@@ -8,7 +8,21 @@ Action Plans across career, finance, startup, and policy domains.
 from __future__ import annotations
 
 import os
+import sys
 import time
+
+# Windows consoles default to cp1252, which crashes on roadmap/XAI symbols
+# (>=, em-dashes, emoji). Force UTF-8 so logging/printing never raises
+# UnicodeEncodeError regardless of terminal code page.
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    try:
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
@@ -36,7 +50,7 @@ logger = get_logger(__name__)
 
 ALLOWED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002,http://127.0.0.1:5173").split(",")
+    for origin in os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3003,http://127.0.0.1:3003").split(",")
     if origin.strip()
 ]
 
@@ -94,6 +108,7 @@ app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit Trail"])
 app.include_router(loan_application.router, prefix="/loan-application", tags=["Finance Application"])
 
 # Backward-compatible routes (no /api/v1 prefix) — keeps existing clients working.
+app.include_router(auth.router, prefix="/auth", tags=["Authentication (legacy)"], include_in_schema=False)
 app.include_router(career.router, prefix="/career", tags=["Career (legacy)"], include_in_schema=False)
 app.include_router(finance.router, prefix="/finance", tags=["Finance (legacy)"], include_in_schema=False)
 app.include_router(startup.router, prefix="/startup", tags=["Startup (legacy)"], include_in_schema=False)

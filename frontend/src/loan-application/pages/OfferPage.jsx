@@ -28,11 +28,15 @@ export default function OfferPage() {
   const statusTone = isApproved ? 'border-emerald-200 bg-emerald-50' : offer?.status === 'rejected' ? 'border-rose-200 bg-rose-50' : 'border-amber-200 bg-amber-50';
   const reasons = offer?.reasons || (offer?.reviewSummary ? [offer.reviewSummary] : []);
   return (
-    <div className="min-h-screen bg-slate-100 p-6">
-      <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
-        <h1 className="text-3xl font-bold text-slate-900">Loan Decision</h1>
-        <p className="mt-2 text-slate-600">This result uses the information you submitted. No credit score or offer values are invented.</p>
-        <div className={`mt-6 rounded-xl border p-6 ${statusTone}`}>
+    <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
+      <div className="rounded-2xl border border-slate-200/80 bg-white/95 backdrop-blur-md p-6 sm:p-8 shadow-xl shadow-slate-200/40">
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 border border-emerald-200/60 mb-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Deterministic Decision Engine
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Loan Evaluation Decision</h1>
+        <p className="mt-1 text-sm text-slate-500">This decision is synthesized from your verified financial profile and loan terms with real-time explainability.</p>
+        <div className={`mt-6 rounded-2xl border p-6 ${statusTone}`}>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="text-sm text-slate-500">Approval status</p>

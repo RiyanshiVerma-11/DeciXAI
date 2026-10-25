@@ -121,7 +121,30 @@ def authenticate_user(email: str, password: str) -> dict | None:
     }
 
 
+def get_user_by_email(email: str) -> dict | None:
+    """Fetch a user by their email address."""
+    with get_db() as db:
+        cursor = db.execute(
+            "SELECT id, email, name, created_at, tier, credits_used FROM users WHERE email = ?",
+            (email.strip().lower(),),
+        )
+        row = cursor.fetchone()
+
+    if row is None:
+        return None
+
+    return {
+        "id": row[0],
+        "email": row[1],
+        "name": row[2],
+        "created_at": row[3],
+        "tier": row[4] if len(row) > 4 and row[4] else "free",
+        "credits_used": row[5] if len(row) > 5 and row[5] is not None else 0,
+    }
+
+
 def get_user_by_id(user_id: int) -> dict | None:
+
     """Fetch a user by their ID."""
     with get_db() as db:
         cursor = db.execute(
@@ -159,4 +182,27 @@ def increment_user_credits(user_id: int) -> int:
         cursor = db.execute("SELECT credits_used FROM users WHERE id = ?", (user_id,))
         row = cursor.fetchone()
         return row[0] if row else 0
+
+
+def get_or_create_guest_user() -> int:
+    """Return user_id of the default guest/demo workspace user, creating if necessary."""
+    with get_db() as db:
+        cursor = db.execute("SELECT id FROM users WHERE email = 'guest@decixai.com'")
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        # Check if any user exists at all
+        cursor = db.execute("SELECT id FROM users ORDER BY id ASC LIMIT 1")
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        # Create guest user
+        hashed = hash_password("Guest@DeciXAI2025")
+        cursor = db.execute(
+            "INSERT INTO users (email, name, password_hash, tier, credits_used) VALUES (?, ?, ?, ?, ?)",
+            ("guest@decixai.com", "Guest User", hashed, "free", 0),
+        )
+        db.commit()
+        return cursor.lastrowid
+
 

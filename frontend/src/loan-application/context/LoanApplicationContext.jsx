@@ -1,13 +1,21 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
+import { useAuth } from '../../components/AuthContext';
 
 const LoanApplicationContext = createContext(null);
 
-const api = axios.create({ baseURL: 'http://localhost:8000/loan-application' });
+const API_BASE = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8002`;
+const api = axios.create({ baseURL: `${API_BASE}/loan-application` });
 
 export const LoanApplicationProvider = ({ children }) => {
+  const authContext = useAuth();
+  const user = authContext?.user;
+
   const [formData, setFormData] = useState({
-    personalDetails: {},
+    personalDetails: {
+      fullName: user?.name || '',
+      email: user?.email || '',
+    },
     loanDetails: {},
     employmentDetails: {},
     financialInfo: {},
@@ -18,6 +26,25 @@ export const LoanApplicationProvider = ({ children }) => {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [offer, setOffer] = useState(null);
+
+  useEffect(() => {
+    if (user) {
+      setFormData((prev) => {
+        const personal = prev.personalDetails || {};
+        if (!personal.fullName || !personal.email) {
+          return {
+            ...prev,
+            personalDetails: {
+              ...personal,
+              fullName: personal.fullName || user.name || '',
+              email: personal.email || user.email || '',
+            },
+          };
+        }
+        return prev;
+      });
+    }
+  }, [user]);
 
   const updateField = (section, payload) => {
     setFormData((prev) => ({ ...prev, [section]: { ...(prev[section] || {}), ...payload } }));

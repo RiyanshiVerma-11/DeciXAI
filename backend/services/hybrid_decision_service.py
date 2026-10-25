@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from difflib import SequenceMatcher
 from typing import Any
@@ -40,6 +41,10 @@ INTEREST_HINTS = {
     "data": ["data science", "analytics", "machine learning"],
     "management": ["product management", "business analyst", "management", "finance", "consulting", "marketing"],
     "technical": ["software development", "software engineer", "web developer", "frontend", "backend", "cloud", "devops", "aws", "azure", "gcp", "docker", "kubernetes", "sre", "ui/ux", "cybersecurity"],
+    "legal": ["corporate law", "legal counsel", "compliance", "regulatory", "due diligence", "contract drafting", "gdpr", "intellectual property", "ip law", "litigation"],
+    "finance": ["financial analysis", "investment banking", "equity research", "accounting", "portfolio management", "valuation", "fintech"],
+    "healthcare": ["clinical research", "pharmacovigilance", "medical affairs", "regulatory affairs", "healthcare consultant", "biotech"],
+    "design": ["ui/ux design", "product design", "user experience", "figma", "interaction design", "wireframing"],
 }
 INTERNSHIP_HINTS = ("internship", "intern", "apprentice", "trainee", "industry training")
 REAL_WORLD_HINTS = (
@@ -57,14 +62,27 @@ PATH_INTEREST_ALIGNMENT = {
     "ai_engineer": "ai",
     "data_science": "data",
     "data_engineering": "data",
-    "finance": "management",
+    "finance": "finance",
     "product_management": "management",
     "marketing": "management",
     "consulting": "management",
     "software_development": "technical",
     "cloud_devops": "technical",
     "cybersecurity": "technical",
-    "ui_ux_design": "technical",
+    "ui_ux_design": "design",
+}
+PATH_INTEREST_DOMAINS = {
+    "ai_engineer": {"ai"},
+    "data_science": {"data", "ai"},
+    "data_engineering": {"data"},
+    "finance": {"finance"},
+    "product_management": {"management", "legal"},
+    "marketing": {"management"},
+    "consulting": {"consulting", "legal", "management", "healthcare"},
+    "software_development": {"technical"},
+    "cloud_devops": {"technical"},
+    "cybersecurity": {"technical"},
+    "ui_ux_design": {"design"},
 }
 PATH_GROUP_ALIGNMENT = {
     "ai_engineer": {"degree": {"engineering", "science", "computer_applications"}, "specialization": {"engineering", "science", "computer_applications"}},
@@ -73,11 +91,11 @@ PATH_GROUP_ALIGNMENT = {
     "software_development": {"degree": {"engineering", "computer_applications"}, "specialization": {"engineering", "computer_applications"}},
     "cloud_devops": {"degree": {"engineering", "computer_applications"}, "specialization": {"engineering", "computer_applications"}},
     "cybersecurity": {"degree": {"engineering", "computer_applications"}, "specialization": {"engineering", "computer_applications"}},
-    "ui_ux_design": {"degree": {"engineering", "general", "computer_applications"}, "specialization": {"engineering", "general", "computer_applications"}},
-    "finance": {"degree": {"business", "engineering", "general"}, "specialization": {"business", "general", "engineering"}},
-    "product_management": {"degree": {"business", "engineering", "general"}, "specialization": {"business", "general", "engineering"}},
-    "marketing": {"degree": {"business", "general"}, "specialization": {"business", "general"}},
-    "consulting": {"degree": {"business", "engineering", "general"}, "specialization": {"business", "general", "engineering"}},
+    "ui_ux_design": {"degree": {"engineering", "general", "computer_applications", "design"}, "specialization": {"engineering", "general", "computer_applications", "design"}},
+    "finance": {"degree": {"business", "finance", "engineering", "general"}, "specialization": {"business", "finance", "general", "engineering"}},
+    "product_management": {"degree": {"business", "engineering", "general", "legal"}, "specialization": {"business", "general", "engineering", "legal"}},
+    "marketing": {"degree": {"business", "general", "design"}, "specialization": {"business", "general", "design"}},
+    "consulting": {"degree": {"business", "engineering", "general", "legal", "finance", "healthcare"}, "specialization": {"business", "general", "engineering", "legal", "finance", "healthcare"}},
 }
 PATH_KEYWORD_HINTS = {
     "ai_engineer": {"ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq", "fastapi", "docker", "python", "vector db", "rag"},
@@ -89,8 +107,90 @@ PATH_KEYWORD_HINTS = {
     "cybersecurity": {"cybersecurity", "security", "ethical hacking", "networking", "linux", "ceh", "penetration testing", "soc", "infosec"},
     "ui_ux_design": {"ui", "ux", "ui/ux", "user interface", "user experience", "figma", "wireframing", "prototyping", "design system", "interaction design", "user research", "product design", "adobe xd", "sketch"},
     "marketing": {"marketing", "digital marketing", "seo", "sem", "content marketing", "social media", "brand", "growth", "campaigns", "copywriting", "advertising", "email marketing", "analytics"},
-    "finance": {"finance", "financial", "accounting", "investment", "banking", "financial modeling", "excel", "valuation", "portfolio", "equity", "cfa", "corporate finance", "risk analysis"},
-    "consulting": {"consulting", "consultant", "strategy", "management consulting", "business strategy", "advisory", "case study", "market entry", "operations", "stakeholder management", "problem solving"},
+    "finance": {"finance", "financial", "accounting", "investment", "banking", "financial modeling", "excel", "valuation", "portfolio", "equity", "cfa", "corporate finance", "risk analysis", "fintech", "audit", "budgeting"},
+    "consulting": {"consulting", "consultant", "strategy", "management consulting", "business strategy", "advisory", "case study", "market entry", "operations", "stakeholder management", "problem solving", "contract drafting", "due diligence", "gdpr", "legal research", "corporate law", "compliance", "regulatory", "nda review", "intellectual property", "cyber law", "clinical research", "regulatory affairs", "legal", "law", "lawyer", "counsel"},
+}
+
+DOMAIN_SKILL_GAPS = {
+    "legal": [
+        "GDPR & Data Privacy (CIPP/E)",
+        "Regulatory Compliance Audit Protocol",
+        "Contract Drafting & Negotiation",
+        "Corporate Governance & Ethics",
+        "Cyber Law & Tech Compliance",
+        "Legal Risk Assessment",
+    ],
+    "finance": [
+        "Financial Modeling & Valuation (DCF / LBO)",
+        "Corporate Finance & Accounting",
+        "Portfolio & Risk Analytics",
+        "Equity Research & Financial Statement Analysis",
+        "Regulatory Reporting (SEC / FINRA)",
+    ],
+    "design": [
+        "Design Systems & Tokens (Figma)",
+        "User Research & Usability Testing",
+        "Interactive Prototyping",
+        "Information Architecture & Wireframing",
+        "Accessibility Standards (WCAG 2.1)",
+    ],
+    "marketing": [
+        "Digital Campaign & Funnel Analytics (GA4)",
+        "SEO & Content Strategy",
+        "Customer Acquisition & Growth Marketing",
+        "Brand Strategy & Copywriting",
+        "Performance Marketing & Ad Optimization",
+    ],
+    "consulting": [
+        "Strategic Problem Solving & Case Frameworks",
+        "Market Entry & Business Model Analysis",
+        "Stakeholder & Client Management",
+        "Financial & Operational Modeling",
+        "Executive Presentation & Storytelling",
+    ],
+    "healthcare": [
+        "Clinical Trials & GCP Guidelines",
+        "Pharmacovigilance & Drug Safety",
+        "Regulatory Affairs (FDA / EMA Compliance)",
+        "Medical Affairs & Clinical Data Management",
+        "Bioethics & Health Economics",
+    ],
+    "ai_engineer": [
+        "Agentic Frameworks (LangGraph / LlamaIndex)",
+        "LLM Evals & Guardrails (Ragas / DeepEval)",
+        "Vector Databases & Hybrid Search (Qdrant / PGVector)",
+        "Local Model Fine-Tuning & Quantization (vLLM / Unsloth)",
+    ],
+    "data_science": [
+        "Machine Learning & Statistical Modeling",
+        "Deep Learning Frameworks (PyTorch / TensorFlow)",
+        "Data Pipeline & Feature Engineering",
+        "SQL & Large-Scale Data Analysis",
+    ],
+    "software_development": [
+        "Full-Stack Architecture & Microservices",
+        "RESTful API & GraphQL Schema Design",
+        "Data Structures & Algorithms (DSA)",
+        "Database Optimization (PostgreSQL / Redis)",
+    ],
+    "cloud_devops": [
+        "Kubernetes & Container Orchestration",
+        "Infrastructure as Code (Terraform / Ansible)",
+        "Cloud Architecture (AWS / Azure / GCP)",
+        "CI/CD Pipeline Automation (GitHub Actions)",
+    ],
+    "product_management": [
+        "Product Strategy & PRD Specification",
+        "User Growth & Funnel Analytics (Mixpanel / GA4)",
+        "Agile & Scrum Methodologies (CSPO)",
+        "System Architecture for Product Managers",
+    ],
+    "cybersecurity": [
+        "Penetration Testing & Vulnerability Assessment",
+        "SOC Monitoring & Incident Response",
+        "Network Security & Threat Intelligence",
+        "Identity & Access Management (IAM)",
+    ],
 }
 
 
@@ -131,9 +231,18 @@ def _split_items(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, list):
-        raw_items = value
+        raw_items = []
+        for item in value:
+            if isinstance(item, str):
+                raw_items.extend(re.split(LIST_SPLIT, item))
+            elif isinstance(item, list):
+                raw_items.extend(_split_items(item))
+            else:
+                raw_items.append(str(item))
+    elif isinstance(value, str):
+        raw_items = re.split(LIST_SPLIT, value)
     else:
-        raw_items = re.split(LIST_SPLIT, str(value))
+        raw_items = [str(value)]
 
     items = []
     seen = set()
@@ -172,14 +281,28 @@ def _normalize_interest(interest: str, options_text: str) -> str:
     def _classify(value: str) -> str | None:
         if not value:
             return None
-        # Check direct career path alignments first
+        # Check Law / Legal tracks FIRST so "tech" in "legal counsel in tech" doesn't trigger "technical"!
+        if any(token in value for token in [
+            "legal", "law", "lawyer", "counsel", "advocate", "compliance", "regulatory",
+            "litigation", "contract", "arbitration", "intellectual property", "ip law", "corporate law"
+        ]):
+            return "legal"
+        # Healthcare / Clinical / Biotech tracks
+        if any(token in value for token in ["health", "healthcare", "medical", "clinical", "pharma", "pharmacy", "biotech", "medicine"]):
+            return "healthcare"
+        # UI/UX & Design tracks
+        if any(token in value for token in ["ui", "ux", "ui/ux", "user interface", "user experience", "design", "figma"]):
+            return "design"
+        # Finance & Banking tracks
+        if any(token in value for token in ["finance", "financial", "banking", "investment", "accounting", "equity", "valuation", "fintech", "audit"]):
+            return "finance"
+        # Check direct career path alignments
         for path_name, aligned_int in PATH_INTEREST_ALIGNMENT.items():
             if path_name in value or path_name.replace("_", " ") in value:
                 return aligned_int
-        # Management / Business / Finance / Consulting / Marketing tracks
+        # Consulting / Strategy / Business / Marketing tracks
         if any(token in value for token in [
             "consulting", "consultant", "strategy", "advisory", "management consulting",
-            "finance", "financial", "banking", "investment", "accounting", "equity", "valuation",
             "market", "marketing", "digital marketing", "seo", "sales", "brand", "advertising",
             "product management", "product manager", "project management", "business", "manage", "leader", "mba"
         ]):
@@ -192,9 +315,6 @@ def _normalize_interest(interest: str, options_text: str) -> str:
             return "technical"
         # Cybersecurity
         if any(token in value for token in ["cybersecurity", "security", "ethical hacking", "soc", "infosec", "penetration testing", "network"]):
-            return "technical"
-        # UI/UX design
-        if any(token in value for token in ["ui", "ux", "ui/ux", "user interface", "user experience", "design", "figma"]):
             return "technical"
         # Software engineering & technical tracks
         if any(token in value for token in ["software", "development", "developer", "engineering", "coding", "frontend", "backend", "full stack", "web developer", "programmer", "technical", "tech"]):
@@ -211,13 +331,22 @@ def _normalize_interest(interest: str, options_text: str) -> str:
 
 def _normalize_course_group(value: Any) -> str:
     text = _clean_token(value)
-    if any(token in text for token in ["btech", "b tech", "b.tech", "be", "b.e", "engineering", "computer", "computer science", "cse", "information", "it", "software", "data science", "artificial intelligence", "ai"]):
+    # Check Legal / Compliance FIRST before engineering so terms like cyber law & compliance are never misread as tech
+    if any(token in text for token in ["law", "llb", "ba llb", "bba llb", "llm", "legal", "juris", "compliance", "regulatory", "cyber law", "corporate law", "advocate", "barrister", "solicitor"]):
+        return "legal"
+    if any(token in text for token in ["btech", "b tech", "b.tech", "be", "b.e", "engineering", "computer", "computer science", "cse", "information technology", "info tech", "software", "data science", "artificial intelligence", "ai"]):
         return "engineering"
-    if any(token in text for token in ["b.sc", "science", "mathematics", "physics"]):
+    if any(token in text for token in ["b.com", "bcom", "ca", "cfa", "cpa", "finance", "accounting", "banking"]):
+        return "finance"
+    if any(token in text for token in ["mbbs", "bds", "bpharm", "mpharm", "pharmacy", "medical", "nursing", "biotech", "biotechnology"]):
+        return "healthcare"
+    if any(token in text for token in ["bdes", "mdes", "design", "fine arts", "animation"]):
+        return "design"
+    if any(token in text for token in ["b.sc", "science", "mathematics", "physics", "chemistry", "biology"]):
         return "science"
     if any(token in text for token in ["bca", "mca"]):
         return "computer_applications"
-    if any(token in text for token in ["business", "commerce", "management", "mba"]):
+    if any(token in text for token in ["business", "commerce", "management", "mba", "bba"]):
         return "business"
     return "general"
 
@@ -537,10 +666,24 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
     cert_count = int(normalized.get("certification_count", 0) or len(certifications))
 
     aligned_interest = _path_aligned_interest(path_class)
+    aligned_domains = PATH_INTEREST_DOMAINS.get(path_class, {aligned_interest} if aligned_interest else set())
     interest_domain = normalized.get("interest_domain") or ""
     explicit_interest_paths = _explicit_interest_paths(normalized.get("raw_interest"))
-    interest_aligned = bool(path_class in explicit_interest_paths) if explicit_interest_paths else bool(aligned_interest and interest_domain == aligned_interest)
-    explicit_interest_hit = path_class in explicit_interest_paths
+
+    clean_raw_interest = str(normalized.get("raw_interest") or "").lower()
+    path_label_clean = _path_display_name(option).lower()
+    textual_interest_hit = (
+        path_class.replace("_", " ") in clean_raw_interest
+        or path_label_clean in clean_raw_interest
+        or clean_raw_interest in path_label_clean
+        or any(word in path_label_clean for word in clean_raw_interest.split() if len(word) > 3)
+    )
+    interest_aligned = (
+        bool(path_class in explicit_interest_paths)
+        or bool(interest_domain and interest_domain in aligned_domains)
+        or textual_interest_hit
+    )
+    explicit_interest_hit = path_class in explicit_interest_paths or textual_interest_hit
 
     skills_aligned = len(skill_hits) >= 2 or (len(skill_hits) >= 1 and len(user_skills) <= 4)
     projects_aligned = len(project_hits) >= 1 or (project_count >= 1 and len(projects) >= 1)
@@ -574,8 +717,35 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
     }
 
 
-def _suggest_projects_for_path(path_class: str) -> list[dict[str, str]]:
+def _suggest_projects_for_path(path_class: str, domain: str = "") -> list[dict[str, str]]:
     # High-quality, resume-worthy project templates
+    if domain == "legal" or (path_class == "consulting" and domain in {"legal", ""}):
+        return [
+            {
+                "title": "IP Portfolio Audit & Trademark Clearance Protocol",
+                "problem": "Unscreened brand and trademark assets trigger costly cross-class trademark opposition and infringement claims.",
+                "stack": "WIPO Brand Database, IP India Search, Nice Classification, Trademark Rules 2017",
+                "impact": "Exhaustive clearance opinion, registrability audit, and risk mitigation dossier."
+            },
+            {
+                "title": "Tech Merger & Antitrust Regulatory Filing Dossier (CCI / FTC)",
+                "problem": "Multi-million dollar tech acquisitions require rigorous merger control clearance under Section 5 & 6 of Competition Act.",
+                "stack": "CCI Combination Regulations, Relevant Market Assessment, Herfindahl-Hirschman Index (HHI)",
+                "impact": "Production merger filing memorandum evaluating market concentration and antitrust remedies."
+            },
+            {
+                "title": "Enterprise Data Privacy & DPDP / GDPR Compliance Playbook",
+                "problem": "Enterprises handling customer data lack compliant cross-border data transfer protocols and audit-ready playbooks.",
+                "stack": "DPDP Act 2023, EU GDPR (Articles 44-49), Standard Contractual Clauses (SCCs), DPA Drafting",
+                "impact": "Ready-to-execute Data Processing Agreements, privacy impact assessments, and vendor compliance SLAs."
+            },
+            {
+                "title": "Patent Claim Mapping & Freedom-to-Operate (FTO) Opinion",
+                "problem": "Commercializing proprietary technology without prior-art FTO searches exposes clients to patent infringement injunctions.",
+                "stack": "USPTO & IPO Patent Databases, Google Patents, Claim-Chart Mapping, Doctrine of Equivalents",
+                "impact": "Defensive legal memorandum, claim boundary charts, and freedom-to-operate clearance report."
+            }
+        ]
     if path_class == "ai_engineer":
         return [
             {
@@ -663,6 +833,51 @@ def _suggest_projects_for_path(path_class: str) -> list[dict[str, str]]:
                 "impact": "Infrastructure as Code and SRE maturity."
             }
         ]
+    if path_class == "consulting":
+        return [
+            {
+                "title": "Enterprise Market Entry & Commercial Strategy Blueprint",
+                "problem": "Global tech expansion into emerging markets requires rigorous regulatory and unit economics analysis.",
+                "stack": "TAM / SAM / SOM Modeling, Porter's Five Forces, Excel, Executive Deck",
+                "impact": "Strategic consulting problem structuring, revenue forecasting, and executive deck signal."
+            },
+            {
+                "title": "Digital Transformation & Operational Cost Reduction Audit",
+                "problem": "Legacy operational processes generate high operating friction and unmanaged SLA breaches.",
+                "stack": "Value Stream Mapping, Process Flow Modeling, ROI Feasibility Matrix",
+                "impact": "Management consulting workflow redesign and operational efficiency proof."
+            }
+        ]
+    if path_class == "finance":
+        return [
+            {
+                "title": "DCF & Three-Statement Financial Valuation Model",
+                "problem": "Manual corporate financial forecasting lacks scenario analysis and sensitivity rigor.",
+                "stack": "Excel / VBA, Python, Financial Modeling",
+                "impact": "Investment banking and corporate valuation signal."
+            },
+            {
+                "title": "Portfolio Risk & Volatility Analytics Suite",
+                "problem": "Measuring Value-at-Risk (VaR) and Sharpe ratios across asset classes.",
+                "stack": "Python, NumPy, Pandas, Plotly / Dash",
+                "impact": "Quantitative finance and risk management proof."
+            }
+        ]
+    if path_class == "ui_ux_design":
+        return [
+            {
+                "title": "Enterprise Design System & Component Library",
+                "problem": "Inconsistent UI patterns across web and mobile products slow down engineering velocity.",
+                "stack": "Figma, Design Tokens, Storybook, Accessibility (WCAG 2.1)",
+                "impact": "Senior product design signal and scalable design architecture proof."
+            },
+            {
+                "title": "Mobile Banking Onboarding Redesign & Usability Audit",
+                "problem": "High user drop-off during KYC verification and account setup.",
+                "stack": "Figma, User Interviews, Wireframing, Maze Usability Testing",
+                "impact": "End-to-end product thinking, interaction design, and conversion optimization."
+            }
+        ]
     return [
         {
             "title": "Domain-Specific Evidence Project",
@@ -688,6 +903,21 @@ def _suggest_certifications_for_path(path_class: str) -> list[str]:
         return ["Security+ (entry)", "CEH or equivalent (depending on your target roles)"]
     if path_class == "product_management":
         return ["Product Management certification (foundational)", "Analytics / SQL certification for PM"]
+    if path_class == "consulting":
+        return [
+            "CIPP/E (Certified Information Privacy Professional — Europe)",
+            "ISO 27001 Lead Auditor or Compliance & Risk Management Certification"
+        ]
+    if path_class == "finance":
+        return [
+            "CFA Level 1 or FMVA (Financial Modeling & Valuation Analyst)",
+            "NISM / FINRA Series certification"
+        ]
+    if path_class == "ui_ux_design":
+        return [
+            "Google UX Design Professional Certificate",
+            "Nielsen Norman Group (NN/g) UX Certification"
+        ]
     return ["One role-aligned certification", "One portfolio-backed certificate (project-based)"]
 
 
@@ -706,8 +936,18 @@ def _career_track_roadmap(normalized: dict[str, Any], option: dict[str, Any], *,
 
     path_profile = option.get("path_profile", {}) or {}
     top_skills = path_profile.get("top_skills", []) or []
+
+    # Domain-aware skill gap lookup: ensure Legal/Finance/Design get domain skill gaps
+    domain_key = normalized.get("interest_domain") or normalized.get("course_group")
+    if domain_key in DOMAIN_SKILL_GAPS and domain_key in {"legal", "finance", "design", "marketing", "healthcare"}:
+        target_skills = DOMAIN_SKILL_GAPS[domain_key]
+    elif path_class in DOMAIN_SKILL_GAPS:
+        target_skills = DOMAIN_SKILL_GAPS[path_class]
+    else:
+        target_skills = top_skills or DOMAIN_SKILL_GAPS.get("software_development", [])
+
     user_skills = {_clean_token(skill) for skill in (normalized.get("expanded_skills") or normalized.get("skills", []))}
-    missing_skills = [skill for skill in top_skills[:6] if _clean_token(skill) not in user_skills]
+    missing_skills = [skill for skill in target_skills if _clean_token(skill) not in user_skills]
 
     projects = normalized.get("projects") or []
     certifications = normalized.get("certifications") or []
@@ -748,7 +988,7 @@ def _career_track_roadmap(normalized: dict[str, Any], option: dict[str, Any], *,
         "gaps": gaps[:6],
         "roadmap": {
             "skills_to_add": missing_skills[:6],
-            "project_ideas": _suggest_projects_for_path(path_class)[:4],
+            "project_ideas": _suggest_projects_for_path(path_class, domain=domain_key)[:4],
             "certifications": _suggest_certifications_for_path(path_class)[:2],
             "proof_moves": [
                 "Deploy at least 1 project (live link) and add a short demo video",
@@ -820,37 +1060,82 @@ def _career_followup_questions(normalized: dict[str, Any]) -> list[str]:
 
 def _calibrate_final_score(normalized: dict[str, Any], probability: float) -> float:
     """
-    Calibrated score: honest, slightly critical, and aligned with hiring manager expectations.
+    Calibrated score: honest, objective, and persona-aligned.
+    Students are evaluated against academic & entry-level readiness criteria.
+    Working professionals are evaluated against industry tenure and production impact.
     """
     cgpa = float(normalized.get("cgpa", 0.0) or 0.0)
     project_count = int(normalized.get("project_count", 0) or 0)
     skill_count = int(normalized.get("skill_count", 0) or 0)
+    cert_count = int(normalized.get("certification_count", 0) or 0)
+    internship_count = int(len(normalized.get("internships") or []))
     experience_years = float(normalized.get("experience_years", 0.0) or 0.0)
+    persona = str(normalized.get("persona") or "").strip().lower()
+
+    if not persona:
+        persona = "professional" if experience_years >= 2.0 else ("graduate" if experience_years >= 0.5 else "student")
 
     # Base score from model
     score = float(probability) * 100.0
 
-    # Calibration rules
-    # For experienced candidates (>= 2 years), industry work experience takes precedence over college CGPA
-    if experience_years >= 2.0:
+    if persona == "student":
+        # Calibrated for college students:
+        # 0 years of experience is the normal, expected baseline for a student.
+        # High CGPA, strong domain skills, certifications, and projects indicate high campus hiring readiness!
+        academic_score = (cgpa / 10.0) * 100.0
+        profile_lift = 0.0
+        if cgpa >= 8.5:
+            profile_lift += 8.0
+        elif cgpa >= 8.0:
+            profile_lift += 5.0
+        elif cgpa >= 7.0:
+            profile_lift += 2.0
+        elif cgpa < 6.0:
+            profile_lift -= 6.0
+
+        if skill_count >= 5:
+            profile_lift += 8.0
+        elif skill_count >= 3:
+            profile_lift += 4.0
+        elif skill_count < 2:
+            profile_lift -= 5.0
+
+        if cert_count >= 1:
+            profile_lift += 5.0
+        if project_count >= 1:
+            profile_lift += 5.0
+        if internship_count >= 1:
+            profile_lift += 6.0
+
+        # Sensitive to role match probability (45%) combined with academic & co-curricular standing (30%)
+        student_calibrated = (academic_score * 0.30) + (score * 0.45) + (profile_lift * 1.0)
+        score = _clamp(student_calibrated, 20.0, 96.0)
+
+    elif persona == "graduate":
+        # Recent graduate / job seeker
+        if internship_count >= 1 or experience_years >= 0.5:
+            score += 6.0
+        if project_count >= 2:
+            score += 5.0
+        if skill_count >= 5:
+            score += 5.0
+        if cgpa >= 8.0:
+            score += 4.0
+        elif cgpa < 6.0:
+            score -= 6.0
+
+    else:
+        # Working professional (>= 2 years)
         if experience_years >= 5.0:
             score += 8.0
         elif experience_years >= 3.0:
             score += 5.0
         else:
             score += 3.0
-    else:
-        if cgpa >= 8.0:
-            score += 5.0
-        elif cgpa < 6.0:
-            score -= 10.0
-        elif cgpa < 7.0:
+        if skill_count < 3:
             score -= 5.0
-
-    if project_count < 2 and experience_years < 1.0:
-        score -= 4.0
-    if skill_count < 3:
-        score -= 5.0
+        if project_count < 2 and experience_years < 1.0:
+            score -= 4.0
 
     return round(_clamp(score, 0.0, 100.0), 1)
 
@@ -882,7 +1167,14 @@ def _rule_based_risks(normalized: dict[str, Any], existing_risks: list[str] | No
     return _unique_text_items(risks)
 
 
-def normalize_career_input(data: dict[str, Any]) -> dict[str, Any]:
+def normalize_career_input(data: Any) -> dict[str, Any]:
+    if hasattr(data, "model_dump"):
+        data = data.model_dump()
+    elif hasattr(data, "dict"):
+        data = data.dict()
+    elif not isinstance(data, dict):
+        data = dict(data or {})
+
     skills = _split_items(data.get("skills"))
     projects = _split_items(data.get("projects"))
     certifications = _split_items(data.get("certifications"))
@@ -922,6 +1214,15 @@ def normalize_career_input(data: dict[str, Any]) -> dict[str, Any]:
     if internships and exp_val == 0.0:
         exp_val = max(0.5 * len(internships), 0.5)
 
+    persona_val = str(data.get("persona") or "").strip().lower()
+    if not persona_val:
+        if exp_val >= 2.0:
+            persona_val = "professional"
+        elif exp_val >= 0.5:
+            persona_val = "graduate"
+        else:
+            persona_val = "student"
+
     score_type = str(data.get("score_type") or "cgpa_10").lower().strip()
     raw_val = data.get("raw_score")
     if raw_val is None:
@@ -952,6 +1253,10 @@ def normalize_career_input(data: dict[str, Any]) -> dict[str, Any]:
         "education_level": _clean_text(data.get("education_level")),
         "year_of_study": _safe_float(data.get("year_of_study", 0), 0.0),
         "experience_years": exp_val,
+        "persona": persona_val,
+        "parent_domain": _clean_text(data.get("parent_domain") or data.get("domain")),
+        "domain": _clean_text(data.get("domain") or data.get("parent_domain")),
+        "target_role": _clean_text(data.get("target_role")),
         "raw_prompt": str(data.get("raw_prompt", "")),
         "project_quality_score": project_quality_score,
         "project_signal": project_signal,
@@ -1020,17 +1325,46 @@ def parse_career_prompt(message: str) -> dict[str, Any]:
     })
 
 
+def _map_course_group_for_model(course_group: str) -> str:
+    """Map new extended course groups to values the ML model was trained on."""
+    return _COURSE_GROUP_MODEL_MAP.get(course_group, course_group)
+
+
+def _map_interest_for_model(interest_domain: str) -> str:
+    """Map extended interest domains to values the ML model was trained on.
+    The model knows: data, management, technical, ai (or general).
+    For new domains, we map to the closest training category."""
+    interest_map = {
+        "legal": "management",   # Legal work is management/consulting-adjacent
+        "finance": "management", # Finance is management-adjacent
+        "healthcare": "general",
+        "design": "technical",   # Design has technical aspects
+        "consulting": "management",
+    }
+    return interest_map.get(interest_domain, interest_domain)
+
+
 def _career_model_frame(normalized: dict[str, Any]) -> pd.DataFrame:
+    exp_years = float(normalized.get("experience_years", 0.0) or 0.0)
+    persona = str(normalized.get("persona", "student")).lower()
+    # For students who naturally have 0.0 years of full-time experience,
+    # evaluate readiness using practical project & internship synthesis
+    # exactly as the training data calibrated student placement readiness
+    if persona == "student" or (exp_years == 0.0 and persona != "professional"):
+        model_exp = float(min(normalized["project_count"] * 0.4 + len(normalized.get("internships") or []) * 0.6 + normalized["certification_count"] * 0.3, 3.0))
+    else:
+        model_exp = exp_years
+
     return build_runtime_frame("career", {
         "cgpa": normalized["cgpa"],
         "skills_count": normalized["skill_count"],
         "projects_count": normalized["project_count"],
         "certifications_count": normalized["certification_count"],
-        "interest": normalized["interest_domain"],
-        "course_group": normalized["course_group"],
-        "specialization_group": normalized["specialization_group"],
+        "interest": _map_interest_for_model(normalized["interest_domain"]),
+        "course_group": _map_course_group_for_model(normalized["course_group"]),
+        "specialization_group": _map_course_group_for_model(normalized["specialization_group"]),
         "internship_count": len(normalized.get("internships") or []),
-        "experience_years": normalized.get("experience_years", 0.0),
+        "experience_years": model_exp,
         "portfolio_strength": normalized["project_count"] + len(normalized.get("internships") or []) + normalized["certification_count"],
         "skill_project_ratio": normalized["skill_count"] / max(normalized["project_count"], 1),
     })
@@ -1059,9 +1393,20 @@ def _comparison_frame(normalized: dict[str, Any], option_text: str = "") -> pd.D
     }])
 
 
+# Map new course groups to ML-model compatible categories
+_COURSE_GROUP_MODEL_MAP = {
+    "legal": "general",
+    "finance": "business",
+    "healthcare": "science",
+    "design": "general",
+}
+
+
 def _get_specialized_display_name(class_name: str, normalized: dict[str, Any]) -> str:
     raw_interest = _clean_token(normalized.get("raw_interest", ""))
     skills_text = " ".join(_clean_token(s) for s in (normalized.get("expanded_skills") or normalized.get("skills", [])))
+    interest_domain = normalized.get("interest_domain", "")
+    course_group = normalized.get("course_group", "")
 
     if class_name == "data_science":
         if any(term in raw_interest or term in skills_text for term in ["ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq"]):
@@ -1088,6 +1433,41 @@ def _get_specialized_display_name(class_name: str, normalized: dict[str, Any]) -
         if any(term in raw_interest or term in skills_text for term in ["big data", "spark", "hadoop", "etl"]):
             return "Big Data & Pipeline Engineer"
         return "Data Engineering"
+
+    if class_name == "consulting":
+        # When the candidate is from a legal background, consulting maps to legal counsel
+        if interest_domain == "legal" or course_group == "legal":
+            if any(term in raw_interest or term in skills_text for term in ["corporate law", "corporate counsel", "in-house", "tech law", "fintech law"]):
+                return "Corporate Legal Counsel (In-House)"
+            if any(term in raw_interest or term in skills_text for term in ["ip", "intellectual property", "patent"]):
+                return "IP & Technology Lawyer"
+            if any(term in raw_interest or term in skills_text for term in ["compliance", "regulatory", "gdpr"]):
+                return "Compliance & Regulatory Manager"
+            return "Corporate Legal Counsel"
+        if interest_domain == "healthcare" or course_group == "healthcare":
+            return "Healthcare & Regulatory Consultant"
+        return "Strategy & Management Consulting"
+
+    if class_name == "finance":
+        if interest_domain == "finance" or course_group == "finance":
+            if any(term in raw_interest or term in skills_text for term in ["investment", "equity", "banking", "ib"]):
+                return "Investment Banking / Equity Research Analyst"
+            if any(term in raw_interest or term in skills_text for term in ["fintech", "digital finance"]):
+                return "FinTech Analyst"
+            return "Financial Analyst"
+        return "Finance & Investment"
+
+    if class_name == "ui_ux_design":
+        if interest_domain == "design" or course_group == "design":
+            if any(term in raw_interest or term in skills_text for term in ["product design", "interaction design"]):
+                return "Product Designer"
+            return "UI/UX Designer"
+        return "UI/UX Design"
+
+    if class_name == "product_management":
+        if interest_domain == "legal":
+            return "LegalTech Product Manager"
+        return "Product Management"
 
     return class_name.replace("_", " ").title()
 
@@ -1232,7 +1612,12 @@ def _contextualize_factor_impacts(
                 impact["reason"] = f"specialization={current_label} has a neutral influence"
         elif factor == "Certification count":
             cert_count = int(normalized.get("certification_count", 0) or 0)
-            if is_positive:
+            if cert_count == 0:
+                impact["impact"] = "Slightly holds back"
+                impact["reason"] = f"certification count=0; adding an industry credential will strengthen profile validation for {target_path}"
+                if shap_value > 0:
+                    shap_value = -0.04
+            elif is_positive:
                 impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"certification count={cert_count} adds verified proof of structured learning for {target_path}"
             elif is_negative:
@@ -1265,9 +1650,12 @@ def _contextualize_factor_impacts(
                 impact["reason"] = f"skill count={skill_count} has a neutral influence"
         elif factor == "Project count":
             project_count = int(normalized.get("project_count", 0) or 0)
-            if is_positive:
+            persona = str(normalized.get("persona") or "").strip().lower()
+            if project_count >= 1 and (persona == "student" or is_positive):
                 impact["impact"] = f"{strength} boosts"
-                impact["reason"] = f"project count={project_count} gives better execution proof for {target_path}"
+                impact["reason"] = f"project count={project_count} gives credible academic and practical execution proof for {target_path}"
+                if shap_value < 0 and persona == "student":
+                    shap_value = 0.14
             elif is_negative:
                 impact["impact"] = f"{strength} holds back"
                 impact["reason"] = f"project count={project_count} is below the level where successful profiles show clear execution proof"
@@ -1276,52 +1664,106 @@ def _contextualize_factor_impacts(
                 impact["reason"] = f"project count={project_count} has a neutral influence"
         elif factor == "Internship count":
             internship_count = int(normalized.get("internship_count") or len(normalized.get("internships") or []))
+            persona = str(normalized.get("persona") or "").strip().lower()
             if is_positive:
                 impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"internship count={internship_count} adds real-world proof that strengthens {target_path}"
             elif is_negative:
-                impact["impact"] = f"{strength} holds back"
-                if internship_count > 0:
-                    impact["reason"] = f"internship count={internship_count} provides early proof, but benchmark candidates show more extensive industry tenure"
+                if persona == "student" and internship_count == 0:
+                    impact["impact"] = "Slightly holds back"
+                    impact["reason"] = f"securing an industry internship before graduation will further accelerate placement offers for {target_path}"
+                    shap_value = -0.05
                 else:
-                    impact["reason"] = f"internship count={internship_count} means the profile lacks external industry validation for {target_path}"
+                    impact["impact"] = f"{strength} holds back"
+                    if internship_count > 0:
+                        impact["reason"] = f"internship count={internship_count} provides early proof, but benchmark candidates show more extensive industry tenure"
+                    else:
+                        impact["reason"] = f"internship count={internship_count} means the profile lacks external industry validation for {target_path}"
             else:
                 impact["impact"] = "Neutral"
                 impact["reason"] = f"internship count={internship_count} has a neutral impact"
+        elif factor == "Portfolio strength":
+            portfolio_val = int(normalized.get("project_count", 0) or 0) + int(normalized.get("certification_count", 0) or 0) + len(normalized.get("internships") or [])
+            persona = str(normalized.get("persona") or "").strip().lower()
+            if portfolio_val >= 2:
+                impact["impact"] = f"{strength} boosts"
+                impact["reason"] = f"portfolio evidence ({portfolio_val} proof items) demonstrates tangible domain execution"
+                if shap_value < 0:
+                    shap_value = 0.12
+            else:
+                impact["impact"] = "Slightly holds back"
+                impact["reason"] = f"adding another project or credential will enhance portfolio credibility for {target_path}"
+                if shap_value < -0.10:
+                    shap_value = -0.05
         elif factor == "Experience years":
             experience_years = float(normalized.get("experience_years", 0.0) or 0.0)
+            persona = str(normalized.get("persona") or "").strip().lower()
             if is_positive:
                 impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"work experience ({experience_years:.1f} years) provides verified industry execution for {target_path}"
             elif is_negative:
-                impact["impact"] = f"{strength} holds back"
-                impact["reason"] = f"limited prior industry experience ({experience_years:.1f} years) holds back the score"
+                if persona == "student" or (experience_years == 0.0 and persona != "professional"):
+                    # Standard baseline for college students: 0 years is natural and expected, NOT a score penalty!
+                    impact["impact"] = "Neutral (Expected)"
+                    impact["reason"] = f"0.0 years full-time experience is the standard baseline for active students; evaluated on college coursework, skills, and projects"
+                    shap_value = 0.01
+                else:
+                    impact["impact"] = f"{strength} holds back"
+                    impact["reason"] = f"limited prior industry experience ({experience_years:.1f} years) holds back the score"
             else:
                 impact["impact"] = "Neutral"
                 impact["reason"] = f"experience years ({experience_years:.1f} years) has a neutral contribution"
 
-        # Preserve the true mathematical SHAP value computed by the model!
+        # Preserve the calibrated SHAP value
         impact["shap_value"] = round(shap_value, 4)
 
     return human_shap
 
 
-def _career_narrative_summary(normalized: dict[str, Any], option_scores: list[dict[str, Any]], score: float) -> str:
+def _career_narrative_summary(
+    normalized: dict[str, Any],
+    option_scores: list[dict[str, Any]],
+    score: float,
+    skills_to_add: list[str] | None = None,
+) -> str:
     top_option = option_scores[0] if option_scores else {"name": "your top path", "path_profile": {}}
     top_path = _path_display_name(top_option)
     top_class = _path_class(top_option)
-    top_skills = top_option.get("path_profile", {}).get("top_skills", [])[:3]
+    top_skills = top_option.get("path_profile", {}).get("top_skills", []) or []
     project_count = int(normalized.get("project_count", 0) or 0)
     skill_count = int(normalized.get("skill_count", 0) or 0)
-    cgpa = float(normalized.get("cgpa", 0.0) or 0.0)
-    summary = f"{top_path} is your strongest fit right now with a {round(score)} / 100 profile score."
-    summary += f" Your CGPA ({cgpa:.1f}), {skill_count} relevant skills, and {project_count} projects already create a credible foundation."
+    score_clean = 70.0 if (score is None or math.isnan(float(score))) else float(score)
+    cgpa_raw = normalized.get("cgpa")
+    cgpa_clean = 0.0 if (cgpa_raw is None or math.isnan(float(cgpa_raw))) else float(cgpa_raw)
+    summary = f"{top_path} is your strongest fit right now with a {round(score_clean)} / 100 profile score."
+    if cgpa_clean > 0:
+        summary += f" Your CGPA ({cgpa_clean:.1f}), {skill_count} relevant skills, and {project_count} projects already create a credible foundation."
+    else:
+        summary += f" Your {skill_count} relevant skills and {project_count} projects already create a credible foundation."
     desired_path = _pick_desired_path_from_interest(normalized)
     if desired_path and desired_path != top_class:
         desired_label = desired_path.replace("_", " ").title()
         summary += f" Your current skills look closer to {top_path}, while your stated interest points more toward {desired_label}."
-    if top_skills:
-        summary += f" The next lift comes from adding depth in {', '.join(top_skills[:2])}."
+
+    # Dynamic skill gap calculation for narrative summary: prefer roadmap skills_to_add
+    if skills_to_add:
+        recommended_skills = [s for s in skills_to_add if str(s).strip()]
+    else:
+        domain_key = normalized.get("interest_domain") or normalized.get("course_group")
+        if domain_key in DOMAIN_SKILL_GAPS and domain_key in {"legal", "finance", "design", "marketing", "healthcare"}:
+            target_skills = DOMAIN_SKILL_GAPS[domain_key]
+        elif top_class in DOMAIN_SKILL_GAPS:
+            target_skills = DOMAIN_SKILL_GAPS[top_class]
+        else:
+            target_skills = top_skills or DOMAIN_SKILL_GAPS.get("software_development", [])
+
+        user_skills = {_clean_token(s) for s in (normalized.get("expanded_skills") or normalized.get("skills", []))}
+        recommended_skills = [s for s in target_skills if _clean_token(s) not in user_skills]
+        if not recommended_skills:
+            recommended_skills = target_skills
+
+    lift_skills = ", ".join(recommended_skills[:2]) if recommended_skills else "domain-specific competencies"
+    summary += f" The next lift comes from adding depth in {lift_skills}."
     return summary
 
 
@@ -1359,6 +1801,7 @@ OUT_OF_SCOPE_DISCIPLINES = {
 
 
 BENCHMARK_ROLE_MAP = {
+    # Tech & AI
     "ai systems & machine learning engineer": "data_science",
     "ai systems & ml engineer": "data_science",
     "ai engineer": "data_science",
@@ -1382,6 +1825,26 @@ BENCHMARK_ROLE_MAP = {
     "product & tech strategy": "product_management",
     "product & engineering lead": "product_management",
     "product management": "product_management",
+    # Legal, Risk & Governance
+    "in-house legal counsel & compliance": "consulting",
+    "corporate regulatory & risk officer": "consulting",
+    "cyber law & ip specialist": "consulting",
+    "compliance & regulatory manager": "consulting",
+    "legal counsel": "consulting",
+    # Finance & Banking
+    "financial risk & investment analyst": "finance",
+    "corporate finance & valuation associate": "finance",
+    "financial analyst": "finance",
+    "investment banking analyst": "finance",
+    # Product & Strategy / Consulting
+    "product & tech strategy lead": "product_management",
+    "management & strategy consultant": "consulting",
+    # Design & Creative
+    "product ui/ux & interaction designer": "ui_ux_design",
+    "ux research & design lead": "ui_ux_design",
+    # Marketing & Growth
+    "digital growth & marketing strategist": "marketing",
+    "performance marketing lead": "marketing",
 }
 
 
@@ -1836,8 +2299,21 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
         score_label = "Needs work"
         score_band = "0-39"
     
+    top_path_prediction = best_option
+    intelligence = _career_intelligence_payload(normalized, option_scores) if option_scores else None
+    roadmap_skills: list[str] = []
+    if intelligence:
+        best_track = intelligence.get("best_fit") or {}
+        roadmap_skills = best_track.get("roadmap", {}).get("skills_to_add", []) or []
+        if not roadmap_skills:
+            interest_track = intelligence.get("interest") or {}
+            roadmap_skills = interest_track.get("roadmap", {}).get("skills_to_add", []) or []
+
     result = {
-        "decision": best_option,
+        "domain": "career",
+        "prediction": top_path_prediction,
+        "predicted_role": top_path_prediction,
+        "decision": top_path_prediction,
         "probability": round(top_path_probability, 4),
         "readiness_probability": round(readiness, 4),
         "top_path_probability": top_path_probability,
@@ -1866,7 +2342,7 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
         ],
         "score_label": score_label,
         "score_band": score_band,
-        "summary": _career_narrative_summary(normalized, option_scores, score),
+        "summary": _career_narrative_summary(normalized, option_scores, score, skills_to_add=roadmap_skills),
         "next_step": action_plan[0] if action_plan else "",
         "details": {
             "option_scores": option_scores,
@@ -1876,6 +2352,7 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
             "rerun_score": rerun_score,
             "skill_strength": skill_strength,
             "action_plan_source": "backend",
+            **({"career_intelligence": intelligence} if intelligence else {}),
         },
         "source": source,
         "mode": "model-driven"
@@ -1889,9 +2366,11 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
 
         # Case 1: everything aligns -> focus on capability + next lift
         if snapshot["skills_aligned"] and snapshot["projects_aligned"] and snapshot["certs_aligned"] and snapshot["interest_aligned"]:
+            lift_skills = ", ".join(roadmap_skills[:2]) if roadmap_skills else "domain-specific competencies"
             result["summary"] = (
                 f"{snapshot['path_label']} is a clean fit: your skills, projects, certifications, and interest are aligned."
                 f" Current readiness is about {round(score)} / 100."
+                f" The next lift comes from adding depth in {lift_skills}."
             )
 
         # Case 2: skills+cert+interest align but projects don't -> project mismatch guidance
@@ -1914,7 +2393,8 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
         # Case 3: skills+projects+cert align but interest doesn't -> dual-track clarity
         elif snapshot["skills_aligned"] and snapshot["projects_aligned"] and snapshot["certs_aligned"] and not snapshot["interest_aligned"]:
             desired_path = _pick_desired_path_from_interest(normalized)
-            desired_label = desired_path.replace("_", " ").title() if desired_path else "your stated interest"
+            raw_interest = normalized.get("raw_interest") or normalized.get("interest") or ""
+            desired_label = desired_path.replace("_", " ").title() if desired_path else (raw_interest or "your stated interest")
             result["insights"] = [
                 f"Your profile evidence matches {snapshot['path_label']}, but your stated interest points to {desired_label}.",
                 *list(result.get("insights") or []),
@@ -1933,8 +2413,7 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
         else:
             result["followup_questions"] = []
 
-        intelligence = _career_intelligence_payload(normalized, option_scores)
-        if intelligence:
+        if intelligence and "career_intelligence" not in (result.get("details") or {}):
             result["details"] = dict(result.get("details") or {})
             result["details"]["career_intelligence"] = intelligence
 

@@ -1,21 +1,26 @@
-import React, { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import React from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import ProfileMenu from './ProfileMenu'
 import { useAuth } from './AuthContext'
 
-export default function AppSidebar({ isMobileOpen, setIsMobileOpen }) {
-  const { user } = useAuth()
-  const [collapsed, setCollapsed] = useState(false)
+export default function AppSidebar({ isMobileOpen, setIsMobileOpen, collapsed, setCollapsed }) {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/')
+  }
 
   const navItemClass = ({ isActive }) =>
     `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-bold transition-all ${
       isActive
-        ? 'bg-slate-900 text-white shadow-sm'
-        : 'text-slate-600 hover:bg-slate-100/90 hover:text-slate-900'
+        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30'
+        : 'text-slate-400 hover:bg-slate-850 hover:bg-slate-800/70 hover:text-white'
     }`
 
   const iconClass = (isActive) =>
-    `w-4 h-4 transition-colors ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-800'}`
+    `w-4 h-4 transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-blue-400'}`
 
   const navigationSections = [
     {
@@ -112,7 +117,7 @@ export default function AppSidebar({ isMobileOpen, setIsMobileOpen }) {
             />
             {!collapsed && (
               <div>
-                <div className="text-base font-black tracking-tight text-slate-950">
+                <div className="text-base font-black tracking-tight text-white">
                   DeciXAI
                 </div>
                 <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
@@ -126,7 +131,7 @@ export default function AppSidebar({ isMobileOpen, setIsMobileOpen }) {
           <button
             type="button"
             onClick={() => setCollapsed(!collapsed)}
-            className="hidden lg:flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+            className="hidden lg:flex h-7 w-7 items-center justify-center rounded-lg border border-slate-800 text-slate-400 hover:bg-slate-800 hover:text-white transition"
             title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             <svg
@@ -145,7 +150,7 @@ export default function AppSidebar({ isMobileOpen, setIsMobileOpen }) {
           {navigationSections.map((section, idx) => (
             <div key={idx} className="space-y-1.5">
               {!collapsed && (
-                <span className="px-2 text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                <span className="px-2 text-[10px] font-black uppercase tracking-wider text-slate-500 block">
                   {section.title}
                 </span>
               )}
@@ -163,12 +168,12 @@ export default function AppSidebar({ isMobileOpen, setIsMobileOpen }) {
                       <div className="flex flex-1 items-center justify-between">
                         <span className="truncate">{item.name}</span>
                         {item.badge && (
-                          <span className="rounded-md bg-sky-100 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-sky-800">
+                          <span className="rounded-md bg-blue-500/15 border border-blue-500/30 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-blue-300">
                             {item.badge}
                           </span>
                         )}
                         {item.hasDot && (
-                          <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                          <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
                         )}
                       </div>
                     )}
@@ -180,28 +185,53 @@ export default function AppSidebar({ isMobileOpen, setIsMobileOpen }) {
         </nav>
       </div>
 
-      {/* Bottom Profile / User Menu */}
-      <div className="pt-4 border-t border-slate-100">
+      {/* Bottom Profile / User Section */}
+      <div className="pt-4 border-t border-slate-800/80 space-y-2">
         {!collapsed ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5 truncate">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-xs shrink-0">
+          <>
+            {/* User info row */}
+            <div className="flex items-center gap-2.5 px-1 truncate">
+              <div className="h-8 w-8 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-black shadow-xs shrink-0">
                 {(user?.name || user?.email || 'U')[0].toUpperCase()}
               </div>
-              <div className="truncate">
-                <div className="text-xs font-bold text-slate-800 truncate">
+              <div className="truncate flex-1">
+                <div className="text-xs font-bold text-white truncate">
                   {user?.name || 'Authorized User'}
                 </div>
                 <div className="text-[10px] text-slate-400 truncate">
                   {user?.email || 'Enterprise Pro Tier'}
                 </div>
               </div>
+              {/* Profile dropdown for settings/upgrade */}
+              <ProfileMenu />
             </div>
-            <ProfileMenu />
-          </div>
+
+            {/* Direct Sign Out button */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-slate-400 transition-all hover:bg-rose-500/10 hover:text-rose-400 border border-transparent hover:border-rose-500/20"
+            >
+              <svg className="h-4 w-4 shrink-0 transition-colors group-hover:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+              <span>Sign Out</span>
+            </button>
+          </>
         ) : (
-          <div className="flex justify-center">
+          /* Collapsed mode — avatar + compact logout icon */
+          <div className="flex flex-col items-center gap-2">
             <ProfileMenu />
+            <button
+              type="button"
+              onClick={handleLogout}
+              title="Sign Out"
+              className="group flex h-8 w-8 items-center justify-center rounded-xl text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+            </button>
           </div>
         )}
       </div>
@@ -212,7 +242,7 @@ export default function AppSidebar({ isMobileOpen, setIsMobileOpen }) {
     <>
       {/* Desktop Persistent Sidebar */}
       <aside
-        className={`hidden md:flex flex-col fixed inset-y-0 left-0 z-40 bg-white border-r border-slate-200/90 shadow-xs transition-all duration-300 ${
+        className={`hidden md:flex flex-col fixed inset-y-0 left-0 z-40 bg-[#0B1120] border-r border-slate-800/80 shadow-2xl transition-all duration-300 ${
           collapsed ? 'w-20' : 'w-64'
         }`}
       >
@@ -223,15 +253,15 @@ export default function AppSidebar({ isMobileOpen, setIsMobileOpen }) {
       {isMobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity"
             onClick={() => setIsMobileOpen(false)}
           />
-          <div className="relative flex w-72 max-w-xs flex-1 flex-col bg-white pt-5 pb-4 shadow-xl z-10">
+          <div className="relative flex w-72 max-w-xs flex-1 flex-col bg-[#0B1120] pt-5 pb-4 shadow-2xl z-10 border-r border-slate-800">
             <div className="absolute top-3 right-3">
               <button
                 type="button"
                 onClick={() => setIsMobileOpen(false)}
-                className="h-8 w-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500"
+                className="h-8 w-8 rounded-lg border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white"
               >
                 ✕
               </button>

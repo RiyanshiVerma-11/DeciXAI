@@ -19,19 +19,33 @@ class CareerInput(BaseModel):
     education_level: str | None = None
     year_of_study: float | None = Field(None, ge=1.0, le=5.0, description="Year of study, usually between 1.0 and 5.0")
     experience_years: float | None = Field(None, ge=0.0, le=50.0, description="Years of professional experience")
+    persona: str | None = Field("student", description="Candidate stage/persona: student, graduate, or professional")
+    parent_domain: str | None = None
+    domain: str | None = None
+    target_role: str | None = None
 
 
 class FinanceInput(BaseModel):
-    income: float = Field(..., ge=1.0, description="Annual income must be positive")
-    loan: float = Field(..., ge=0.0, description="Loan amount cannot be negative")
+    income: float = Field(..., ge=1.0, le=100_000_000_000.0, description="Annual income, bounded up to 100B to reject absurd values")
+    loan: float = Field(..., ge=0.0, le=100_000_000_000.0, description="Loan amount, bounded up to 100B to reject absurd values")
     credit_score: float = Field(..., ge=300.0, le=850.0, description="Credit score must be between 300 and 850")
 
 
 class StartupInput(BaseModel):
-    funding: float = Field(..., ge=0.0, description="Funding amount cannot be negative")
-    team_size: int = Field(..., ge=1, description="Team size must be at least 1")
-    market: str
+    funding: float = Field(..., ge=0.0, le=100_000_000_000.0, description="Funding amount in the given currency, bounded up to 100B to keep runway math sane")
+    team_size: int = Field(..., ge=1, le=10_000, description="Team size must be between 1 and 10000")
+    market: str = Field(..., min_length=1, description="Target market / vertical, non-empty")
     experience: float = Field(..., ge=0.0, le=60.0, description="Founder years of experience, bounded up to 60")
+    currency: str = Field("USD", description="Funding currency: INR or USD (₹/$). Model normalizes to USD internally.")
+
+    @model_validator(mode="after")
+    def normalize_currency(self) -> "StartupInput":
+        cur = str(self.currency or "USD").strip().upper()
+        if cur in {"₹", "RS", "RS.", "RUPEE", "RUPEES", "INR"}:
+            self.currency = "INR"
+        else:
+            self.currency = "USD"
+        return self
 
 
 class StartupPromptInput(BaseModel):
@@ -43,9 +57,9 @@ class CareerPromptInput(BaseModel):
 
 
 class PolicyInput(BaseModel):
-    sector: str
-    budget: float = Field(..., ge=0.0, description="Policy budget cannot be negative")
-    population: float = Field(..., ge=0.0, description="Target population size cannot be negative")
+    sector: str = Field(..., min_length=1, description="Policy sector, non-empty")
+    budget: float = Field(..., ge=0.0, le=1_000_000_000_000.0, description="Policy budget, bounded up to 1T to reject absurd values")
+    population: float = Field(..., ge=0.0, le=10_000_000_000.0, description="Target population, bounded up to 10B (world population)")
     political_support: str | None = None
     infrastructure_readiness: str | None = None
     risk_level: str | None = None
@@ -168,13 +182,98 @@ class TokenResponse(BaseModel):
 
 class SaveDecisionInput(BaseModel):
     domain: str = Field(..., description="Decision domain: career, finance, startup, policy")
-    title: str = Field(..., min_length=2, max_length=120, description="Title for this decision run")
+    title: str = Field(default="Decision Dossier", min_length=2, max_length=120, description="Title for this decision run")
     notes: str = Field(default="", description="Optional user notes")
     tags: str = Field(default="", description="Comma separated tags")
-    input_payload: dict[str, Any]
-    output_payload: dict[str, Any]
-    score: float
-    verdict: str = ""
+    input_payload: dict[str, Any] = Field(default_factory=dict)
+    output_payload: dict[str, Any] = Field(default_factory=dict)
+    score: float = Field(default=0.0)
+    verdict: str = Field(default="")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Normalize domain
+            if not data.get("domain") or not str(data.get("domain")).strip():
+                data["domain"] = "general"
+
+            # Normalize tags
+            if isinstance(data.get("tags"), list):
+                data["tags"] = ", ".join(str(t) for t in data["tags"])
+            elif data.get("tags") is None:
+                data["tags"] = ""
+            else:
+                data["tags"] = str(data.get("tags", ""))
+
+            # Normalize title
+            raw_title = str(data.get("title", "")).strip()
+            if not raw_title:
+                dom = str(data.get("domain", "General")).capitalize()
+                raw_title = f"{dom} Decision Analysis"
+            if len(raw_title) < 2:
+                raw_title = f"{raw_title} Analysis"
+            if len(raw_title) > 120:
+                raw_title = raw_title[:120]
+            data["title"] = raw_title
+
+            # Normalize input_payload
+            if not data.get("input_payload"):
+                if "input" in data and isinstance(data["input"], dict):
+                    data["input_payload"] = data["input"]
+                else:
+                    data["input_payload"] = {}
+
+            # Normalize output_payload
+            if not data.get("output_payload"):
+                if "result" in data and isinstance(data["result"], dict):
+                    data["output_payload"] = data["result"]
+                else:
+                    data["output_payload"] = {}
+
+            # Normalize notes from summary
+            if not data.get("notes") and data.get("summary"):
+                data["notes"] = str(data.get("summary"))
+
+            # Normalize score
+            if "score" not in data or data["score"] is None:
+                output = data.get("output_payload") or data.get("result") or {}
+                extracted_score = 0.0
+                if "score" in output and isinstance(output["score"], (int, float)):
+                    extracted_score = float(output["score"])
+                elif "fit_score" in output and isinstance(output["fit_score"], (int, float)):
+                    extracted_score = float(output["fit_score"])
+                elif "probability" in output and isinstance(output["probability"], (int, float)):
+                    val = float(output["probability"])
+                    extracted_score = val * 100.0 if val <= 1.0 else val
+                elif "confidence" in output and isinstance(output["confidence"], (int, float)):
+                    val = float(output["confidence"])
+                    extracted_score = val * 100.0 if val <= 1.0 else val
+                elif "overall_score" in output and isinstance(output["overall_score"], (int, float)):
+                    val = float(output["overall_score"])
+                    extracted_score = val * 10.0 if val <= 10.0 else val
+                elif isinstance(output.get("metrics"), dict):
+                    metrics = output["metrics"]
+                    if "fit_score" in metrics and isinstance(metrics["fit_score"], (int, float)):
+                        extracted_score = float(metrics["fit_score"])
+                    elif "score" in metrics and isinstance(metrics["score"], (int, float)):
+                        extracted_score = float(metrics["score"])
+                data["score"] = round(extracted_score, 1)
+
+            # Normalize verdict
+            if not data.get("verdict"):
+                output = data.get("output_payload") or data.get("result") or {}
+                verdict = (
+                    output.get("verdict")
+                    or output.get("decision")
+                    or output.get("prediction")
+                    or output.get("recommendation")
+                    or output.get("outcome")
+                    or "Decision Analyzed"
+                )
+                data["verdict"] = str(verdict)
+
+        return data
 
 
 class UpdateDecisionInput(BaseModel):

@@ -7,6 +7,7 @@ from services.domain_classifier_service import classify_domain
 router = APIRouter()
 
 
+@router.post('', response_model=ChatbotResponse)
 @router.post('/', response_model=ChatbotResponse)
 async def chat(input: ChatbotInput):
     payload = input.model_dump()

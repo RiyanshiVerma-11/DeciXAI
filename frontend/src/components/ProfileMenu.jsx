@@ -1,12 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from './AuthContext'
-import UpgradeModal from './UpgradeModal'
 
 export default function ProfileMenu() {
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
-  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false)
   const menuRef = useRef(null)
   const navigate = useNavigate()
 
@@ -26,11 +24,6 @@ export default function ProfileMenu() {
   const initials = user.name
     ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
     : user.email[0].toUpperCase()
-
-  const tier = (user.tier || 'free').toUpperCase()
-  const isPro = tier === 'PRO' || tier === 'ENTERPRISE'
-  const creditsUsed = user.credits_used || 0
-  const creditsLimit = isPro ? 'Unlimited' : 25
 
   const handleLogout = () => {
     logout()
@@ -66,38 +59,15 @@ export default function ProfileMenu() {
               </div>
             </div>
 
-            {/* SaaS Subscription & Usage Meter */}
-            <div className="px-3 py-3 border-b border-slate-100 bg-slate-50/50 rounded-xl m-1">
+            {/* Workspace Status */}
+            <div className="px-3 py-2.5 border-b border-slate-100 bg-slate-50/50 rounded-xl m-1">
               <div className="flex items-center justify-between">
-                <span className={`rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider ${
-                  isPro ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-700'
-                }`}>
-                  {tier} PLAN
+                <span className="rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider">
+                  DeciXAI Core
                 </span>
-
-                <button
-                  onClick={() => {
-                    setOpen(false)
-                    setIsUpgradeOpen(true)
-                  }}
-                  className="text-[11px] font-bold text-sky-600 hover:text-sky-800 hover:underline"
-                >
-                  {isPro ? 'Manage Plan' : '⚡ Upgrade'}
-                </button>
-              </div>
-
-              {/* Credits progress */}
-              <div className="mt-2.5">
-                <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold">
-                  <span>Monthly Quota</span>
-                  <span>{creditsUsed} / {creditsLimit}</span>
-                </div>
-                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-sky-500 transition-all duration-300"
-                    style={{ width: `${Math.min(100, isPro ? (creditsUsed * 5) : (creditsUsed / 25) * 100)}%` }}
-                  />
-                </div>
+                <span className="text-[10px] font-semibold text-slate-500">
+                  All 4 Studios Active
+                </span>
               </div>
             </div>
 
@@ -135,7 +105,7 @@ export default function ProfileMenu() {
             <div className="p-1 mt-1">
               <button
                 onClick={handleLogout}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50"
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 cursor-pointer"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
@@ -146,12 +116,6 @@ export default function ProfileMenu() {
           </div>
         )}
       </div>
-
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        isOpen={isUpgradeOpen}
-        onClose={() => setIsUpgradeOpen(false)}
-      />
     </>
   )
 }

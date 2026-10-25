@@ -31,7 +31,7 @@ async def create_saved_decision(
     authorization: str | None = Header(None),
 ):
     """Save a decision evaluation run to the user's workspace."""
-    user_id = _get_current_user_id(authorization)
+    user_id = _get_current_user_id(authorization, allow_guest=True)
     result = save_decision(
         user_id=user_id,
         domain=body.domain,
@@ -53,7 +53,7 @@ async def get_saved_decisions(
     authorization: str | None = Header(None),
 ):
     """List saved decisions for the authenticated user."""
-    user_id = _get_current_user_id(authorization)
+    user_id = _get_current_user_id(authorization, allow_guest=True)
     records = list_user_decisions(user_id, domain=domain, search=search)
     return [SavedDecisionResponse(**r) for r in records]
 
@@ -73,7 +73,7 @@ async def get_single_decision(
     authorization: str | None = Header(None),
 ):
     """Fetch details of a single saved decision."""
-    user_id = _get_current_user_id(authorization)
+    user_id = _get_current_user_id(authorization, allow_guest=True)
     record = get_user_decision(user_id, decision_id)
     if not record:
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -86,7 +86,7 @@ async def remove_decision(
     authorization: str | None = Header(None),
 ):
     """Delete a saved decision from workspace."""
-    user_id = _get_current_user_id(authorization)
+    user_id = _get_current_user_id(authorization, allow_guest=True)
     success = delete_user_decision(user_id, decision_id)
     if not success:
         raise HTTPException(status_code=404, detail="Decision not found")
@@ -100,7 +100,7 @@ async def share_decision(
     authorization: str | None = Header(None),
 ):
     """Toggle public sharing status of a decision report."""
-    user_id = _get_current_user_id(authorization)
+    user_id = _get_current_user_id(authorization, allow_guest=True)
     is_public = bool(body.get("is_public", True))
     updated = toggle_decision_sharing(user_id, decision_id, is_public)
     if not updated:

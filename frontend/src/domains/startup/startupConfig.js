@@ -10,7 +10,8 @@ export const STARTUP_CONFIG = {
     'Pre-seed stage, raised 150000, 3 engineers, market HealthTech AI, founder experience 3 years',
   ],
   fields: [
-    { name: 'funding', label: 'Funding Capital ($)', type: 'number', min: 0, required: true },
+    { name: 'funding', label: 'Funding Capital', type: 'number', min: 0, required: true },
+    { name: 'currency', label: 'Currency', type: 'select', options: ['USD', 'INR'], required: true },
     { name: 'team_size', label: 'Team Size (Headcount)', type: 'number', min: 1, required: true },
     { name: 'market', label: 'Target Market / Vertical', type: 'text', required: true },
     { name: 'experience', label: 'Founder Experience (Years)', type: 'number', min: 0, required: true },
@@ -24,6 +25,7 @@ export const STARTUP_PRESETS = [
     badge: 'DeepTech',
     data: {
       funding: 500000,
+      currency: 'USD',
       team_size: 5,
       market: 'Developer Tools & AI Infrastructure',
       experience: 6,
@@ -35,6 +37,7 @@ export const STARTUP_PRESETS = [
     badge: 'SaaS',
     data: {
       funding: 75000,
+      currency: 'USD',
       team_size: 4,
       market: 'B2B Enterprise Software',
       experience: 4,
@@ -46,6 +49,7 @@ export const STARTUP_PRESETS = [
     badge: 'Fintech',
     data: {
       funding: 750000,
+      currency: 'USD',
       team_size: 8,
       market: 'Digital Banking & Compliance',
       experience: 8,
@@ -57,18 +61,42 @@ export const STARTUP_PRESETS = [
     badge: 'Pre-Seed',
     data: {
       funding: 25000,
+      currency: 'USD',
       team_size: 2,
       market: 'Consumer Productivity',
       experience: 1,
     },
   },
+  {
+    label: 'Indian Pre-Seed (₹20L)',
+    desc: 'Indian founding team, INR runway math',
+    badge: 'INR',
+    data: {
+      funding: 2000000,
+      currency: 'INR',
+      team_size: 4,
+      market: 'B2B SaaS',
+      experience: 3,
+    },
+  },
 ]
+
+const UNIT_MULTIPLIERS = {
+  k: 1000,
+  m: 1000000, mn: 1000000, million: 1000000, millions: 1000000,
+  b: 1000000000, billion: 1000000000, billions: 1000000000,
+  l: 100000, lac: 100000, lacs: 100000, lakh: 100000, lakhs: 100000,
+  cr: 10000000, crore: 10000000, crores: 10000000,
+}
 
 const extractNumber = (text, keys) => {
   const lower = text.toLowerCase()
   for (const key of keys) {
-    const match = lower.match(new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\D*([0-9]+(?:\\.[0-9]+)?)`, 'i'))
-    if (match) return Number(match[1])
+    const match = lower.match(new RegExp(`\\b${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\D*([0-9]+(?:\\.[0-9]+)?)\\s*(k|m|mn|b|l|lac|lacs|lakh|lakhs|cr|crore|crores|million|millions|billion|billions)?\\b`, 'i'))
+    if (match) {
+      const multiplier = UNIT_MULTIPLIERS[(match[2] || '').toLowerCase()] || 1
+      return Number(match[1]) * multiplier
+    }
   }
   return null
 }
@@ -87,19 +115,32 @@ export const parseStartupPrompt = (text) => {
   const marketMatch = text.match(/(?:market|sector|domain|industry)\s*[:=]?\s*([a-zA-Z0-9\s-]+?)(?:,|\.|$)/i)
   const market = marketMatch ? marketMatch[1].trim() : (commaParts[2] || 'Enterprise Software')
   const experience = pickNumber(extractNumber(text, ['experience', 'years']), Number(commaParts[3])) ?? 4
+  // Indian units / symbols imply INR — mirrors backend parse_startup_input.
+  const lower = text.toLowerCase()
+  const currency = /₹|\blakh?s?\b|\blac?s?\b|\bcrores?\b|\bcr\b|\binr\b|\brs\.?\b|\brupee/.test(lower) ? 'INR' : 'USD'
 
   return {
     funding,
+    currency,
     team_size: teamSize,
     market,
     experience,
   }
 }
 
+export const normalizeCurrency = (value) => {
+  const cur = String(value || 'USD').trim().toUpperCase()
+  return ['INR', '₹', 'RS', 'RS.', 'RUPEE', 'RUPEES'].includes(cur) ? 'INR' : 'USD'
+}
+
 export const validateStartupPayload = (payload) => {
   const errors = {}
   if (payload.funding === null || payload.funding === undefined || payload.funding < 0) {
     errors.funding = 'Funding amount is required.'
+  }
+  const cur = String(payload.currency || 'USD').trim().toUpperCase()
+  if (!['USD', 'INR', '₹', 'RS', 'RS.', 'RUPEE', 'RUPEES'].includes(cur)) {
+    errors.currency = 'Currency must be USD or INR.'
   }
   if (!payload.team_size || payload.team_size < 1) {
     errors.team_size = 'Team size must be at least 1.'
