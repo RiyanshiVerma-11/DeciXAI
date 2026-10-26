@@ -201,10 +201,11 @@ export default function CareerForm({
       specialization: defaults.specialization || '',
       skills: defaults.skills ? [...defaults.skills] : [],
       projects: defaults.projects ? [...defaults.projects] : [],
-      interest: defaults.interest || '',
+      interest: '', // Clean blank interest so model evaluates pure profile affinity
       certifications: [],
-      target_role: domain.roleSuggestions?.[0] || 'auto',
+      target_role: 'auto', // Clean default to AI recommendation
     }))
+    setTargetIntentChoice('ai_recommend')
     setStep(3)
   }
 
@@ -233,6 +234,7 @@ export default function CareerForm({
         projects: extractedProjects || prev.projects,
         certifications: Array.isArray(creds.certifications) && creds.certifications.length > 0 ? creds.certifications : prev.certifications,
         internships: Array.isArray(creds.internships) && creds.internships.length > 0 ? creds.internships : prev.internships,
+        achievements: Array.isArray(creds.achievements) && creds.achievements.length > 0 ? creds.achievements : (prev.achievements || []),
         resume_text: data.extracted_text_preview || data.raw_text || '',
         resume_extracted: true,
       }))

@@ -880,6 +880,7 @@ function InputSnapshot({ input, onUpdateInput, isLiveUpdating }) {
   const projectsList = parseItems(input.projects)
   const projectDescriptions = Array.isArray(input.project_descriptions) ? input.project_descriptions : []
   const certsList = parseItems(input.certifications)
+  const achsList = parseItems(input.achievements)
 
   return (
     <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm col-span-full overflow-hidden transition-all duration-200">
@@ -1050,7 +1051,7 @@ function InputSnapshot({ input, onUpdateInput, isLiveUpdating }) {
           {certsList.length > 0 && (
             <div className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 space-y-1.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
-                <span>🏆</span> Certifications &amp; Achievements ({certsList.length})
+                <span>📜</span> Professional Certifications ({certsList.length})
               </span>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {certsList.map((cert, idx) => (
@@ -1059,6 +1060,25 @@ function InputSnapshot({ input, onUpdateInput, isLiveUpdating }) {
                     className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[11px] font-medium text-emerald-800"
                   >
                     ✓ {cert}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Standout Achievements */}
+          {achsList.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                <span>🏆</span> Competitive Honors &amp; Achievements ({achsList.length})
+              </span>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {achsList.map((ach, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center rounded-md bg-white border border-amber-300 px-2.5 py-1 text-[11px] font-bold text-amber-950 shadow-xs"
+                  >
+                    ⭐ {ach}
                   </span>
                 ))}
               </div>

@@ -519,11 +519,17 @@ export default function WhatIfSimulator({
       hint: 'Google Analytics 4, HubSpot Inbound, Meta Performance Marketing credentials',
       defaultCertName: 'Growth Analytics & Inbound Certification',
     },
-    engineering: {
-      label: 'Add Cloud / Architecture Credentials',
-      hint: 'AWS / GCP / CKA / System Architecture credentials',
-      defaultCertName: 'Cloud / Architecture Certification',
-    },
+    engineering: /ai|machine learning|llm|agentic|data science/i.test(String(targetRole || baseProfile.interest || baseProfile.specialization || ''))
+      ? {
+          label: 'Add AI / LLMOps Credentials',
+          hint: 'DeepLearning.AI LLMOps, Coursera GenAI Specialization, Databricks GenAI Engineer',
+          defaultCertName: 'DeepLearning.AI / Coursera GenAI Credential',
+        }
+      : {
+          label: 'Add Cloud / Architecture Credentials',
+          hint: 'AWS / GCP / CKA / System Architecture credentials',
+          defaultCertName: 'Cloud / Architecture Certification',
+        },
   }[activeDomain.id] || {
     label: 'Add Industry Certifications',
     hint: 'Domain-aligned professional credentials',

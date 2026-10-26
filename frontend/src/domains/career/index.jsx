@@ -520,15 +520,14 @@ export default function CareerDomain() {
             candidateProfile={resultInput || input}
             targetRole={
               result?.prediction ||
-              result?.details?.career_intelligence?.interest?.path_label ||
+              result?.predicted_role ||
               result?.details?.career_intelligence?.best_fit?.path_label ||
-              resultInput?.interest ||
-              input?.interest ||
+              result?.details?.career_intelligence?.interest?.path_label ||
               'Career Path'
             }
             skillGaps={
-              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
               result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
+              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
               []
             }
             onApplyToForm={handleApplySimulatedProfile}
@@ -542,24 +541,22 @@ export default function CareerDomain() {
           <MockInterviewStudio
             targetRole={
               result?.prediction ||
-              result?.details?.career_intelligence?.interest?.path_label ||
-              resultInput?.interest ||
-              input?.interest ||
-              'Software Engineer'
+              result?.predicted_role ||
+              result?.details?.career_intelligence?.best_fit?.path_label ||
+              'AI Engineer (Agentic & LLM Systems)'
             }
             skillGaps={
-              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
               result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
+              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
               []
             }
             bestFitRole={
               result?.details?.career_intelligence?.best_fit?.path_label ||
               result?.prediction ||
-              'AI Systems & Machine Learning Engineer'
+              'AI Engineer (Agentic & LLM Systems)'
             }
             bestFitSkillGaps={
               result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
-              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
               []
             }
             candidateProfile={resultInput || input}
@@ -569,13 +566,11 @@ export default function CareerDomain() {
           <SprintRoadmap
             targetRole={
               result?.prediction ||
-              result?.details?.career_intelligence?.interest?.path_label ||
-              resultInput?.interest ||
-              input?.interest ||
-              'Software Engineer'
+              result?.predicted_role ||
+              result?.details?.career_intelligence?.best_fit?.path_label ||
+              'AI Engineer (Agentic & LLM Systems)'
             }
             skillGaps={
-              result?.details?.career_intelligence?.interest?.roadmap?.skills_to_add ||
               result?.details?.career_intelligence?.best_fit?.roadmap?.skills_to_add ||
               []
             }
@@ -584,10 +579,9 @@ export default function CareerDomain() {
           <CompensationEstimator
             targetRole={
               result?.prediction ||
-              result?.details?.career_intelligence?.interest?.path_label ||
-              resultInput?.interest ||
-              input?.interest ||
-              'Software Engineer'
+              result?.predicted_role ||
+              result?.details?.career_intelligence?.best_fit?.path_label ||
+              'AI Engineer (Agentic & LLM Systems)'
             }
             candidateProfile={resultInput || input}
           />

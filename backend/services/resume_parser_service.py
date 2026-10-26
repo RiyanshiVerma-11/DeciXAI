@@ -566,6 +566,23 @@ def extract_achievements_from_resume(raw_text: str, ach_section: str) -> list[st
         if current_ach and len(current_ach) >= 6:
             achievements.append(current_ach[:110])
 
+    if not achievements and raw_text:
+        # Scan raw_text for high-impact achievements (rankings, hackathons, national percentiles, competitions)
+        patterns = [
+            r"(?:ranked|rank)\s+in\s+the\s+top\s+[\d\.]+%[^.\n]+",
+            r"(?:top\s+[\d\.]+%|rank\s+#?\d+|1st|2nd|3rd\s+place|winner|runner-up|finalist)[^.\n]+",
+            r"(?:promptwars|codeforces|leetcode|hackathon|kaggle|olympiad)[^.\n]+",
+        ]
+        for pat in patterns:
+            for match in re.finditer(pat, raw_text, flags=re.IGNORECASE):
+                found = re.sub(r"^[^\w]+", "", match.group(0)).strip()
+                if len(found) >= 8 and not any(found.lower() in a.lower() for a in achievements):
+                    achievements.append(found[:120])
+                if len(achievements) >= 4:
+                    break
+            if len(achievements) >= 4:
+                break
+
     return achievements[:5]
 
 

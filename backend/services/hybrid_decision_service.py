@@ -98,7 +98,7 @@ PATH_GROUP_ALIGNMENT = {
     "consulting": {"degree": {"business", "engineering", "general", "legal", "finance", "healthcare"}, "specialization": {"business", "general", "engineering", "legal", "finance", "healthcare"}},
 }
 PATH_KEYWORD_HINTS = {
-    "ai_engineer": {"ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq", "fastapi", "docker", "python", "vector db", "rag"},
+    "ai_engineer": {"ai", "artificial intelligence", "ai engineer", "ai systems", "ai developer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq", "fastapi", "docker", "python", "vector db", "rag", "ai and machine learning", "ai & machine learning"},
     "data_science": {"data science", "machine learning", "deep learning", "statistics", "pandas", "numpy", "analytics", "python"},
     "data_engineering": {"data engineering", "etl", "spark", "pipelines", "data pipeline", "sql", "python", "big data", "hadoop", "airflow", "kafka"},
     "software_development": {"software", "development", "developer", "frontend", "backend", "react", "javascript", "java", "testing", "full stack", "web developer", "c++", "c#", "node"},
@@ -509,6 +509,8 @@ def _path_affinity_adjustment(normalized: dict[str, Any], path_class: str, path_
 
 def _explicit_interest_paths(raw_interest: Any) -> list[str]:
     interest_text = _clean_token(raw_interest)
+    if not interest_text or interest_text in {"auto", "none", "ai recommend", "ai recommended", "not specified"}:
+        return []
     matches = []
     for path_class, hints in PATH_KEYWORD_HINTS.items():
         if any(hint in interest_text for hint in hints):
@@ -539,6 +541,16 @@ def _path_evidence_score(normalized: dict[str, Any], path_class: str, path_profi
         for term in {*(hint_terms or set()), *(top_skill_terms or set())}
         if term and (term in _clean_token(project_text) or term in _clean_token(certification_text))
     )
+    achievement_text = " ".join(normalized.get("achievements") or [])
+    clean_ach = _clean_token(achievement_text)
+    achievement_hits = sum(
+        1
+        for term in {*(hint_terms or set()), *(top_skill_terms or set())}
+        if term and term in clean_ach
+    )
+    if clean_ach and any(k in clean_ach for k in ["top", "rank", "winner", "promptwars", "percentile", "hackathon", "olympiad"]):
+        achievement_hits += 2
+
     specialization_hits = sum(1 for hint in hint_terms if hint and hint in specialization)
     explicit_interest_hit = any(hint in raw_interest for hint in hint_terms)
     aligned_interest = _path_aligned_interest(path_class)
@@ -548,11 +560,12 @@ def _path_evidence_score(normalized: dict[str, Any], path_class: str, path_profi
     score += profile_skill_hits * 3.0
     score += skill_hint_hits * 2.4
     score += project_hits * 1.5
+    score += achievement_hits * 1.5
     score += specialization_hits * 1.2
     score += interest_alignment * 0.45
     if explicit_interest_hit:
         score += 0.35
-    if profile_skill_hits == 0 and skill_hint_hits == 0 and project_hits == 0 and specialization_hits == 0:
+    if profile_skill_hits == 0 and skill_hint_hits == 0 and project_hits == 0 and specialization_hits == 0 and achievement_hits == 0:
         score *= 0.4
 
     return score
@@ -580,6 +593,10 @@ def _pick_desired_path_from_interest(
     normalized: dict[str, Any],
     path_profiles: dict[str, dict[str, Any]] | None = None,
 ) -> str | None:
+    raw_interest = str(normalized.get("raw_interest") or "").strip().lower()
+    target_role = str(normalized.get("target_role") or "").strip().lower()
+    if (target_role == "auto" and not raw_interest) or raw_interest in {"auto", "none", "not specified"}:
+        return None
     explicit_paths = _explicit_interest_paths(normalized.get("raw_interest"))
     if not explicit_paths:
         return None
@@ -1179,6 +1196,7 @@ def normalize_career_input(data: Any) -> dict[str, Any]:
     projects = _split_items(data.get("projects"))
     certifications = _split_items(data.get("certifications"))
     internships = _split_items(data.get("internships") or data.get("internship"))
+    achievements = _split_items(data.get("achievements") or data.get("achievement"))
 
     # Users often paste internships under "certifications". Treat those as experience proof.
     if certifications:
@@ -1241,6 +1259,8 @@ def normalize_career_input(data: Any) -> dict[str, Any]:
         "projects": projects,
         "certifications": certifications,
         "internships": internships,
+        "achievements": achievements,
+        "achievements_count": len(achievements),
         "skill_count": skill_count,
         "project_count": project_count,
         "certification_count": certification_count,
@@ -1405,13 +1425,15 @@ _COURSE_GROUP_MODEL_MAP = {
 def _get_specialized_display_name(class_name: str, normalized: dict[str, Any]) -> str:
     raw_interest = _clean_token(normalized.get("raw_interest", ""))
     skills_text = " ".join(_clean_token(s) for s in (normalized.get("expanded_skills") or normalized.get("skills", [])))
+    project_text = " ".join(_clean_token(p) for p in (normalized.get("projects") or []))
+    combined_evidence = f"{raw_interest} {skills_text} {project_text}"
     interest_domain = normalized.get("interest_domain", "")
     course_group = normalized.get("course_group", "")
 
     if class_name == "data_science":
-        if any(term in raw_interest or term in skills_text for term in ["ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq"]):
+        if any(term in combined_evidence for term in ["ai engineer", "agentic", "llm", "genai", "generative ai", "prompt engineering", "llama", "gemini", "groq", "claude", "rag", "langchain", "promptwars", "vector db"]):
             return "AI Engineer (Agentic & LLM Systems)"
-        if any(term in raw_interest or term in skills_text for term in ["ml engineer", "machine learning engineer", "mlops"]):
+        if any(term in combined_evidence for term in ["ml engineer", "machine learning engineer", "mlops"]):
             return "Machine Learning Engineer"
         return "Data Science & AI"
 
@@ -1740,8 +1762,12 @@ def _career_narrative_summary(
         summary += f" Your CGPA ({cgpa_clean:.1f}), {skill_count} relevant skills, and {project_count} projects already create a credible foundation."
     else:
         summary += f" Your {skill_count} relevant skills and {project_count} projects already create a credible foundation."
+    user_achievements = normalized.get("achievements") or []
+    if user_achievements:
+        summary += f" Key differentiator: '{user_achievements[0]}' provides proven competitive validation."
     desired_path = _pick_desired_path_from_interest(normalized)
-    if desired_path and desired_path != top_class:
+    target_role_str = str(normalized.get("target_role") or "").strip().lower()
+    if desired_path and desired_path != top_class and target_role_str != "auto":
         desired_label = desired_path.replace("_", " ").title()
         summary += f" Your current skills look closer to {top_path}, while your stated interest points more toward {desired_label}."
 
@@ -2079,7 +2105,8 @@ def _shap_insights(normalized: dict[str, Any], model_result: dict[str, Any], opt
         top_path = _path_display_name(top_option)
         top_class = _path_class(top_option)
         desired_path = _pick_desired_path_from_interest(normalized, {item.get("mapped_class"): item.get("path_profile", {}) for item in option_scores})
-        if desired_path and desired_path != top_class:
+        target_role_val = str(normalized.get("target_role") or "").strip().lower()
+        if desired_path and desired_path != top_class and target_role_val != "auto":
             desired_label = desired_path.replace("_", " ").title()
             insights.insert(0, f"Your current profile evidence is closer to {top_path}, while your stated interest is closer to {desired_label}.")
             risks.insert(0, f"Interest-to-skill mismatch: moving into {desired_label} will require more path-specific proof than your current skills show.")
@@ -2110,6 +2137,17 @@ def _shap_insights(normalized: dict[str, Any], model_result: dict[str, Any], opt
                 "value": impact.get("shap_value", 0.0),
                 "reason": impact["reason"],
             })
+
+    user_achievements = normalized.get("achievements") or []
+    if user_achievements:
+        lead_ach = str(user_achievements[0]).strip()
+        insights.insert(0, f"Standout Achievement: '{lead_ach}' directly proves top-tier competitive execution beyond standard coursework.")
+        factor_impacts.insert(0, {
+            "factor": "Competitive Achievement",
+            "impact": "Strongly boosts",
+            "value": 0.28,
+            "reason": f"'{lead_ach}' provides external competitive validation",
+        })
 
     return insights[:4], risks[:4], factor_impacts[:6]
 

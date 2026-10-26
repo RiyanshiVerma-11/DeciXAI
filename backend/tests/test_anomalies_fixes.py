@@ -296,6 +296,31 @@ def test_14_non_tech_role_skill_gaps():
     assert "django" not in actions_str.lower()
 
 
+def test_15_ai_resume_auto_target_no_phantom_software_mismatch():
+    # Candidate with B.Tech CSE (Data Science), HospiSynAI, VoteWise AI, Python, SQL, Claude
+    # Target role is 'auto' (AI recommendation selected / resume dropped without explicit pivot)
+    normalized = normalize_career_input({
+        "cgpa": 8.47,
+        "course": "B.Tech",
+        "specialization": "Computer Science (Data Science)",
+        "skills": ["Python", "SQL", "Claude", "FastAPI", "React", "Docker"],
+        "projects": ["HospiSynAI", "VoteWise AI"],
+        "target_role": "auto",
+        "interest": "",
+    })
+    res = analyze_career_profile(normalized)
+    insights_str = " ".join(res.get("insights") or [])
+    risks_str = " ".join(res.get("risks") or [])
+    summary_str = res.get("summary") or ""
+
+    # Should match AI Engineer as top recommendation
+    assert "AI Engineer" in res.get("prediction", "")
+    # Should NOT claim stated interest points to Software Development or create an artificial mismatch
+    assert "stated interest points more toward Software Development" not in summary_str
+    assert "Interest-to-skill mismatch" not in risks_str
+    assert "Interest-to-skill mismatch" not in insights_str
+
+
 if __name__ == "__main__":
     test_1_probability_not_deflated()
     print("[PASS] Test 1: Probability not artificially deflated")

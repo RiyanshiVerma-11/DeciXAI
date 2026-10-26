@@ -258,6 +258,24 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
                     "priority": "High",
                 },
             ]
+        elif domain in {"ai_engineer", "data_science"}:
+            optimal_recommendations = [
+                {
+                    "action": "Consolidate your top AI project into a production-deployed RAG / Agentic demo with CI/CD and evaluation metrics",
+                    "estimated_uplift": "+10% to +15%",
+                    "priority": "Critical",
+                },
+                {
+                    "action": "Earn an industry-recognized credential (e.g., DeepLearning.AI LLM Ops or Coursera GenAI Specialization)",
+                    "estimated_uplift": "+6% to +10%",
+                    "priority": "High",
+                },
+                {
+                    "action": "Add Machine Learning & Statistical Modeling / PyTorch implementation proof",
+                    "estimated_uplift": "+5% to +8%",
+                    "priority": "High",
+                },
+            ]
         else:
             optimal_recommendations = [
                 {
