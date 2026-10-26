@@ -165,13 +165,20 @@ function VisualAlignmentBar({ label, value }) {
   let iconClass = 'text-amber-500'
   let icon = '⚠'
   
-  if (normalized === 'match') {
+  if (normalized === 'match' || normalized === 'project_verified' || normalized === 'verified') {
     percent = 100
     color = 'from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.15)]'
-    labelText = 'Match'
+    labelText = normalized === 'project_verified' ? 'Project-Verified' : 'Match'
     textColor = 'text-emerald-700'
     iconClass = 'text-emerald-500 font-bold'
     icon = '✓'
+  } else if (normalized === 'partial') {
+    percent = 70
+    color = 'from-sky-400 to-blue-500'
+    labelText = 'Partial'
+    textColor = 'text-sky-700'
+    iconClass = 'text-sky-500 font-bold'
+    icon = '≈'
   } else if (normalized === 'mismatch') {
     percent = 40
     color = 'from-orange-400 to-rose-500'

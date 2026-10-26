@@ -251,12 +251,26 @@ def call_llm_json(
             messages,
             api_key=q_key,
             temperature=0.2,
-            max_tokens=1500,
+            max_tokens=2000,
             json_mode=True,
             timeout_seconds=timeout_seconds,
         )
         if text:
             parsed = _extract_json_object(text)
+            if parsed is not None:
+                return parsed
+
+        # Fallback to plain completion without json_mode if Groq schema validation errors
+        text_raw, _ = _call_groq_raw(
+            messages,
+            api_key=q_key,
+            temperature=0.2,
+            max_tokens=2000,
+            json_mode=False,
+            timeout_seconds=timeout_seconds,
+        )
+        if text_raw:
+            parsed = _extract_json_object(text_raw)
             if parsed is not None:
                 return parsed
 

@@ -359,10 +359,49 @@ export default function ResumeAuditCard({
                     <span className="font-bold text-slate-900">{parsed_profile.experience_years} yrs</span>
                   </div>
                 )}
+                {Array.isArray(parsed_profile.achievements) && parsed_profile.achievements.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-amber-700 font-semibold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 shadow-2xs">
+                    <span className="text-amber-500 font-bold">🏆</span>
+                    <span>Competitive Honors:</span>
+                    <span className="font-bold text-amber-950">{parsed_profile.achievements.length}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
+
+        {/* Competitive Honors & Accolades Showcase */}
+        {Array.isArray(parsed_profile.achievements) && parsed_profile.achievements.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-yellow-50/60 p-5 shadow-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-amber-200/60">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs text-sm">
+                  🏆
+                </span>
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-950">
+                    Standout Competitive Honors &amp; National Rankings ({parsed_profile.achievements.length})
+                  </h4>
+                  <p className="text-[11px] text-amber-800/80">
+                    Verified external proof of elite execution, high-percentile problem solving, and competition success.
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-200/80 text-amber-900 border border-amber-300 shadow-2xs">
+                Elite Proof
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3.5">
+              {parsed_profile.achievements.map((ach, idx) => (
+                <div key={idx} className="flex items-start gap-2.5 rounded-xl bg-white/95 border border-amber-200/90 p-3 shadow-2xs transition hover:border-amber-300">
+                  <span className="text-amber-500 text-xs shrink-0 mt-0.5 font-bold">⭐</span>
+                  <span className="text-xs font-bold text-slate-800 leading-snug">{ach}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Strengths & Recommendations Executive Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

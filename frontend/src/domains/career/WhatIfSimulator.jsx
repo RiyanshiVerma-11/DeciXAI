@@ -540,6 +540,7 @@ export default function WhatIfSimulator({
   const [capstoneProjects, setCapstoneProjects] = useState([])
   const [addedCerts, setAddedCerts]             = useState(0)
   const [cgpaDelta, setCgpaDelta]               = useState(0.0)
+  const [hasHackathonWin, setHasHackathonWin]   = useState(false)
 
   // Inline form state
   const [showForm, setShowForm]           = useState(false)
@@ -570,6 +571,7 @@ export default function WhatIfSimulator({
             added_projects: projectDescriptions,
             added_certs: addedCerts > 0 ? Array(addedCerts).fill(certConfig.defaultCertName) : [],
             cgpa_delta: cgpaDelta,
+            has_hackathon_win: hasHackathonWin,
           },
         })
         if (isCurrent) setSimulationData(res)
@@ -579,7 +581,7 @@ export default function WhatIfSimulator({
     }
     const t = setTimeout(run, 400)
     return () => { isCurrent = false; clearTimeout(t) }
-  }, [baseProfile, selectedSkills, capstoneProjects, addedCerts, cgpaDelta, certConfig.defaultCertName])
+  }, [baseProfile, selectedSkills, capstoneProjects, addedCerts, cgpaDelta, hasHackathonWin, certConfig.defaultCertName])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const toggleSkill = s =>
@@ -624,6 +626,7 @@ export default function WhatIfSimulator({
     setCapstoneProjects([])
     setAddedCerts(0)
     setCgpaDelta(0.0)
+    setHasHackathonWin(false)
     handleCancel()
   }
 
@@ -834,6 +837,49 @@ export default function WhatIfSimulator({
                 <span>+1.5</span>
               </div>
             </div>
+          </div>
+
+          {/* Competitive Proof & Honors Lever */}
+          <div className={`rounded-xl border p-4 transition-all ${
+            hasHackathonWin
+              ? 'border-amber-300 bg-amber-50/80 ring-2 ring-amber-400/20'
+              : 'border-slate-100 bg-slate-50/70 hover:border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🏆</span>
+                <div>
+                  <div className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                    <span>Competitive Proof & Honors</span>
+                    <span className="rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 border border-amber-300/50">
+                      High Signal
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    National Hackathon Podium / Algorithmic Contest Top Rank / PromptWars Placement
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setHasHackathonWin(p => !p)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  hasHackathonWin ? 'bg-amber-500' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    hasHackathonWin ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            {hasHackathonWin && (
+              <div className="mt-3 text-[11px] font-semibold text-amber-900 bg-amber-100/70 rounded-lg px-3 py-1.5 flex items-center gap-2 border border-amber-200">
+                <span>✨</span>
+                <span>Validates elite execution velocity under pressure; strongly substitutes for standard enterprise cert requirements.</span>
+              </div>
+            )}
           </div>
         </div>
 

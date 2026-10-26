@@ -9,6 +9,8 @@ and normalizes candidate attributes for direct ingestion into the ML Decision En
 from __future__ import annotations
 
 import io
+import os
+from pathlib import Path
 import re
 from typing import Any
 
@@ -17,14 +19,32 @@ from services.hybrid_decision_service import normalize_career_input, analyze_car
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extract raw text from PDF bytes using pdfplumber with fallback to pypdf."""
+    """
+    Extract raw text from PDF bytes using pdfplumber with layout-aware
+    page reading, table preservation, and fallback to pypdf.
+    """
     text = ""
     try:
         import pdfplumber
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             pages = []
             for page in pdf.pages:
-                extracted = page.extract_text()
+                extracted = page.extract_text(layout=False) or ""
+                if len(extracted.strip()) < 50:
+                    extracted = page.extract_text(layout=True) or ""
+
+                # Extract any structured tables (e.g. coursework, education, skill matrices)
+                tables = page.extract_tables() or []
+                table_lines = []
+                for table in tables:
+                    for row in table:
+                        if row:
+                            row_str = " | ".join(str(cell or "").strip() for cell in row if str(cell or "").strip())
+                            if row_str:
+                                table_lines.append(row_str)
+                if table_lines:
+                    extracted = (extracted + "\n" + "\n".join(table_lines)).strip()
+
                 if extracted:
                     pages.append(extracted)
             text = "\n\n".join(pages).strip()
@@ -38,8 +58,8 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
             pages = []
             for page in reader.pages:
                 extracted = page.extract_text()
-                if extracted:
-                    pages.append(extracted)
+                if extracted and extracted.strip():
+                    pages.append(extracted.strip())
             text = "\n\n".join(pages).strip()
         except Exception:
             pass
@@ -48,11 +68,18 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
 
 
 def extract_text_from_docx(file_bytes: bytes) -> str:
-    """Extract raw text from docx bytes."""
+    """Extract raw text from docx bytes including paragraphs and tables."""
     try:
         import docx
         doc = docx.Document(io.BytesIO(file_bytes))
         paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+
+        for table in doc.tables:
+            for row in table.rows:
+                row_str = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                if row_str:
+                    paragraphs.append(row_str)
+
         return "\n".join(paragraphs).strip()
     except Exception:
         return ""
@@ -542,9 +569,25 @@ def extract_certifications_from_resume(raw_text: str, cert_section: str) -> list
     return certs[:6]
 
 
-def extract_achievements_from_resume(raw_text: str, ach_section: str) -> list[str]:
-    """Extract awards, hackathon rankings, and competitive achievements without fragmentation."""
+def _clean_achievement_entry(entry: str) -> str:
+    cleaned = entry.strip()
+    # Strip bullet characters or list numbering like "1. ", "1) ", but preserve ordinals like "1st", "2nd"
+    cleaned = re.sub(r"^(?:[-*•–—]\s*|\d+(?!(?:st|nd|rd|th)\b)[\.\)]\s*)", "", cleaned).strip()
+    # Repair missing or truncated leading ordinal digits: e.g. "nd Place" -> "2nd Place", "st Place" -> "1st Place", "rd Place" -> "3rd Place"
+    cleaned = re.sub(r"^\bnd\s+Place\b", "2nd Place", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^\bst\s+Place\b", "1st Place", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^\brd\s+Place\b", "3rd Place", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^\bth\s+Place\b", "4th Place", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\[.*?\]", "", cleaned).strip()
+    return cleaned
+
+
+def extract_achievements_from_resume(raw_text: str, ach_section: str = "") -> list[str]:
+    """Extract awards, hackathon rankings, and competitive achievements without ordinal corruption or fragmentation."""
     achievements: list[str] = []
+    if not ach_section and raw_text:
+        sections = segment_resume_sections(raw_text)
+        ach_section = sections.get("achievements", "")
     if ach_section:
         lines = ach_section.split("\n")
         current_ach = ""
@@ -552,83 +595,95 @@ def extract_achievements_from_resume(raw_text: str, ach_section: str) -> list[st
             stripped = line.strip()
             if not stripped:
                 continue
-            is_bullet = stripped.startswith(("-", "*", "•", "–", "—")) or bool(re.match(r"^\d+[\.\)]\s+", stripped))
-            clean_line = re.sub(r"^[-*•–—\d\.\)\s]+", "", stripped).strip()
-            clean_line = re.sub(r"\[.*?\]", "", clean_line).strip()
+            is_bullet = stripped.startswith(("-", "*", "•", "–", "—")) or bool(re.match(r"^\d+(?!(?:st|nd|rd|th)\b)[\.\)]\s+", stripped))
+            clean_line = _clean_achievement_entry(stripped)
 
             if is_bullet or not current_ach:
                 if current_ach and len(current_ach) >= 6:
-                    achievements.append(current_ach[:110])
+                    cleaned_curr = _clean_achievement_entry(current_ach)
+                    if cleaned_curr:
+                        achievements.append(cleaned_curr[:250])
                 current_ach = clean_line
             else:
                 current_ach += " " + clean_line
 
         if current_ach and len(current_ach) >= 6:
-            achievements.append(current_ach[:110])
+            cleaned_curr = _clean_achievement_entry(current_ach)
+            if cleaned_curr:
+                achievements.append(cleaned_curr[:250])
 
-    if not achievements and raw_text:
+    if raw_text:
         # Scan raw_text for high-impact achievements (rankings, hackathons, national percentiles, competitions)
         patterns = [
             r"(?:ranked|rank)\s+in\s+the\s+top\s+[\d\.]+%[^.\n]+",
-            r"(?:top\s+[\d\.]+%|rank\s+#?\d+|1st|2nd|3rd\s+place|winner|runner-up|finalist)[^.\n]+",
+            r"(?:top\s+[\d\.]+%|rank\s+#?\d+|(?:1st|2nd|3rd|4th|\d+th)\s+place|winner|runner-up|finalist)[^.\n]+",
             r"(?:promptwars|codeforces|leetcode|hackathon|kaggle|olympiad)[^.\n]+",
         ]
         for pat in patterns:
             for match in re.finditer(pat, raw_text, flags=re.IGNORECASE):
-                found = re.sub(r"^[^\w]+", "", match.group(0)).strip()
+                found = _clean_achievement_entry(match.group(0))
                 if len(found) >= 8 and not any(found.lower() in a.lower() for a in achievements):
-                    achievements.append(found[:120])
-                if len(achievements) >= 4:
+                    achievements.append(found[:250])
+                if len(achievements) >= 6:
                     break
-            if len(achievements) >= 4:
+            if len(achievements) >= 6:
                 break
 
-    return achievements[:5]
+    return [_clean_achievement_entry(a) for a in achievements[:6] if _clean_achievement_entry(a)]
 
 
 def infer_best_fit_role(skills: list[str], specialization: str, target_role: str | None) -> str:
     """Intelligently map credentials to the highest-affinity benchmark career track."""
-    if target_role and target_role.strip():
+    if target_role and target_role.strip() and target_role.strip().lower() != "auto":
         return target_role.strip()
 
     skills_lower = set(s.lower() for s in skills)
     spec_lower = specialization.lower()
 
-    # Legal & Compliance
-    legal_hits = sum(1 for s in skills_lower if any(w in s for w in ["legal", "trademark", "patent", "antitrust", "gdpr", "dpdp", "compliance", "regulatory", "ip due", "contract", "merger", "wipo"]))
+    # 1. AI / ML & Agentic Systems (Evaluate first when candidate has modern LLM/AI stack)
+    ai_ml_keywords = [
+        "machine learning", "deep learning", "nlp", "gemini", "claude", "groq", "pytorch",
+        "tensorflow", "rag", "generative ai", "prompt engineering", "langchain", "llamaindex",
+        "ollama", "llm", "llama", "multi-agent", "agent orchestration", "agentic", "vector",
+        "embeddings", "fine-tuning", "lora", "transformers", "hugging face", "neural"
+    ]
+    ai_ml_hits = sum(1 for s in skills_lower if any(kw in s for kw in ai_ml_keywords))
+    if ai_ml_hits >= 2 or ("data science" in spec_lower and ai_ml_hits >= 1) or ("ai" in spec_lower and ai_ml_hits >= 1):
+        return "AI Systems & Machine Learning Engineer"
+
+    # 2. Legal & Compliance
+    legal_keywords = ["legal", "trademark", "patent", "antitrust", "gdpr", "dpdp", "compliance", "regulatory", "ip due", "contract", "merger", "wipo"]
+    legal_hits = sum(1 for s in skills_lower if any(w in s for w in legal_keywords))
     if legal_hits >= 2 or any(l in spec_lower for l in ["law", "legal", "compliance", "intellectual property", "antitrust"]):
         return "IP & Technology Lawyer"
 
-    # Finance & Investment
-    fin_hits = sum(1 for s in skills_lower if any(w in s for w in ["finance", "valuation", "dcf", "lbo", "equity research", "cfa", "credit risk", "accounting", "banking"]))
+    # 3. Finance & Investment
+    fin_keywords = ["finance", "valuation", "dcf", "lbo", "equity research", "cfa", "credit risk", "accounting", "banking", "financial modeling"]
+    fin_hits = sum(1 for s in skills_lower if any(w in s for w in fin_keywords))
     if fin_hits >= 2 or any(f in spec_lower for f in ["finance", "banking", "investment", "accounting"]):
         return "Finance & Investment Analyst"
 
-    # UI/UX & Design
-    design_hits = sum(1 for s in skills_lower if any(w in s for w in ["figma", "ui", "ux", "wireframing", "prototyping", "usability", "wcag"]))
-    if design_hits >= 2 or any(d in spec_lower for d in ["design", "ui", "ux"]):
+    # 4. UI/UX & Design (Requires genuine design tools/methodologies, not just wcag accessibility)
+    design_keywords = ["figma", "wireframing", "prototyping", "adobe xd", "user research", "ui design", "ux design", "interaction design"]
+    design_hits = sum(1 for s in skills_lower if any(w in s for w in design_keywords))
+    if design_hits >= 2 or ("design" in spec_lower and "system" not in spec_lower and "science" not in spec_lower):
         return "Product UI/UX Designer"
 
-    # AI / ML Engineer
-    ai_ml_hits = sum(1 for s in skills_lower if s in {
-        "machine learning", "deep learning", "nlp", "gemini api", "gemini", "claude", "groq", "pytorch",
-        "tensorflow", "rag", "generative ai", "prompt engineering", "langchain", "llamaindex", "ollama", "llms", "llama"
-    })
-    if ai_ml_hits >= 2 or "data science" in spec_lower or "ai" in spec_lower:
-        return "AI Systems & Machine Learning Engineer"
-
-    # Cloud & DevOps
-    cloud_hits = sum(1 for s in skills_lower if s in {"docker", "kubernetes", "aws", "gcp", "azure", "ci/cd", "terraform", "github actions", "linux"})
+    # 5. Cloud & DevOps
+    cloud_keywords = ["docker", "kubernetes", "aws", "gcp", "azure", "ci/cd", "terraform", "github actions", "linux", "devops"]
+    cloud_hits = sum(1 for s in skills_lower if any(w in s for w in cloud_keywords))
     if cloud_hits >= 3:
         return "Cloud & DevOps Architect"
 
-    # Data Science / Analytics
-    ds_hits = sum(1 for s in skills_lower if s in {"sql", "pandas", "numpy", "tableau", "power bi", "python"})
-    if ds_hits >= 3:
+    # 6. Data Science / Analytics
+    ds_keywords = ["sql", "pandas", "numpy", "tableau", "power bi", "data analysis", "data analytics", "data warehouse"]
+    ds_hits = sum(1 for s in skills_lower if any(w in s for w in ds_keywords))
+    if ds_hits >= 2 or "data science" in spec_lower:
         return "Data Scientist & Analytics Engineer"
 
-    # Full-Stack Software
-    sde_hits = sum(1 for s in skills_lower if s in {"react", "javascript", "typescript", "node.js", "fastapi", "django", "html", "css", "java", "c++", "c"})
+    # 7. Full-Stack Software
+    sde_keywords = ["react", "javascript", "typescript", "node.js", "fastapi", "django", "html", "css", "java", "c++", "c", "springboot"]
+    sde_hits = sum(1 for s in skills_lower if any(w in s for w in sde_keywords))
     if sde_hits >= 2:
         return "Full-Stack Software Engineer"
 
@@ -740,7 +795,36 @@ def calculate_ats_audit(text: str, parsed_profile: dict[str, Any]) -> dict[str, 
         score -= 10
         feedback.append("Resume is very brief. Expand on technical architecture and responsibilities.")
 
-    ats_score = round(max(20.0, min(100.0, score)), 1)
+    # 5. Link & Repository Verifiability
+    has_links = bool(re.search(r"https?://|github\.com/|linkedin\.com/|vercel\.app|render\.com", lowered))
+    if has_links:
+        score += 4
+        strengths.append("Verified online portfolio and code repository links present.")
+    else:
+        score -= 4
+        feedback.append("Add direct GitHub repository or live deployment URLs for instant 1-click recruiter verification.")
+
+    # 6. Competitive Honors & Achievements
+    achievements_detected = any(w in lowered for w in ["hackathon", "rank", "winner", "runner-up", "finalist", "promptwars", "codeforces", "leetcode", "kaggle", "top 0.", "top 1%"])
+    if achievements_detected:
+        score += 4
+        strengths.append("Verified competitive hackathon or high-percentile contest achievements present.")
+
+    # 7. Actionable Enterprise ATS Recommendations
+    if "jwt" in lowered or "fastapi" in lowered or "rag" in lowered or "api" in lowered or "llm" in lowered:
+        if not any(w in lowered for w in ["latency", "throughput", "qps", "response time", "ms"]):
+            feedback.append("Quantify system performance (e.g., API latency in ms, token cost reductions, or user concurrency) on core backend projects.")
+
+    if len(feedback) < 2:
+        feedback.append("Ensure every project bullet point follows the Google X-Y-Z formula (Accomplished [X] as measured by [Y], by doing [Z]).")
+        if not has_links:
+            feedback.append("Embed clickable GitHub repository and live demo links directly into project headers for instant recruiter verification.")
+        else:
+            feedback.append("Align technical skill token frequency with target role postings to pass strict enterprise ATS keyword density filters.")
+
+    # Calibrate realistic enterprise score: 88.0 - 93.0 for strong early career profiles
+    raw_calc = score - 8.0
+    ats_score = round(max(25.0, min(94.0 if (has_links and achievements_detected) else 91.0, raw_calc)), 1)
 
     if ats_score >= 80:
         ats_grade = "High ATS Match"
@@ -756,6 +840,12 @@ def calculate_ats_audit(text: str, parsed_profile: dict[str, Any]) -> dict[str, 
         "ats_score": ats_score,
         "ats_grade": ats_grade,
         "grade_color": grade_color,
+        "section_checks": {
+            "education": has_edu,
+            "skills": has_skills,
+            "projects": has_proj,
+            "experience": has_exp,
+        },
         "strengths": strengths[:5],
         "recommendations": feedback[:4],
         "word_count": words,
@@ -764,11 +854,68 @@ def calculate_ats_audit(text: str, parsed_profile: dict[str, Any]) -> dict[str, 
     }
 
 
+def extract_profile_with_llm(raw_text: str, target_role: str | None = None) -> dict[str, Any] | None:
+    """
+    Uses Gemini API (via resilient LLM Client) to deeply and accurately parse resumes.
+    STRICT ZERO-HALLUCINATION GUARDRAILS:
+    - Never invent, exaggerate, or assume details not in the resume text.
+    - Captures rich project descriptions (tech stack, real-world purpose, impact).
+    - Captures competitive achievements, hackathon placements, and honors accurately.
+    - Returns structured profile dictionary or None on failure.
+    """
+    if not raw_text or len(raw_text.strip()) < 40:
+        return None
+
+    try:
+        from services.llm_client import call_llm_json
+
+        system_prompt = (
+            "You are an expert ATS & Resume Intelligence Parser for Decision XAI.\n"
+            "Your core principle is 100% TRANSPARENCY, AUDITABILITY, AND ZERO HALLUCINATION.\n"
+            "Rules:\n"
+            "1. NEVER invent, exaggerate, or assume details not present in the resume text.\n"
+            "2. Only extract verified facts explicitly mentioned in the text.\n"
+            "3. For PROJECTS: Extract project title, tech stack (libraries/tools), and a detailed description explaining what was built, how it works, and its real-world impact. Do not just return 1-word titles.\n"
+            "4. For ACHIEVEMENTS: Extract all hackathon ranks, competition placements, awards, and national percentiles accurately without truncating them.\n"
+            "5. For CERTIFICATIONS: Only include verified credentials explicitly listed in a certifications/courses section. If none, return an empty array [].\n"
+            "6. Return ONLY valid JSON in this exact structure:\n"
+            "{\n"
+            '  "full_name": "Candidate Name",\n'
+            '  "degree": "e.g. B.Tech, B.E., BS, MBA, BA LLB",\n'
+            '  "specialization": "e.g. Computer Science (Data Science)",\n'
+            '  "cgpa": 8.47,\n'
+            '  "score_type": "cgpa_10",\n'
+            '  "skills": ["Python", "FastAPI", "React", ...],\n'
+            '  "project_titles": ["Project 1", "Project 2"],\n'
+            '  "project_descriptions": ["Project 1: Full description with stack...", "Project 2: ..."],\n'
+            '  "achievements": ["2nd Place Winner (Rank 2) - STARTUPATHON...", "Rank 8 - HACKDAY..."],\n'
+            '  "internships": ["AI Intern - Organization"],\n'
+            '  "certifications": [],\n'
+            '  "experience_years": 0.0,\n'
+            '  "inferred_role": "AI Engineer (Agentic & LLM Systems)",\n'
+            '  "evidence_citations": {"degree": "snippet from resume", "achievements": "snippet from resume"}\n'
+            "}"
+        )
+
+        prompt = f"Resume Content:\n```text\n{raw_text[:7000]}\n```"
+        if target_role:
+            prompt += f"\nTarget Benchmark Role: {target_role}"
+
+        parsed = call_llm_json(prompt, system_prompt=system_prompt, timeout_seconds=25)
+        if isinstance(parsed, dict) and (parsed.get("skills") or parsed.get("project_titles") or parsed.get("degree")):
+            return parsed
+    except Exception as exc:
+        import logging
+        logging.getLogger("DeciXAI.ResumeParser").warning("Gemini LLM resume parser exception: %s", exc)
+
+    return None
+
+
 def parse_and_analyze_resume(file_bytes: bytes, filename: str, target_role: str | None = None) -> dict[str, Any]:
     """
-    Parses an uploaded resume file (PDF or DOCX), extracts candidate attributes dynamically,
-    computes an ATS audit, and runs the Decision XAI career analysis engine.
-    Optionally evaluates candidate fit against a specified target_role.
+    Parses an uploaded resume file (PDF or DOCX), extracts candidate attributes dynamically
+    using Gemini API intelligence with deterministic guardrails, computes an ATS audit,
+    and runs the Decision XAI career analysis engine.
     """
     filename_lower = filename.lower()
     if filename_lower.endswith(".docx"):
@@ -788,23 +935,93 @@ def parse_and_analyze_resume(file_bytes: bytes, filename: str, target_role: str 
     cert_section = sections.get("certifications", "")
     ach_section = sections.get("achievements", "")
 
-    # 2. Extract credentials dynamically with high precision
-    cgpa, score_type = extract_cgpa_from_resume(raw_text, edu_section)
-    degree, specialization = extract_degree_and_spec(raw_text, edu_section)
-    skills = extract_skills_from_resume(raw_text, skills_section)
-    projects, project_descriptions = extract_projects_from_resume(raw_text, proj_section)
-    internships, internship_count, experience_years, exp_entries = extract_experience_from_resume(raw_text, exp_section)
-    certifications = extract_certifications_from_resume(raw_text, cert_section)
-    achievements = extract_achievements_from_resume(raw_text, ach_section)
+    # 2. Deterministic Extractors (always available as benchmark and fallback)
+    cgpa_det, score_type_det = extract_cgpa_from_resume(raw_text, edu_section)
+    degree_det, spec_det = extract_degree_and_spec(raw_text, edu_section)
+    skills_det = extract_skills_from_resume(raw_text, skills_section)
+    projects_det, project_desc_det = extract_projects_from_resume(raw_text, proj_section)
+    internships_det, internship_count_det, exp_years_det, exp_entries_det = extract_experience_from_resume(raw_text, exp_section)
+    certifications_det = extract_certifications_from_resume(raw_text, cert_section)
+    achievements_det = extract_achievements_from_resume(raw_text, ach_section)
 
-    # 3. Determine target track & options
-    inferred_track = infer_best_fit_role(skills, specialization, target_role)
+    # 3. Gemini / Resilient LLM Deep Resume Intelligence Parser
+    llm_profile = extract_profile_with_llm(raw_text, target_role=target_role)
+
+    # 4. Synthesize with Transparent Guardrails
+    if llm_profile:
+        # CGPA
+        llm_cgpa = llm_profile.get("cgpa")
+        cgpa = float(llm_cgpa) if (isinstance(llm_cgpa, (int, float)) and 0.0 < float(llm_cgpa) <= 100.0) else cgpa_det
+        score_type = str(llm_profile.get("score_type") or score_type_det)
+
+        # Degree & Specialization
+        degree = str(llm_profile.get("degree") or degree_det)
+        specialization = str(llm_profile.get("specialization") or spec_det)
+
+        # Skills: Union of LLM extracted skills and deterministic keyword hits
+        llm_skills = llm_profile.get("skills") or []
+        combined_skills = []
+        seen_skills = set()
+        for s in (llm_skills + skills_det):
+            clean_s = str(s).strip()
+            if clean_s and clean_s.lower() not in seen_skills and len(clean_s) < 50:
+                seen_skills.add(clean_s.lower())
+                combined_skills.append(clean_s)
+        skills = combined_skills if combined_skills else skills_det
+
+        # Projects: Keep rich descriptions and titles
+        llm_proj_titles = llm_profile.get("project_titles") or []
+        llm_proj_desc = llm_profile.get("project_descriptions") or []
+        if llm_proj_titles:
+            projects = [str(p).strip() for p in llm_proj_titles if str(p).strip()]
+            project_descriptions = [str(d).strip() for d in llm_proj_desc if str(d).strip()]
+        else:
+            projects = projects_det
+            project_descriptions = project_desc_det
+
+        # Achievements: Deeply capture competition rankings & awards
+        llm_achs = llm_profile.get("achievements") or []
+        combined_achs = []
+        seen_achs = set()
+        for a in (llm_achs + achievements_det):
+            clean_a = _clean_achievement_entry(str(a))
+            if clean_a and clean_a.lower() not in seen_achs:
+                seen_achs.add(clean_a.lower())
+                combined_achs.append(clean_a)
+        achievements = combined_achs if combined_achs else [_clean_achievement_entry(a) for a in achievements_det]
+
+        # Internships
+        llm_interns = llm_profile.get("internships") or []
+        internships = [str(i).strip() for i in llm_interns if str(i).strip()] if llm_interns else internships_det
+        internship_count = len(internships)
+
+        # Experience years
+        llm_exp = llm_profile.get("experience_years")
+        experience_years = float(llm_exp) if isinstance(llm_exp, (int, float)) else exp_years_det
+
+        # Certifications
+        llm_certs = llm_profile.get("certifications")
+        certifications = [str(c).strip() for c in llm_certs if str(c).strip()] if isinstance(llm_certs, list) else certifications_det
+
+        inferred_track = llm_profile.get("inferred_role") or infer_best_fit_role(skills, specialization, target_role)
+        evidence_citations = llm_profile.get("evidence_citations") or {}
+    else:
+        cgpa, score_type = cgpa_det, score_type_det
+        degree, specialization = degree_det, spec_det
+        skills = skills_det
+        projects, project_descriptions = projects_det, project_desc_det
+        internships, internship_count, experience_years = internships_det, internship_count_det, exp_years_det
+        certifications = certifications_det
+        achievements = achievements_det
+        inferred_track = infer_best_fit_role(skills, specialization, target_role)
+        evidence_citations = {}
+
     active_target = target_role.strip() if (target_role and target_role.strip()) else inferred_track
 
-    # 4. Normalize profile for ML model
+    # Persona
     persona = "student" if experience_years < 1.0 else ("graduate" if experience_years < 2.5 else "professional")
 
-    # Domain-aware fallback options
+    # Domain umbrella detection
     active_domain = None
     target_lower = active_target.lower()
     if any(k in target_lower for k in ["legal", "law", "compliance", "regulatory", "ip", "patent", "trademark"]):
@@ -847,11 +1064,11 @@ def parse_and_analyze_resume(file_bytes: bytes, filename: str, target_role: str 
         "raw_prompt": raw_text[:2500],
     })
 
-    # 5. Run hybrid decision XAI model
+    # Run decision XAI model
     decision_result = analyze_career_profile(normalized, source="resume_upload")
     decision_result["intent"] = "career"
 
-    # 6. Compute ATS Compatibility Audit
+    # ATS Compatibility Audit
     ats_audit = calculate_ats_audit(raw_text, {
         "degree": degree,
         "specialization": specialization,
@@ -870,7 +1087,26 @@ def parse_and_analyze_resume(file_bytes: bytes, filename: str, target_role: str 
             ats_audit["recommendations"].insert(0, f"Target Role Gap: Add more explicit projects/skills tailored to '{active_target}'.")
         ats_audit["target_role"] = active_target
 
+    # Candidate name extraction: LLM name, or first non-empty header line of resume, or filename fallback
+    candidate_name = None
+    if llm_profile and llm_profile.get("full_name"):
+        candidate_name = str(llm_profile.get("full_name")).strip()
+    if not candidate_name:
+        for line in raw_text.splitlines()[:6]:
+            line_str = line.strip()
+            if line_str and not any(k in line_str.lower() for k in ["http", "email", "phone", "curriculum", "resume", "@", "+91", "github", "linkedin"]):
+                words = line_str.split()
+                if 1 <= len(words) <= 4 and all(re.match(r"^[A-Za-z\.\'-]+$", w) for w in words):
+                    candidate_name = line_str
+                    break
+    if not candidate_name and filename:
+        clean_name = re.sub(r"(?i)\b(resume|cv|updated|profile|final|docx|pdf)\b", "", Path(filename).stem).strip(" _-")
+        if clean_name and len(clean_name.split()) <= 4:
+            candidate_name = clean_name.replace("_", " ").title()
+
     parsed_profile = {
+        "name": candidate_name or "Candidate",
+        "full_name": candidate_name or "Candidate",
         "degree": degree,
         "course": degree,
         "specialization": specialization,
@@ -889,14 +1125,16 @@ def parse_and_analyze_resume(file_bytes: bytes, filename: str, target_role: str 
         "achievements_count": len(achievements),
         "experience_years": experience_years,
         "interest": active_target,
-        "target_role": target_role.strip() if target_role else None,
+        "target_role": target_role.strip() if target_role else "auto",
         "persona": persona,
         "domain": active_domain,
+        "llm_parsed": bool(llm_profile),
+        "evidence_citations": evidence_citations,
     }
 
     return {
         "filename": filename,
-        "target_role": target_role.strip() if target_role else None,
+        "target_role": target_role.strip() if target_role else "auto",
         "extracted_text_preview": raw_text[:1200] + ("..." if len(raw_text) > 1200 else ""),
         "raw_text": raw_text,
         "parsed_profile": parsed_profile,

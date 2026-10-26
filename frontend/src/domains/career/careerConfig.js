@@ -491,7 +491,15 @@ export const validateCareerPayload = (payload) => {
   }
 
   if (!payload.course?.trim?.()) errors.course = 'Course/Degree is required.'
-  if (!payload.interest?.trim?.()) errors.interest = 'Interest/Track is required.'
+  if (!payload.interest?.trim?.()) {
+    if (payload.target_role && payload.target_role !== 'auto') {
+      payload.interest = payload.target_role
+    } else if (payload.target_role === 'auto') {
+      payload.interest = 'AI Recommended Best Fit'
+    } else {
+      errors.interest = 'Interest/Track is required.'
+    }
+  }
   if (!payload.skills || payload.skills.length < 1) errors.skills = 'Please add at least 1 skill.'
   if (!payload.projects || payload.projects.length < 1) errors.projects = 'Please add at least 1 project.'
 

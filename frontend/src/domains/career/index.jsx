@@ -406,6 +406,14 @@ export default function CareerDomain() {
     result && pinnedResult && result.metrics && pinnedResult.metrics
   )
 
+  const handleResumeParsedFromForm = (data) => {
+    if (!data) return
+    setResumeData(data)
+    if (data.decision) {
+      setResult(data.decision)
+    }
+  }
+
   const workbenchContent = (
     <div className="space-y-3">
       {error && (
@@ -426,6 +434,7 @@ export default function CareerDomain() {
         setStep={setFormStep}
         intakeMode={intakeMode}
         setIntakeMode={setIntakeMode}
+        onResumeParsed={handleResumeParsedFromForm}
       />
     </div>
   )

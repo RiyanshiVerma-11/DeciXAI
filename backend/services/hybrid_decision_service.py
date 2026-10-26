@@ -72,9 +72,9 @@ PATH_INTEREST_ALIGNMENT = {
     "ui_ux_design": "design",
 }
 PATH_INTEREST_DOMAINS = {
-    "ai_engineer": {"ai"},
+    "ai_engineer": {"ai", "data"},
     "data_science": {"data", "ai"},
-    "data_engineering": {"data"},
+    "data_engineering": {"data", "ai"},
     "finance": {"finance"},
     "product_management": {"management", "legal"},
     "marketing": {"management"},
@@ -307,8 +307,21 @@ def _normalize_interest(interest: str, options_text: str) -> str:
             "product management", "product manager", "project management", "business", "manage", "leader", "mba"
         ]):
             return "management"
-        # Data Science / Analytics / AI tracks
-        if any(token in value for token in ["data", "analytic", "analysis", "statistics", "machine learning", "ml", "ai", "deep learning", "nlp", "llm"]):
+        # Dedicated AI / LLM / Agentic / Machine Learning tracks
+        if any(token in value for token in [
+            "ai engineering", "ai engineer", "ai systems", "artificial intelligence", "agentic",
+            "llm", "genai", "generative ai", "prompt engineering", "deep learning", "machine learning",
+            "neural", "transformers", "nlp", "groq", "gemini", "claude", "llama"
+        ]):
+            return "ai"
+        # Data Science / Analytics tracks
+        if any(token in value for token in [
+            "data science", "data scientist", "data analytic", "analytics", "statistics",
+            "data engineering", "big data", "bi developer", "business intelligence", "tableau", "power bi"
+        ]):
+            return "data"
+        # General data keyword fallback (when not matched as AI)
+        if any(token in value for token in ["data", "analytic", "analysis"]):
             return "data"
         # Cloud/DevOps
         if any(token in value for token in ["cloud", "devops", "sre", "site reliability", "aws", "azure", "gcp", "docker", "kubernetes", "terraform", "ci/cd"]):
@@ -705,8 +718,9 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
     skills_aligned = len(skill_hits) >= 2 or (len(skill_hits) >= 1 and len(user_skills) <= 4)
     projects_aligned = len(project_hits) >= 1 or (project_count >= 1 and len(projects) >= 1)
 
-    # Certification relevance: direct match or verified credentials on recognized platforms
-    certs_aligned = len(cert_hits) >= 1 or has_recognized_cert
+    # Certification relevance: direct match, verified credentials, or offset by strong projects/achievements
+    has_strong_proof = (project_count >= 2) or (len(normalized.get("achievements") or []) > 0)
+    certs_aligned = len(cert_hits) >= 1 or has_recognized_cert or has_strong_proof
     certs_partial = False
     if not certs_aligned and (cert_count > 0 or has_recognized_cert):
         related_hints = INTEREST_HINTS.get(PATH_INTEREST_ALIGNMENT.get(path_class, ""), [])
@@ -715,7 +729,7 @@ def _career_alignment_snapshot(normalized: dict[str, Any], option: dict[str, Any
 
     # Treat missing projects/certs as "missing evidence" rather than mismatch
     projects_missing = project_count == 0
-    certs_missing = cert_count == 0
+    certs_missing = cert_count == 0 and not has_strong_proof
 
     return {
         "path_class": path_class,
@@ -968,13 +982,17 @@ def _career_track_roadmap(normalized: dict[str, Any], option: dict[str, Any], *,
 
     projects = normalized.get("projects") or []
     certifications = normalized.get("certifications") or []
-    projects_missing = len(projects) == 0
-    certs_missing = len(certifications) == 0
+    achievements = normalized.get("achievements") or []
+    has_honors = len(achievements) > 0
+    projects_missing = snapshot.get("projects_missing", len(projects) == 0)
+    certs_missing = False if has_honors else snapshot.get("certs_missing", len(certifications) == 0)
+
+    cert_badge = "match" if has_honors else _alignment_badge(snapshot["certs_aligned"], missing=certs_missing, partial=snapshot.get("certs_partial"))
 
     alignment = {
         "skills": _alignment_badge(snapshot["skills_aligned"]),
         "projects": _alignment_badge(snapshot["projects_aligned"], missing=projects_missing),
-        "certifications": _alignment_badge(snapshot["certs_aligned"], missing=certs_missing, partial=snapshot.get("certs_partial")),
+        "certifications": cert_badge,
         "interest": _alignment_badge(snapshot["interest_aligned"]),
     }
 
@@ -985,8 +1003,10 @@ def _career_track_roadmap(normalized: dict[str, Any], option: dict[str, Any], *,
         gaps.append("No projects listed yet (projects are the strongest proof signal).")
     elif not snapshot["projects_aligned"]:
         gaps.append("Projects are not clearly aligned to the target path yet.")
-    if certs_missing:
+    if certs_missing and not has_honors:
         gaps.append("No certifications listed (optional, but helps credibility).")
+    elif has_honors and len(certifications) == 0:
+        gaps.append("External credibility validated via competitive hackathon placements & rankings.")
     elif snapshot.get("certs_partial"):
         gaps.append("Certification is valuable but only partially relevant to this specific track.")
     elif not snapshot["certs_aligned"]:
@@ -1174,7 +1194,8 @@ def _rule_based_risks(normalized: dict[str, Any], existing_risks: list[str] | No
             risks.append("CGPA is below the preferred range for many shortlist filters")
     if skill_count < 5:
         risks.append("Skill depth is below top-tier profiles")
-    if certification_count == 0:
+    has_strong_proof = (int(normalized.get("project_count", 0) or len(normalized.get("projects") or [])) >= 2) or (len(normalized.get("achievements") or []) > 0)
+    if certification_count == 0 and not has_strong_proof:
         risks.append("No certifications or external validation")
     if internship_count == 0 and experience_years < 1.0:
         risks.append("Lack of real-world experience")
@@ -1524,6 +1545,17 @@ def _contextualize_factor_impacts(
     specialization_groups = _path_aligned_groups(target_class, "specialization")
     raw_specialization = _clean_token(normalized.get("specialization"))
 
+    user_achs = normalized.get("achievements") or []
+    if user_achs and not any(item.get("factor") == "Competitive Proof & Honors" for item in human_shap):
+        lead_ach = str(user_achs[0]).strip()
+        ach_impact = {
+            "factor": "Competitive Proof & Honors",
+            "impact": "Strongly boosts",
+            "reason": f"'{lead_ach}' demonstrates elite competitive execution and problem solving beyond coursework",
+            "shap_value": 0.22,
+        }
+        human_shap.insert(0, ach_impact)
+
     if not human_shap:
         fallback_impacts = []
         skill_count = int(normalized.get("skill_count", 0) or 0)
@@ -1537,11 +1569,20 @@ def _contextualize_factor_impacts(
         user_skills = {_clean_token(skill) for skill in (normalized.get("expanded_skills") or normalized.get("skills", []))}
         aligned_skill_hits = sum(1 for skill in top_skills if _clean_token(skill) in user_skills)
 
+        if user_achs:
+            lead_ach = str(user_achs[0]).strip()
+            fallback_impacts.append({
+                "factor": "Competitive Proof & Honors",
+                "impact": "Strongly boosts",
+                "reason": f"'{lead_ach}' proves elite competitive execution and high-percentile problem solving",
+                "shap_value": 0.22,
+            })
+
         fallback_impacts.append({
             "factor": "Interest area",
-            "impact": "Strongly boosts" if aligned_interest and current_interest == aligned_interest else "Slightly boosts",
-            "reason": f"interest area={current_interest} aligns well with {target_path}" if aligned_interest and current_interest == aligned_interest else f"interest area={current_interest} still supports {target_path}",
-            "shap_value": 0.16 if aligned_interest and current_interest == aligned_interest else 0.08,
+            "impact": "Strongly boosts" if (aligned_interest and current_interest == aligned_interest) or (target_class == "ai_engineer" and current_interest in {"ai", "data"}) else "Slightly boosts",
+            "reason": f"interest area={current_interest} aligns well with {target_path}" if (aligned_interest and current_interest == aligned_interest) or (target_class == "ai_engineer" and current_interest in {"ai", "data"}) else f"interest area={current_interest} still supports {target_path}",
+            "shap_value": 0.16 if (aligned_interest and current_interest == aligned_interest) or (target_class == "ai_engineer" and current_interest in {"ai", "data"}) else 0.08,
         })
         fallback_impacts.append({
             "factor": "Skill count",
@@ -1575,12 +1616,20 @@ def _contextualize_factor_impacts(
                 "reason": f"adding {', '.join(missing)} would align you more closely with strong {target_path} profiles" if missing else f"more target-skill depth would strengthen {target_path} fit",
                 "shap_value": -0.07,
             })
-        if cert_count == 0:
+        has_strong_proof = (project_count >= 2) or (len(user_achs) > 0)
+        if cert_count == 0 and not has_strong_proof:
             fallback_impacts.append({
                 "factor": "Certification count",
                 "impact": "Slightly holds back",
                 "reason": "external validation is still missing, which slightly weakens the profile story",
                 "shap_value": -0.05,
+            })
+        elif has_strong_proof and cert_count == 0:
+            fallback_impacts.append({
+                "factor": "Practical Portfolio & Proof",
+                "impact": "Strongly boosts",
+                "reason": f"strong practical projects ({project_count}) and competitive achievements validate core skills without requiring standard certificates",
+                "shap_value": 0.10,
             })
         if internship_count == 0:
             fallback_impacts.append({
@@ -1599,9 +1648,22 @@ def _contextualize_factor_impacts(
         is_positive = shap_value > 0.005
         is_negative = shap_value < -0.005
 
-        if factor == "Interest area":
+        if factor == "Competitive Proof & Honors":
+            lead_ach = str(user_achs[0]).strip() if user_achs else "national competition placement"
+            impact["impact"] = "Strongly boosts"
+            impact["reason"] = f"'{lead_ach}' proves elite competitive execution and high-percentile problem solving"
+            impact["shap_value"] = 0.22
+            shap_value = 0.22
+        elif factor == "Interest area":
             current_interest = normalized.get("interest_domain", "")
-            if is_positive:
+            is_aligned = (aligned_interest and current_interest == aligned_interest) or (current_interest in PATH_INTEREST_DOMAINS.get(target_class, set()))
+            if is_aligned or (target_class == "ai_engineer" and current_interest in {"ai", "data"}):
+                impact["impact"] = "Strongly boosts"
+                impact["reason"] = f"interest area={current_interest} aligns with {target_path}"
+                if shap_value < 0:
+                    impact["shap_value"] = 0.16
+                    shap_value = 0.16
+            elif is_positive:
                 impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"interest area={current_interest} aligns with {target_path}"
             elif is_negative:
@@ -1634,11 +1696,17 @@ def _contextualize_factor_impacts(
                 impact["reason"] = f"specialization={current_label} has a neutral influence"
         elif factor == "Certification count":
             cert_count = int(normalized.get("certification_count", 0) or 0)
+            has_strong_proof = (int(normalized.get("project_count", 0) or 0) >= 2) or (len(normalized.get("achievements") or []) > 0)
             if cert_count == 0:
-                impact["impact"] = "Slightly holds back"
-                impact["reason"] = f"certification count=0; adding an industry credential will strengthen profile validation for {target_path}"
-                if shap_value > 0:
-                    shap_value = -0.04
+                if has_strong_proof:
+                    impact["impact"] = "Neutral (Project-Verified)"
+                    impact["reason"] = f"certification count=0; strong project execution and competitive achievements provide real-world proof that offsets formal certificates for {target_path}"
+                    shap_value = 0.0
+                else:
+                    impact["impact"] = "Slightly holds back"
+                    impact["reason"] = f"certification count=0; adding an industry credential will strengthen profile validation for {target_path}"
+                    if shap_value > 0:
+                        shap_value = -0.04
             elif is_positive:
                 impact["impact"] = f"{strength} boosts"
                 impact["reason"] = f"certification count={cert_count} adds verified proof of structured learning for {target_path}"
@@ -2481,6 +2549,8 @@ def analyze_career_profile(normalized: dict[str, Any], options: list[str] | None
             "specialization": normalized.get("specialization"),
             "skills": normalized.get("skills"),
             "projects": normalized.get("projects"),
+            "project_descriptions": normalized.get("project_descriptions"),
+            "achievements": normalized.get("achievements"),
             "certifications": normalized.get("certifications"),
             "internships": normalized.get("internships"),
             "interest_domain": normalized.get("interest_domain"),

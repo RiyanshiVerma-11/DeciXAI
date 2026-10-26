@@ -44,8 +44,8 @@ const bandStyles = {
   'Weak case': 'bg-rose-100 text-rose-800',
 }
 
-const POSITIVE_COLORS = ['#14b8a6', '#22c55e', '#06b6d4', '#84cc16']
-const NEGATIVE_COLORS = ['#f97316', '#ef4444', '#fb7185', '#f59e0b']
+const POSITIVE_COLORS = ['#f59e0b', '#14b8a6', '#22c55e', '#06b6d4', '#84cc16']
+const NEGATIVE_COLORS = ['#ef4444', '#f97316', '#fb7185', '#e11d48']
 
 const clampPercent = (value) => Math.max(0, Math.min(100, Math.round((value || 0) * 100)))
 
@@ -66,6 +66,8 @@ const humanizeFeatureLabel = (rawLabel = '') => {
   const lowered = String(rawLabel).trim().toLowerCase()
 
   if (!lowered) return 'This factor'
+  if (lowered.includes('competitive proof') || lowered.includes('competitive achievement') || lowered.includes('honors')) return 'Competitive Proof & Honors'
+  if (lowered.includes('interest alignment') || lowered.includes('interest bonus') || lowered.includes('interest fit')) return 'Target Interest Alignment'
   if (lowered.includes('interest management')) return 'Management interest'
   if (lowered.includes('interest technical')) return 'Technical interest'
   if (lowered.includes('interest data')) return 'Data interest'
@@ -74,7 +76,6 @@ const humanizeFeatureLabel = (rawLabel = '') => {
   if (lowered.includes('credit score')) return 'Credit score'
   if (lowered.includes('team size')) return 'Team size'
   if (lowered.includes('per capita')) return 'Per-capita allocation'
-  if (lowered.includes('interest bonus')) return 'Interest fit'
 
   return prettifyKey(lowered)
 }
@@ -534,13 +535,20 @@ function VisualAlignmentBar({ label, value }) {
   let iconClass = 'text-amber-500'
   let icon = '⚠'
   
-  if (normalized === 'match') {
+  if (normalized === 'match' || normalized === 'project_verified' || normalized === 'verified') {
     percent = 100
     color = 'from-emerald-400 to-teal-500 shadow-[0_0_8px_rgba(16,185,129,0.15)]'
-    labelText = 'Match'
+    labelText = normalized === 'project_verified' ? 'Project-Verified' : 'Match'
     textColor = 'text-emerald-700'
     iconClass = 'text-emerald-500 font-bold'
     icon = '✓'
+  } else if (normalized === 'partial') {
+    percent = 70
+    color = 'from-sky-400 to-blue-500'
+    labelText = 'Partial'
+    textColor = 'text-sky-700'
+    iconClass = 'text-sky-500 font-bold'
+    icon = '≈'
   } else if (normalized === 'mismatch') {
     percent = 40
     color = 'from-orange-400 to-rose-500'
@@ -738,17 +746,57 @@ function DualRoadmapCard({ intel, input }) {
             <p className="text-[11px] text-rose-500 font-semibold mb-1">{compareError}</p>
           )}
 
-          <h4 className="text-base font-bold text-slate-800 mt-0.5">{activeCompare.path_label}</h4>
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <VisualAlignmentBar label="Skills" value={activeCompare.alignment?.skills} />
-            <VisualAlignmentBar label="Projects" value={activeCompare.alignment?.projects} />
-            <VisualAlignmentBar label="Certs" value={activeCompare.alignment?.certifications} />
-            <VisualAlignmentBar label="Interest" value={activeCompare.alignment?.interest} />
-          </div>
-          <div className="mt-3 grid gap-2">
-            <RoadmapBlock title="Skills to add" items={activeCompare.roadmap?.skills_to_add || []} tone="amber" />
-            <RoadmapBlock title="Project ideas" items={activeCompare.roadmap?.project_ideas || []} tone="emerald" />
-          </div>
+          {!compareIntel && best.path_label.toLowerCase() === interest.path_label.toLowerCase() ? (
+            <div className="flex flex-col items-center justify-center p-5 text-center space-y-3 bg-white/80 rounded-xl border border-rose-200/70 min-h-[260px]">
+              <span className="text-3xl">🎯</span>
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-rose-950">
+                  Your Stated Interest Matches Your Best-Fit Path!
+                </h4>
+                <p className="text-[11px] text-slate-600 mt-1 max-w-xs leading-relaxed">
+                  Both your profile evidence and domain interest point to <strong>{best.path_label}</strong>. Select an alternative benchmark below to inspect transferable skills, bridge gaps, and compare requirements:
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 justify-center pt-2">
+                {BENCHMARK_ROLES.filter(r => !r.toLowerCase().includes(best.path_label.toLowerCase().slice(0, 4))).slice(0, 4).map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setCompareRole(r)
+                      setCompareError('')
+                      const payload = { ...(input || {}), interest: r, options: [r] }
+                      setComparing(true)
+                      submitCareer(payload)
+                        .then(data => {
+                          const ci = data?.details?.career_intelligence
+                          if (ci?.interest) setCompareIntel(ci)
+                        })
+                        .catch(err => setCompareError(err.message))
+                        .finally(() => setComparing(false))
+                    }}
+                    className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 text-rose-800 border border-rose-200 transition shadow-2xs cursor-pointer"
+                  >
+                    Benchmark vs {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <h4 className="text-base font-bold text-slate-800 mt-0.5">{activeCompare.path_label}</h4>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                <VisualAlignmentBar label="Skills" value={activeCompare.alignment?.skills} />
+                <VisualAlignmentBar label="Projects" value={activeCompare.alignment?.projects} />
+                <VisualAlignmentBar label="Certs" value={activeCompare.alignment?.certifications} />
+                <VisualAlignmentBar label="Interest" value={activeCompare.alignment?.interest} />
+              </div>
+              <div className="mt-3 grid gap-2">
+                <RoadmapBlock title="Skills to add" items={activeCompare.roadmap?.skills_to_add || []} tone="amber" />
+                <RoadmapBlock title="Project ideas" items={activeCompare.roadmap?.project_ideas || []} tone="emerald" />
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

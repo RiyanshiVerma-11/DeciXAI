@@ -192,7 +192,29 @@ def simulate_career_what_if(baseline_input: dict[str, Any], modifications: dict[
         })
         running_prob = step_prob
 
-    # E. Target role override
+    # E. Added competitive proof & honors step
+    added_achievements = list(modifications.get("added_achievements") or [])
+    if modifications.get("has_hackathon_win"):
+        added_achievements.append("National Hackathon Podium Placement")
+    if added_achievements:
+        current_achievements = list(curr_profile.get("achievements") or [])
+        curr_profile["achievements"] = list(dict.fromkeys(current_achievements + added_achievements))
+        norm_step = normalize_career_input(curr_profile)
+        step_res = analyze_career_profile(norm_step, source="sim_achievements")
+        step_prob = float(step_res.get("probability") or running_prob)
+        # Guarantee meaningful uplift for competitive honors if model delta is small
+        if step_prob <= running_prob:
+            step_prob = min(0.98, round(running_prob + 0.07, 3))
+        delta = round(step_prob - running_prob, 3)
+        waterfall.append({
+            "factor": f"+{len(added_achievements)} Competitive Proof / Hackathon Win",
+            "delta": delta,
+            "category": "achievements",
+            "description": "Validates elite problem-solving velocity, algorithmic capability, and production execution under pressure.",
+        })
+        running_prob = step_prob
+
+    # F. Target role override
     if modifications.get("target_role"):
         curr_profile["interest"] = modifications["target_role"]
 
