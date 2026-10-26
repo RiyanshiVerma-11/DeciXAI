@@ -81,6 +81,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://.*\.vercel\.app$|^https://.*\.onrender\.com$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -233,7 +234,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("BACKEND_PORT", "8002"))
+    port = int(os.getenv("PORT", os.getenv("BACKEND_PORT", "8002")))
     host = os.getenv("BACKEND_HOST", "0.0.0.0")
     uvicorn.run("main:app", host=host, port=port, reload=True)
 

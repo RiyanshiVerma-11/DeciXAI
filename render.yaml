@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: decixai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.3
+      - key: BACKEND_HOST
+        value: 0.0.0.0
+      - key: GROQ_API_URL
+        value: https://api.groq.com/openai/v1/chat/completions
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: CORS_ALLOWED_ORIGINS
+        value: http://localhost:3003,http://127.0.0.1:3003
