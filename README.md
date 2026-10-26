@@ -2,7 +2,11 @@
 
 <div align="center">
 
-![DeciXAI Platform](https://img.shields.io/badge/Platform-DeciXAI%20Enterprise-6366f1?style=for-the-badge&logo=probot)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-deci--xai.vercel.app-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://deci-xai.vercel.app/)
+[![Backend API](https://img.shields.io/badge/Backend%20API-decixai.onrender.com-46E3B7?style=for-the-badge&logo=render&logoColor=white)](https://decixai.onrender.com)
+[![API Docs](https://img.shields.io/badge/API%20Docs-Swagger%20UI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://decixai.onrender.com/docs)
+
+![Platform](https://img.shields.io/badge/Platform-DeciXAI%20Enterprise-6366f1?style=for-the-badge&logo=probot)
 ![Version](https://img.shields.io/badge/Version-2.0.0%20Production-10b981?style=for-the-badge)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688?style=for-the-badge&logo=fastapi)
 ![React 18](https://img.shields.io/badge/React-18.3.1-61DAFB?style=for-the-badge&logo=react)
@@ -13,6 +17,12 @@
 <p align="center">
   <strong>Grounded Multi-Domain Decision Intelligence &bull; Dynamic ATS 2.0 Resume Intelligence &bull; Transparent Explainability (SHAP) &bull; Immutable Regulatory Audit Trail</strong>
 </p>
+
+| Service | Live URL | Description |
+| :--- | :--- | :--- |
+| 🖥️ **Frontend Studio** | [https://deci-xai.vercel.app/](https://deci-xai.vercel.app/) | Interactive Glassmorphism UI (React + Vite) |
+| 🛡️ **Backend Engine** | [https://decixai.onrender.com](https://decixai.onrender.com) | FastAPI Core + ML Models + SHAP |
+| 📖 **API Documentation** | [https://decixai.onrender.com/docs](https://decixai.onrender.com/docs) | Swagger UI for Developer Integrations |
 
 </div>
 
