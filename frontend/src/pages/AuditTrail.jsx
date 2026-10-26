@@ -7,8 +7,8 @@ export default function AuditTrail() {
   const fetchLogs = async () => {
     try {
       setLoading(true)
-      // Connect to the backend API we created in Phase 3
-      const res = await fetch('http://127.0.0.1:8000/api/v1/audit/history?limit=50')
+      const apiBase = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8002`
+      const res = await fetch(`${apiBase}/api/v1/audit/history?limit=50`)
       if (res.ok) {
         const data = await res.json()
         setLogs(data.logs || [])

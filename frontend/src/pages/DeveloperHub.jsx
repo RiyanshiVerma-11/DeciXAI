@@ -71,7 +71,7 @@ export default function DeveloperHub() {
   // Snippet generator
   const getSnippet = () => {
     const activeKeyStr = newlyCreatedKey ? newlyCreatedKey.secret_key : (keys[0] ? `${keys[0].prefix}` : 'dx_live_YOUR_API_KEY')
-    const apiHost = window.location.origin.includes('5173') ? 'http://localhost:8000' : window.location.origin
+    const apiHost = import.meta.env.VITE_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8002`
 
     let payload = {}
     let endpointPath = ''
